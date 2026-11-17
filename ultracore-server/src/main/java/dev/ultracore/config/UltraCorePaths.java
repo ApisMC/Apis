@@ -40,14 +40,26 @@ public final class UltraCorePaths {
     }
 
     /**
-     * Resolves a configuration file path: keeps ./<fileName> if it already exists in server root,
-     * otherwise creates config/ and returns config/<fileName>.
+     * Resolves a configuration file path strictly inside the {@code config/} directory.
      *
      * @param fileName relative configuration filename
-     * @return resolved path
+     * @return resolved path inside config/
      */
     public static Path resolveConfigPath(final String fileName) {
-        return resolveWithRootFallback(Path.of("."), CONFIG_DIR, fileName);
+        return resolveConfigPath(Path.of("."), fileName);
+    }
+
+    /**
+     * Resolves a configuration file path strictly inside {@code <baseDir>/config/} without root fallback.
+     *
+     * @param baseDir  server working directory
+     * @param fileName relative configuration filename
+     * @return resolved path inside config/
+     */
+    public static Path resolveConfigPath(final Path baseDir, final String fileName) {
+        final Path targetDir = baseDir.resolve(CONFIG_DIR);
+        ensureDirectory(targetDir);
+        return targetDir.resolve(fileName);
     }
 
     /**

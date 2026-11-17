@@ -39,6 +39,18 @@ class UltraCorePathsAndSyncTest {
     }
 
     @Test
+    void resolvesConfigsStrictlyInsideConfigDirWithoutRootFallback(final @TempDir Path tempDir) throws IOException {
+        Files.writeString(tempDir.resolve("server.properties"), "server-port=25565\n");
+        Files.writeString(tempDir.resolve("bukkit.yml"), "settings: {}\n");
+
+        final Path propsPath = UltraCorePaths.resolveConfigPath(tempDir, "server.properties");
+        final Path bukkitPath = UltraCorePaths.resolveConfigPath(tempDir, "bukkit.yml");
+        assertEquals(tempDir.resolve("config").resolve("server.properties"), propsPath);
+        assertEquals(tempDir.resolve("config").resolve("bukkit.yml"), bukkitPath);
+        assertTrue(Files.isDirectory(tempDir.resolve("config")));
+    }
+
+    @Test
     void generatesDefaultGitIgnoreWithoutOverwritingExisting(final @TempDir Path tempDir) throws IOException {
         UltraCorePaths.ensureGitIgnore(tempDir);
         final Path gitIgnore = tempDir.resolve(".gitignore");
