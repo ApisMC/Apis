@@ -1,5 +1,13 @@
 --- a/src/main/java/io/papermc/paper/ServerBuildInfoImpl.java
 +++ b/src/main/java/io/papermc/paper/ServerBuildInfoImpl.java
+@@ -12,6 +_,7 @@
+ import org.bukkit.craftbukkit.CraftServer;
+ import org.bukkit.craftbukkit.Main;
+ import org.jetbrains.annotations.NotNull;
++import org.jspecify.annotations.Nullable;
+ 
+ public record ServerBuildInfoImpl(
+     Key brandId,
 @@ -33,6 +_,16 @@
      private static final String BRAND_PAPER_NAME = "Paper";
  
@@ -7,7 +15,7 @@
 +    private static final String BUILD_RELEASE = "RELEASE";
 +    private static final boolean IS_RELEASE_MANIFEST = isReleaseManifest(JarManifests.manifest(CraftServer.class));
 +
-+    private static boolean isReleaseManifest(final org.jspecify.annotations.Nullable Manifest manifest) {
++    private static boolean isReleaseManifest(final @Nullable Manifest manifest) {
 +        if (manifest == null) {
 +            return false;
 +        }
