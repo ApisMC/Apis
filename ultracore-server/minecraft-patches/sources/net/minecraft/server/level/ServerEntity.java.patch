@@ -1,0 +1,11 @@
+--- a/net/minecraft/server/level/ServerEntity.java
++++ b/net/minecraft/server/level/ServerEntity.java
+@@ -380,7 +_,7 @@
+             }
+         }
+ 
+-        if (this.entity instanceof LivingEntity livingEntity) {
++        if (this.entity instanceof LivingEntity livingEntity && !dev.ultracore.hooks.UltraCoreHooks.shouldFilterEquipmentPacket(this.entity, player)) { // UltraCore - Fast packet filtering
+             List<Pair<EquipmentSlot, ItemStack>> slots = Lists.newArrayList();
+ 
+             for (EquipmentSlot slot : EquipmentSlot.VALUES) {

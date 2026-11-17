@@ -1,11 +1,11 @@
 --- a/paper-server/build.gradle.kts
 +++ b/paper-server/build.gradle.kts
-@@ -22,15 +_,31 @@
- paperweight {
+@@ -23,15 +23,31 @@
      minecraftVersion = providers.gradleProperty("mcVersion")
      gitFilePatches = false
  
 -    updatingMinecraft {
+-        //oldPaperCommit = "e5fe71723e2ffde7cc9fafc085ac3bb73e63175e"
 +    // UltraCore start - Rebrand
 +    val ultracore = forks.register("ultracore") {
 +        upstream.patchDir("paperServer") {
@@ -14,27 +14,28 @@
 +            patchesDir = rootDirectory.dir("ultracore-server/paper-patches")
 +            outputDir = rootDirectory.dir("paper-server")
 +        }
-+    }
+     }
 +    activeFork = ultracore
 +    // UltraCore end - Rebrand
 +
-+    /*updatingMinecraft { // UltraCore - unused in downstream
-         //oldPaperCommit = "e5fe71723e2ffde7cc9fafc085ac3bb73e63175e"
--    }
++    /*updatingMinecraft {
++        //oldPaperCommit = "e5fe71723e2ffde7cc9fafc085ac3bb73e63175e"
 +    }*/
  }
  
  paperCheckstyle {
 -    directoriesToSkipFile = layout.projectDirectory.file(".checkstyle/ignored_directories.txt")
 +    directoriesToSkipFile = layout.projectDirectory.file("../paper-server/.checkstyle/ignored_directories.txt")
-+}
-+
-+tasks.named<io.papermc.paperweight.checkstyle.tasks.MergeCheckstyleConfigs>("mergeCheckstyleConfigs") {
-+    overrideConfigFile.set(layout.projectDirectory.file("../paper-server/.checkstyle/checkstyle.xml"))
  }
  
++tasks.named<io.papermc.paperweight.checkstyle.tasks.MergeCheckstyleConfigs>("mergeCheckstyleConfigs") {
++    overrideConfigFile.set(layout.projectDirectory.file("../paper-server/.checkstyle/checkstyle.xml"))
++}
++
  tasks.generateDevelopmentBundle {
-@@ -91,7 +_,21 @@
+     libraryRepositories.addAll(
+         "https://repo.maven.apache.org/maven2/",
+@@ -91,7 +107,21 @@
      }
  }
  
@@ -57,7 +58,7 @@
  configurations.named(log4jPlugins.compileClasspathConfigurationName) {
      extendsFrom(configurations.compileClasspath.get())
  }
-@@ -114,7 +_,7 @@
+@@ -114,7 +144,7 @@
  }
  
  dependencies {
@@ -66,7 +67,7 @@
      implementation(platform("ca.spottedleaf.leafpile:bom:1.3.2"))
      implementation("ca.spottedleaf.leafpile:common")
      implementation("ca.spottedleaf.leafpile:concurrentutil")
-@@ -165,6 +_,8 @@
+@@ -165,6 +195,8 @@
      // Spark
      implementation("me.lucko:spark-api:0.1-20240720.200737-2")
      implementation("me.lucko:spark-paper:1.10.191")
@@ -75,7 +76,7 @@
  }
  
  tasks.jar {
-@@ -179,15 +_,15 @@
+@@ -179,14 +211,14 @@
          val gitBranch = git.exec(providers, "rev-parse", "--abbrev-ref", "HEAD").get().trim()
          attributes(
              "Main-Class" to "org.bukkit.craftbukkit.Main",
@@ -95,7 +96,7 @@
              "Build-Number" to (build ?: ""),
              "Build-Time" to buildTime.toString(),
              "Git-Branch" to gitBranch,
-@@ -264,7 +_,7 @@
+@@ -264,7 +296,7 @@
      )
  }
  
@@ -104,16 +105,16 @@
  idea {
      module {
          generatedSourceDirs.add(generatedDir.toFile())
-@@ -346,7 +_,7 @@
+@@ -346,7 +378,7 @@
      mainClass.set(null as String?)
  }
  
 -fill {
-+/* fill { // UltraCore - unused
++/* fill {
      project("paper")
      versionFamily(paperweight.minecraftVersion.map { it.split(".", "-").takeWhile { part -> part.toIntOrNull() != null }.take(2).joinToString(".") })
      version(paperweight.minecraftVersion)
-@@ -361,4 +_,4 @@
+@@ -361,4 +393,4 @@
              }
          }
      }

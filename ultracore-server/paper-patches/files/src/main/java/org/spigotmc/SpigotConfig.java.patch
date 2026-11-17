@@ -1,0 +1,11 @@
+--- a/src/main/java/org/spigotmc/SpigotConfig.java
++++ b/src/main/java/org/spigotmc/SpigotConfig.java
+@@ -96,6 +_,8 @@
+         }
+ 
+         try {
++            dev.ultracore.config.UltraCoreConfigSync.syncSpigot(); // UltraCore
++            dev.ultracore.config.UltraCoreConfigSync.stripLegacySpigotSettings(SpigotConfig.config); // UltraCore
+             SpigotConfig.config.save(SpigotConfig.CONFIG_FILE);
+         } catch (IOException ex) {
+             Bukkit.getLogger().log(Level.SEVERE, "Could not save " + SpigotConfig.CONFIG_FILE, ex);

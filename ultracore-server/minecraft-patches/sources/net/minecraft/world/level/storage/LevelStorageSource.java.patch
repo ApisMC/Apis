@@ -1,0 +1,18 @@
+--- a/net/minecraft/world/level/storage/LevelStorageSource.java
++++ b/net/minecraft/world/level/storage/LevelStorageSource.java
+@@ -609,6 +_,7 @@
+         }
+ 
+         public void saveDataTag(final WorldData levelData, final @Nullable UUID singleplayerUUID) {
++            if (dev.ultracore.hooks.UltraCoreHooks.isMemoryOnlyWorld()) return; // UltraCore - Ephemeral memory-only world
+             CompoundTag dataTag = levelData.createTag(singleplayerUUID);
+             CompoundTag root = new CompoundTag();
+             root.put("Data", dataTag);
+@@ -616,6 +_,7 @@
+         }
+ 
+         public void saveLevelData(final Dynamic<?> tag) {
++            if (dev.ultracore.hooks.UltraCoreHooks.isMemoryOnlyWorld()) return; // UltraCore - Ephemeral memory-only world
+             Tag genericTag = tag.convert(NbtOps.INSTANCE).getValue();
+             CompoundTag root = new CompoundTag();
+             root.put("Data", genericTag);

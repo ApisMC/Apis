@@ -10,7 +10,7 @@ val paperMavenPublicUrl = "https://repo.papermc.io/repository/maven-public/"
 
 paperweight {
     upstreams.paper {
-        url = file("../Paper").toURI().toString()
+        repo = github("PaperMC", "Paper")
         ref = providers.gradleProperty("paperCommit")
 
         patchFile {

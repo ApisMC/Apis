@@ -1,0 +1,10 @@
+--- a/net/minecraft/world/entity/Entity.java
++++ b/net/minecraft/world/entity/Entity.java
+@@ -2449,6 +_,7 @@
+     }
+ 
+     public void push(final Entity entity) {
++        if (dev.ultracore.hooks.UltraCoreHooks.isEntityCollisionDisabled(this, entity)) return; // UltraCore - Skip entity/player collisions
+         if (!this.isPassengerOfSameVehicle(entity)) {
+             if (!entity.noPhysics && !this.noPhysics) {
+                 if (this.level.paperConfig().collisions.onlyPlayersCollide && !(entity instanceof ServerPlayer || this instanceof ServerPlayer)) return; // Paper - Collision option for requiring a player participant

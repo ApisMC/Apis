@@ -1,0 +1,28 @@
+--- a/net/minecraft/world/entity/Mob.java
++++ b/net/minecraft/world/entity/Mob.java
+@@ -167,7 +_,7 @@
+         this.bodyRotationControl = this.createBodyControl();
+         this.navigation = this.createNavigation(level);
+         this.sensing = new Sensing(this);
+-        if (level instanceof ServerLevel) {
++        if (level instanceof ServerLevel && !dev.ultracore.hooks.UltraCoreHooks.isAiDisabled(type)) { // UltraCore - Skip Goal allocation when AI disabled
+             this.registerGoals();
+         }
+     }
+@@ -223,7 +_,7 @@
+     @Override
+     public void inactiveTick() {
+         super.inactiveTick();
+-        if (!this.aware) return; // Paper - Do not tick AI for inactive unaware mobs
++        if (!this.aware || dev.ultracore.hooks.UltraCoreHooks.isAiDisabled(this)) return; // Paper - Do not tick AI for inactive unaware mobs // UltraCore
+         final boolean isThrottled = this.level().paperConfig().entities.behavior.inactiveMobGoalSelectorThrottleRate.enabled() && inactiveTickDisableCounter++ % this.level().paperConfig().entities.behavior.inactiveMobGoalSelectorThrottleRate.intValue() != 0; // Paper - Throttle inactive goal selector ticking
+         if (this.goalSelector.inactiveTick() && !isThrottled) {
+             this.goalSelector.tick();
+@@ -816,6 +_,7 @@
+ 
+     @Override
+     protected final void serverAiStep() {
++        if (dev.ultracore.hooks.UltraCoreHooks.isAiDisabled(this)) return; // UltraCore - Skip all AI/brain/navigation ticking
+         this.noActionTime++;
+         // Paper start - Allow nerfed mobs to jump and float
+         if (!this.aware) {

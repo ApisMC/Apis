@@ -1,0 +1,18 @@
+--- a/net/minecraft/world/entity/ai/Brain.java
++++ b/net/minecraft/world/entity/ai/Brain.java
+@@ -383,6 +_,7 @@
+     }
+ 
+     public void tick(final ServerLevel level, final E body) {
++        if (dev.ultracore.hooks.UltraCoreHooks.isBrainDisabled()) return; // UltraCore
+         this.forgetOutdatedMemories();
+         this.tickSensors(level, body);
+         this.startEachNonRunningBehavior(level, body);
+@@ -390,6 +_,7 @@
+     }
+ 
+     private void tickSensors(final ServerLevel level, final E body) {
++        if (dev.ultracore.hooks.UltraCoreHooks.isSensorsDisabled()) return; // UltraCore
+         for (Sensor<? super E> sensor : this.sensors.values()) {
+             sensor.tick(level, body);
+         }

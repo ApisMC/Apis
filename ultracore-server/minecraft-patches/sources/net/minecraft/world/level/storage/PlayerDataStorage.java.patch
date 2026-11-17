@@ -1,0 +1,11 @@
+--- a/net/minecraft/world/level/storage/PlayerDataStorage.java
++++ b/net/minecraft/world/level/storage/PlayerDataStorage.java
+@@ -31,7 +_,7 @@
+     }
+ 
+     public void save(final Player player) {
+-        if (org.spigotmc.SpigotConfig.disablePlayerDataSaving) return; // Spigot
++        if (org.spigotmc.SpigotConfig.disablePlayerDataSaving || dev.ultracore.hooks.UltraCoreHooks.isPlayerDataSavingDisabled()) return; // Spigot // UltraCore
+         try (ProblemReporter.ScopedCollector reporter = new ProblemReporter.ScopedCollector(player.problemPath(), LOGGER)) {
+             TagValueOutput output = TagValueOutput.createWithContext(reporter, player.registryAccess());
+             player.saveWithoutId(output);

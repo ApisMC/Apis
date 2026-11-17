@@ -1,0 +1,97 @@
+--- a/net/minecraft/server/MinecraftServer.java
++++ b/net/minecraft/server/MinecraftServer.java
+@@ -640,8 +_,10 @@
+         }
+         // Paper end - Configurable player collision; Handle collideRule team for player collision toggle
+         this.server.enablePlugins(org.bukkit.plugin.PluginLoadOrder.POSTWORLD);
+-        this.server.spark.registerCommandBeforePlugins(this.server); // Paper - spark
+-        this.server.spark.enableAfterPlugins(this.server); // Paper - spark
++        if (!dev.ultracore.hooks.UltraCoreHooks.isMetricsAndProfilerDisabled()) { // UltraCore
++            this.server.spark.registerCommandBeforePlugins(this.server); // Paper - spark
++            this.server.spark.enableAfterPlugins(this.server); // Paper - spark
++        } // UltraCore
+         io.papermc.paper.command.brigadier.PaperCommands.INSTANCE.setValid(); // Paper - reset invalid state for event fire below
+         io.papermc.paper.plugin.lifecycle.event.LifecycleEventRunner.INSTANCE.callReloadableRegistrarEvent(io.papermc.paper.plugin.lifecycle.event.types.LifecycleEvents.COMMANDS, io.papermc.paper.command.brigadier.PaperCommands.INSTANCE, org.bukkit.plugin.Plugin.class, io.papermc.paper.plugin.lifecycle.event.registrar.ReloadableRegistrarEvent.Cause.INITIAL); // Paper - call commands event for regular plugins
+         this.server.getCommandMap().registerServerAliases(); // Paper - relocate initial CommandMap#registerServerAliases() call
+@@ -666,7 +_,9 @@
+         savedDataStorage.set(WorldGenSettings.TYPE, new WorldGenSettings(worldDataAndGenSettings.genSettings().options(), worldDataAndGenSettings.genSettings().dimensions()));
+         long seed = worldOptions.seed();
+         long biomeZoomSeed = BiomeManager.obfuscateSeed(seed);
+-        List<CustomSpawner> overworldCustomSpawners = ImmutableList.of(
++        List<CustomSpawner> overworldCustomSpawners = dev.ultracore.hooks.UltraCoreHooks.isCustomSpawnersDisabled()
++            ? Collections.emptyList()
++            : ImmutableList.of( // UltraCore - Disable custom spawners
+             new PhantomSpawner(), new PatrolSpawner(), new CatSpawner(), new VillageSiege(), new WanderingTraderSpawner(savedDataStorage) // Paper - save to world data
+         );
+         final org.bukkit.generator.ChunkGenerator chunkGenerator = this.server.getGenerator(loading.data().bukkitName());
+@@ -930,6 +_,14 @@
+     }
+     public boolean saveAllChunks(final boolean silent, final boolean flush, final boolean force, final boolean close) {
+         // Paper end - add close param
++        if (dev.ultracore.hooks.UltraCoreHooks.isMemoryOnlyWorld()) { // UltraCore - Ephemeral memory-only world
++            if (close) {
++                for (ServerLevel level : this.getAllLevels()) {
++                    level.save(null, false, true, true);
++                }
++            }
++            return false;
++        }
+         this.saveGlobalData(flush); // Paper - move to saveGlobalData()
+         boolean result = false;
+ 
+@@ -1005,6 +_,27 @@
+ 
+         LOGGER.info("Stopping server");
+         Commands.COMMAND_SENDING_POOL.shutdownNow(); // Paper - Perf: Async command map building; Shutdown and don't bother finishing
++        if (dev.ultracore.hooks.UltraCoreHooks.isFastShutdown()) { // UltraCore - Fast ephemeral shutdown on SIGTERM
++            if (this.server != null) {
++                this.server.spark.disable();
++                this.server.disablePlugins();
++            }
++            this.getConnection().stop();
++            if (this.playerList != null) {
++                this.playerList.removeAll(this.isRestarting);
++                this.getConnection().handleAllDisconnections();
++            }
++            this.isSaving = false;
++            this.resources.close();
++            try { this.storageSource.close(); } catch (IOException ignored) {}
++            io.papermc.paper.util.MCUtil.ASYNC_EXECUTOR.shutdownNow();
++            if ((Object)this instanceof net.minecraft.server.dedicated.DedicatedServer) {
++                ca.spottedleaf.moonrise.common.util.MoonriseCommon.haltExecutors();
++            }
++            Util.shutdownExecutors();
++            this.onServerExit();
++            return;
++        }
+         // CraftBukkit start
+         if (this.server != null) {
+             this.server.spark.disable(); // Paper - spark
+@@ -1726,7 +_,7 @@
+     private ServerStatus.Players buildPlayerStatus() {
+         List<ServerPlayer> players = this.playerList.getPlayers();
+         int maxPlayers = this.getMaxPlayers();
+-        if (this.hidesOnlinePlayers()) {
++        if (this.hidesOnlinePlayers() || dev.ultracore.hooks.UltraCoreHooks.isServerPingSampleDisabled()) { // UltraCore
+             return new ServerStatus.Players(maxPlayers, players.size(), List.of());
+         }
+ 
+@@ -1796,6 +_,7 @@
+ 
+         this.isIteratingOverLevels = true; // Paper - Throw exception on world create while being ticked
+         for (ServerLevel level : this.getAllLevels()) {
++            if (dev.ultracore.hooks.UltraCoreHooks.isWorldTickDisabled(level)) continue; // UltraCore - Skip ticking disabled world
+             level.hasPhysicsEvent = org.bukkit.event.block.BlockPhysicsEvent.getHandlerList().getRegisteredListeners().length > 0; // Paper - BlockPhysicsEvent
+             level.hasEntityMoveEvent = io.papermc.paper.event.entity.EntityMoveEvent.getHandlerList().getRegisteredListeners().length > 0; // Paper - Add EntityMoveEvent
+             level.updateLagCompensationTick(); // Paper - lag compensation
+@@ -1842,7 +_,9 @@
+         }
+ 
+         profiler.pop();
+-        this.serverActivityMonitor.tick();
++        if (!dev.ultracore.hooks.UltraCoreHooks.isMetricsAndProfilerDisabled()) { // UltraCore
++            this.serverActivityMonitor.tick();
++        }
+     }
+ 
+     // Paper start - per world respawn data
