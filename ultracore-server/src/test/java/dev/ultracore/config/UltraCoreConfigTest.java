@@ -24,44 +24,51 @@ class UltraCoreConfigTest {
     }
 
     @Test
-    void writesBilingualEngUaCommentsAndRoundTripsFlags(final @TempDir Path tempDir) throws IOException {
+    void writesBilingualEngUaCommentsAndRoundTripsPositiveFlags(final @TempDir Path tempDir) throws IOException {
         final Path cfgFile = tempDir.resolve("ultracore.yml");
         final UltraCoreConfig initial = UltraCoreConfig.loadEarly(cfgFile);
-        assertFalse(initial.storage.ephemeral.memoryOnlyWorld);
+        assertTrue(initial.startup.datafixers);
+        assertTrue(initial.storage.ephemeral.worldSaving);
+        assertTrue(initial.world.physics.blockEntityTicking);
         assertTrue(Files.exists(cfgFile));
 
         final String yamlText = Files.readString(cfgFile);
-        assertTrue(yamlText.contains("# Worlds & dimensions") && yamlText.contains(" | "),
+        assertTrue(yamlText.contains("# Bootstrap & cold-start") && yamlText.contains(" | "),
             "Generated config must contain ENG | UA bilingual comments");
-        assertTrue(yamlText.contains("# Disable falling sand") && yamlText.contains("Вимкнути падіння піску"),
-            "Generated leaf settings must include ENG | UA comments");
-        assertTrue(yamlText.contains("memory-only-world"));
-        assertTrue(yamlText.contains("fast-shutdown"));
-        assertTrue(yamlText.contains("disable-player-collisions"));
-        assertTrue(yamlText.contains("disable-hopper-ticking"));
+        assertTrue(yamlText.contains("true = standard Vanilla/Paper behavior enabled"),
+            "Generated header must explain positive true/false semantics");
+        assertTrue(yamlText.contains("datafixers: true"));
+        assertTrue(yamlText.contains("world-saving: true"));
+        assertTrue(yamlText.contains("player-collisions: true"));
+        assertTrue(yamlText.contains("block-entity-ticking: true"));
+        assertFalse(yamlText.contains("disable-portals"), "Legacy disable-* keys must not exist");
 
         final String updated = yamlText
-            .replace("memory-only-world: false", "memory-only-world: true")
-            .replace("fast-shutdown: false", "fast-shutdown: true")
-            .replace("disable-player-collisions: false", "disable-player-collisions: true")
+            .replace("datafixers: true", "datafixers: false")
+            .replace("world-saving: true", "world-saving: false")
+            .replace("graceful-shutdown: true", "graceful-shutdown: false")
+            .replace("player-collisions: true", "player-collisions: false")
             .replace("projectile-tracking-range: 32", "projectile-tracking-range: 9999");
         Files.writeString(cfgFile, updated);
 
         final UltraCoreConfig reloaded = UltraCoreConfig.loadEarly(cfgFile);
-        assertTrue(reloaded.storage.ephemeral.memoryOnlyWorld);
-        assertTrue(reloaded.storage.ephemeral.fastShutdown);
-        assertTrue(reloaded.network.tracking.disablePlayerCollisions);
+        assertFalse(reloaded.startup.datafixers);
+        assertFalse(reloaded.storage.ephemeral.worldSaving);
+        assertFalse(reloaded.storage.ephemeral.gracefulShutdown);
+        assertFalse(reloaded.network.tracking.playerCollisions);
         assertEquals(256, reloaded.network.tracking.projectileTrackingRange, "Out-of-bounds tracking range must be clamped");
-        assertTrue(FeatureRegistry.isDisabled(Feature.STORAGE_EPHEMERAL_MEMORY_ONLY_WORLD));
+        assertTrue(FeatureRegistry.isDisabled(Feature.STARTUP_DATAFIXERS));
+        assertTrue(FeatureRegistry.isDisabled(Feature.STORAGE_WORLD_SAVING));
+        assertEquals(4, FeatureRegistry.activeKillSwitches().size());
     }
 
     @Test
     void malformedYamlBacksUpFileAndFallsBackToDefaults(final @TempDir Path tempDir) throws IOException {
         final Path cfgFile = tempDir.resolve("ultracore.yml");
-        Files.writeString(cfgFile, "worlds:\n  disable-portals: [unclosed\n");
+        Files.writeString(cfgFile, "worlds:\n  portals: [unclosed\n");
 
         final UltraCoreConfig fallback = UltraCoreConfig.loadOrCreate(cfgFile, LoggerFactory.getLogger("UltraCoreTest"));
-        assertFalse(fallback.worlds.disablePortals);
+        assertTrue(fallback.worlds.portals);
         assertTrue(Files.exists(tempDir.resolve("ultracore.yml.broken")));
         assertTrue(Files.exists(cfgFile));
     }

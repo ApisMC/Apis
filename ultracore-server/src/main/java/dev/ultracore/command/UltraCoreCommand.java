@@ -43,18 +43,18 @@ public final class UltraCoreCommand extends Command {
         if (args.length == 0 || "status".equalsIgnoreCase(args[0])) {
             final List<String> active = FeatureRegistry.activeKillSwitches();
             sender.sendMessage(
-                Component.text("[UltraCore] Active kill-switches (" + active.size() + "): ", NamedTextColor.GOLD)
+                Component.text("Active kill-switches (" + active.size() + "): ", NamedTextColor.GOLD)
                     .append(Component.text(active.isEmpty() ? "none" : String.join(", ", active), NamedTextColor.GRAY))
             );
             return true;
         }
         if ("reload".equalsIgnoreCase(args[0])) {
             UltraCoreConfig.reload();
-            FeatureRegistry.resolveRegistries(this.server.registryAccess(), LoggerFactory.getLogger("UltraCore"));
+            FeatureRegistry.resolveRegistries(this.server.registryAccess(), LoggerFactory.getLogger("Minecraft"));
             UltraCoreConfigSync.syncAll(this.server);
             sender.sendMessage(
                 Component.text(
-                    "[UltraCore] Reloaded ultracore.yml (" + FeatureRegistry.activeKillSwitches().size() + " active).",
+                    "Reloaded ultracore.yml (" + FeatureRegistry.activeKillSwitches().size() + " active).",
                     NamedTextColor.GREEN
                 )
             );

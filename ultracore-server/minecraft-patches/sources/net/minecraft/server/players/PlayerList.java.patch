@@ -15,3 +15,11 @@
      public static final Component CHAT_FILTERED_FULL = Component.translatable("chat.filtered_full");
      public static final Component DUPLICATE_LOGIN_DISCONNECT_MESSAGE = Component.translatable("multiplayer.disconnect.duplicate_login");
      private static final Logger LOGGER = LogUtils.getLogger();
+@@ -742,6 +_,7 @@
+     }
+ 
+     public void tick() {
++        if (!dev.ultracore.hooks.UltraCoreHooks.isTabLatencyUpdatesEnabled()) return; // UltraCore
+         if (++this.sendAllPlayerInfoIn > 600) {
+             // CraftBukkit start
+             for (int i = 0; i < this.players.size(); ++i) {

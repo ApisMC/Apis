@@ -1,0 +1,11 @@
+--- a/net/minecraft/util/datafix/DataFixTypes.java
++++ b/net/minecraft/util/datafix/DataFixTypes.java
+@@ -77,7 +_,7 @@
+     }
+ 
+     public <T> Dynamic<T> update(final DataFixer fixerUpper, final Dynamic<T> input, final int fromVersion, final int toVersion) {
+-        if (this.type == null) return input; // Paper - add no-op fix for custom types until we actually need fixers for them
++        if (this.type == null || !dev.ultracore.hooks.UltraCoreHooks.isDataFixersEnabled()) return input; // Paper - add no-op fix for custom types until we actually need fixers for them // UltraCore
+         return fixerUpper.update(this.type, input, fromVersion, toVersion);
+     }
+ 

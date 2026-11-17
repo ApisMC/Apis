@@ -1,61 +1,77 @@
 package dev.ultracore.feature;
 
 /**
- * Compile-time indexed kill-switch flags for O(1) bitmask checks in hot tick paths.
+ * Compile-time indexed capability flags for O(1) bitmask checks in hot tick paths.
+ * Semantics: {@code true} keeps vanilla/Paper behavior enabled; {@code false} activates the kill-switch.
  */
 public enum Feature {
-    // 1. Worlds & Dimensions
-    WORLDS_DISABLE_CUSTOM_WORLDS("worlds.disable-custom-worlds"),
-    WORLDS_DISABLE_PORTALS("worlds.disable-portals"),
+    // 1. Startup & Bootstrap
+    STARTUP_DATAFIXERS("startup.datafixers"),
+    STARTUP_SEARCH_SPAWN_POINT("startup.search-spawn-point"),
+    STARTUP_INITIAL_CHUNK_LOAD("startup.initial-chunk-load"),
+    STARTUP_VALIDATE_REGISTRIES("startup.validate-registries"),
+    STARTUP_MOJANG_SERVICE_DISCOVERY("startup.mojang-service-discovery"),
+    STARTUP_PAPER_VERSION_CHECK("startup.paper-version-check"),
 
-    // 2. Entities & AI
-    AI_DISABLE_GLOBALLY("entities.ai.disable-globally"),
-    AI_DISABLE_GOAL_SELECTOR("entities.ai.disable-goal-selector"),
-    AI_DISABLE_BRAIN("entities.ai.disable-brain"),
-    AI_DISABLE_PATHFINDING("entities.ai.disable-pathfinding"),
-    AI_DISABLE_SENSORS("entities.ai.disable-sensors"),
-    ENTITIES_DISABLE_COLLISIONS("entities.ai.disable-collisions"),
+    // 2. Worlds & Dimensions
+    WORLDS_CUSTOM_WORLDS("worlds.custom-worlds"),
+    WORLDS_PORTALS("worlds.portals"),
 
-    // 3. Chunks & Generation
-    CHUNKS_DISABLE_STRUCTURES("chunks.disable-structures"),
-    CHUNKS_DISABLE_BIOME_DECORATION("chunks.disable-biome-decoration"),
-    CHUNKS_DISABLE_TICKING("chunks.disable-chunk-ticking"),
-    CHUNKS_DISABLE_RANDOM_TICKS("chunks.disable-random-ticks"),
-    CHUNKS_DISABLE_BLOCK_TICKS("chunks.disable-block-ticks"),
-    CHUNKS_DISABLE_FLUID_TICKS("chunks.disable-fluid-ticks"),
+    // 3. Entities & AI
+    AI_ENABLED("entities.ai.enabled"),
+    AI_GOAL_SELECTOR("entities.ai.goal-selector"),
+    AI_BRAIN("entities.ai.brain"),
+    AI_PATHFINDING("entities.ai.pathfinding"),
+    AI_SENSORS("entities.ai.sensors"),
+    ENTITIES_COLLISIONS("entities.ai.collisions"),
 
-    // 4. Gameplay & Environment
-    GAMEPLAY_DISABLE_WEATHER("gameplay.disable-weather"),
-    GAMEPLAY_DISABLE_RAIDS("gameplay.disable-raids"),
-    GAMEPLAY_DISABLE_REDSTONE("gameplay.disable-redstone"),
-    GAMEPLAY_DISABLE_NATURAL_SPAWNING("gameplay.disable-natural-spawning"),
-    GAMEPLAY_DISABLE_CUSTOM_SPAWNERS("gameplay.disable-custom-spawners"),
-    GAMEPLAY_DISABLE_MONSTERS("gameplay.disable-monsters"),
-    GAMEPLAY_DISABLE_ANIMALS("gameplay.disable-animals"),
+    // 4. Chunks & Generation
+    CHUNKS_STRUCTURES("chunks.structures"),
+    CHUNKS_BIOME_DECORATION("chunks.biome-decoration"),
+    CHUNKS_TICKING("chunks.chunk-ticking"),
+    CHUNKS_RANDOM_TICKS("chunks.random-ticks"),
+    CHUNKS_BLOCK_TICKS("chunks.block-ticks"),
+    CHUNKS_FLUID_TICKS("chunks.fluid-ticks"),
 
-    // 5. Network & Analytics
-    ANALYTICS_DISABLE_METRICS_AND_PROFILER("network.analytics.disable-metrics-and-profiler"),
-    ANALYTICS_DISABLE_DEBUG_SYNCHRONIZERS("network.analytics.disable-debug-synchronizers"),
+    // 5. Gameplay & Environment
+    GAMEPLAY_WEATHER("gameplay.weather"),
+    GAMEPLAY_RAIDS("gameplay.raids"),
+    GAMEPLAY_REDSTONE("gameplay.redstone"),
+    GAMEPLAY_NATURAL_SPAWNING("gameplay.natural-spawning"),
+    GAMEPLAY_CUSTOM_SPAWNERS("gameplay.custom-spawners"),
+    GAMEPLAY_MONSTERS("gameplay.monsters"),
+    GAMEPLAY_ANIMALS("gameplay.animals"),
+    GAMEPLAY_ADVANCEMENTS("gameplay.advancements"),
+    GAMEPLAY_RECIPES("gameplay.recipes"),
+    GAMEPLAY_WARDEN_AND_SLEEP("gameplay.warden-and-sleep"),
+    GAMEPLAY_COMMAND_FUNCTIONS("gameplay.command-functions"),
 
-    // 6. Ephemeral Container Lifecycle & Storage
-    STORAGE_EPHEMERAL_MEMORY_ONLY_WORLD("storage.ephemeral.memory-only-world"),
-    STORAGE_EPHEMERAL_FAST_SHUTDOWN("storage.ephemeral.fast-shutdown"),
+    // 6. Network & Analytics
+    NETWORK_GENERATE_KEYPAIR("network.generate-keypair"),
+    ANALYTICS_METRICS_AND_PROFILER("network.analytics.metrics-and-profiler"),
+    ANALYTICS_DEBUG_SYNCHRONIZERS("network.analytics.debug-synchronizers"),
+    NETWORK_PLAYER_COLLISIONS("network.tracking.player-collisions"),
+    NETWORK_FULL_PACKET_BROADCAST("network.tracking.full-packet-broadcast"),
+    NETWORK_SERVER_PING_SAMPLE("network.tracking.server-ping-sample"),
+    NETWORK_TAB_LATENCY_UPDATES("network.tracking.tab-latency-updates"),
 
-    // 7. Network Tracking & Packet Filtering
-    NETWORK_DISABLE_PLAYER_COLLISIONS("network.tracking.disable-player-collisions"),
-    NETWORK_FAST_PACKET_FILTERING("network.tracking.fast-packet-filtering"),
-    NETWORK_DISABLE_SERVER_PING_SAMPLE("network.tracking.disable-server-ping-sample"),
+    // 7. Ephemeral Container Lifecycle & Storage
+    STORAGE_WORLD_SAVING("storage.ephemeral.world-saving"),
+    STORAGE_GRACEFUL_SHUTDOWN("storage.ephemeral.graceful-shutdown"),
 
-    // 8. Players Lifecycle & Inventory
-    PLAYERS_DISABLE_DATA_SAVING("players.lifecycle.disable-player-data-saving"),
-    PLAYERS_DISABLE_ADVANCEMENTS("players.lifecycle.disable-advancements"),
-    PLAYERS_DISABLE_RECIPES("players.lifecycle.disable-recipes"),
+    // 8. Players Lifecycle
+    PLAYERS_DATA_SAVING("players.lifecycle.player-data-saving"),
+    PLAYERS_HUNGER("players.lifecycle.hunger"),
+    PLAYERS_STATISTICS("players.lifecycle.statistics"),
 
-    // 9. World Physics & Containers
-    PHYSICS_DISABLE_BLOCK_GRAVITY("world.physics.disable-block-gravity"),
-    PHYSICS_DISABLE_HOPPER_TICKING("world.physics.disable-hopper-ticking"),
-    PHYSICS_DISABLE_LEAF_DECAY("world.physics.disable-leaf-decay"),
-    PHYSICS_DISABLE_FIRE_SPREAD("world.physics.disable-fire-spread");
+    // 9. World Time & Physics
+    WORLD_DAYLIGHT_CYCLE("world.daylight-cycle"),
+    PHYSICS_BLOCK_GRAVITY("world.physics.block-gravity"),
+    PHYSICS_HOPPER_TICKING("world.physics.hopper-ticking"),
+    PHYSICS_BLOCK_ENTITY_TICKING("world.physics.block-entity-ticking"),
+    PHYSICS_ITEM_PHYSICS("world.physics.item-physics"),
+    PHYSICS_LEAF_DECAY("world.physics.leaf-decay"),
+    PHYSICS_FIRE_SPREAD("world.physics.fire-spread");
 
     static final int MAX_SUPPORTED_FEATURES = 128;
 
@@ -74,7 +90,7 @@ public enum Feature {
     }
 
     /**
-     * Returns the YAML configuration key corresponding to this feature flag.
+     * Returns the YAML configuration key corresponding to this capability flag.
      *
      * @return the configuration key
      */

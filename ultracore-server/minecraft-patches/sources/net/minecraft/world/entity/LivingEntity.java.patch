@@ -17,7 +17,7 @@
      private void updatePlayersWithNewEquipment(final ServerLevel level, final List<Pair<EquipmentSlot, ItemStack>> itemsToSend) {
 -        level.getChunkSource().sendToTrackingPlayers(this, new ClientboundSetEquipmentPacket(this.getId(), itemsToSend, true)); // Paper - data sanitization
 +        final ClientboundSetEquipmentPacket packet = new ClientboundSetEquipmentPacket(this.getId(), itemsToSend, true); // Paper - data sanitization
-+        if (dev.ultracore.feature.FeatureRegistry.isDisabled(dev.ultracore.feature.Feature.NETWORK_FAST_PACKET_FILTERING)) { // UltraCore
++        if (dev.ultracore.hooks.UltraCoreHooks.isFastPacketFilteringEnabled()) { // UltraCore
 +            for (final ServerPlayer viewer : level.players()) {
 +                if (!dev.ultracore.hooks.UltraCoreHooks.shouldFilterEquipmentPacket(this, viewer)) {
 +                    viewer.connection.send(packet);

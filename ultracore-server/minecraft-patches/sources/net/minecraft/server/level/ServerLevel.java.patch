@@ -1,6 +1,6 @@
 --- a/net/minecraft/server/level/ServerLevel.java
 +++ b/net/minecraft/server/level/ServerLevel.java
-@@ -810,8 +_,10 @@
+@@ -810,13 +_,15 @@
          if (runs) {
              profiler.push("world border");
              this.getWorldBorder().tick();
@@ -13,6 +13,21 @@
              profiler.pop();
          }
  
+         int percentage = this.getGameRules().get(GameRules.PLAYERS_SLEEPING_PERCENTAGE);
+-        if (this.sleepStatus.areEnoughSleeping(percentage) && this.sleepStatus.areEnoughDeepSleeping(percentage, this.players)) {
++        if (dev.ultracore.hooks.UltraCoreHooks.isWardenAndSleepEnabled() && this.sleepStatus.areEnoughSleeping(percentage) && this.sleepStatus.areEnoughDeepSleeping(percentage, this.players)) { // UltraCore
+             Optional<Holder<WorldClock>> defaultClock = this.dimensionType().defaultClock();
+             org.bukkit.event.world.ClockTimeSkipEvent event = null; // Paper - per-world time
+             if (this.getGameRules().get(GameRules.ADVANCE_TIME) && defaultClock.isPresent()) {
+@@ -843,7 +_,7 @@
+             }
+         }
+ 
+-        this.updateSkyBrightness();
++        if (dev.ultracore.hooks.UltraCoreHooks.isDaylightCycleEnabled()) this.updateSkyBrightness(); // UltraCore
+         if (runs) {
+             this.tickTime();
+         }
 @@ -851,15 +_,20 @@
          profiler.push("tickPending");
          if (!this.isDebug() && runs) {
@@ -41,6 +56,15 @@
              this.raids.tick(this);
          }
  
+@@ -883,7 +_,7 @@
+ 
+         if (this.emptyTime < 300) {
+             profiler.push("entities");
+-            if (this.dragonFight != null && runs) {
++            if (this.dragonFight != null && runs && dev.ultracore.hooks.UltraCoreHooks.isWardenAndSleepEnabled()) { // UltraCore
+                 profiler.push("dragonFight");
+                 this.dragonFight.tick();
+                 profiler.pop();
 @@ -927,16 +_,18 @@
          profiler.push("entityManagement");
          // Paper - rewrite chunk system

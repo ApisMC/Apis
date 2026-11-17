@@ -1,0 +1,10 @@
+--- a/net/minecraft/server/ServerFunctionManager.java
++++ b/net/minecraft/server/ServerFunctionManager.java
+@@ -39,6 +_,7 @@
+     }
+ 
+     public void tick() {
++        if (!dev.ultracore.hooks.UltraCoreHooks.isCommandFunctionsEnabled()) return; // UltraCore
+         if (this.server.tickRateManager().runsNormally()) {
+             if (this.postReload) {
+                 this.postReload = false;

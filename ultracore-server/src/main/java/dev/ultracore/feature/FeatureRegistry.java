@@ -23,6 +23,7 @@ import org.slf4j.Logger;
 
 /**
  * Lock-free O(1) bitmask registry for UltraCore kill-switches and fast reference sets for per-ID filters.
+ * A bit is set when its capability is configured as {@code false} (kill-switch active).
  */
 public final class FeatureRegistry {
 
@@ -46,10 +47,20 @@ public final class FeatureRegistry {
     }
 
     /**
-     * Checks in O(1) whether a feature kill-switch is active (disabled in config).
+     * Checks in O(1) whether a capability is enabled ({@code true} in ultracore.yml).
      *
-     * @param feature feature flag to test
-     * @return {@code true} if the feature is disabled
+     * @param feature capability flag to test
+     * @return {@code true} if active (not killed)
+     */
+    public static boolean isEnabled(final Feature feature) {
+        return !isDisabled(feature);
+    }
+
+    /**
+     * Checks in O(1) whether a capability is killed ({@code false} in ultracore.yml).
+     *
+     * @param feature capability flag to test
+     * @return {@code true} if the kill-switch is active
      */
     public static boolean isDisabled(final Feature feature) {
         return feature.word == 0
@@ -58,15 +69,11 @@ public final class FeatureRegistry {
     }
 
     /**
-     * Checks whether a feature is active (not disabled).
+     * Checks whether loading a dimension is blocked in {@code worlds.disabled-dimensions}.
      *
-     * @param feature feature flag to test
-     * @return {@code true} if the feature is enabled
+     * @param dimensionKey dimension resource key
+     * @return {@code true} if disabled
      */
-    public static boolean isEnabled(final Feature feature) {
-        return !isDisabled(feature);
-    }
-
     public static boolean isDimensionDisabled(final ResourceKey<Level> dimensionKey) {
         if (registriesResolved) {
             return disabledDimensions.contains(dimensionKey);
@@ -75,6 +82,12 @@ public final class FeatureRegistry {
             && disabledDimensionIds.contains(dimensionKey.identifier().toString());
     }
 
+    /**
+     * Checks whether ticking a dimension is skipped in {@code worlds.disabled-ticking-dimensions}.
+     *
+     * @param dimensionKey dimension resource key
+     * @return {@code true} if ticking is disabled
+     */
     public static boolean isWorldTickDisabled(final ResourceKey<Level> dimensionKey) {
         if (registriesResolved) {
             return disabledTickDimensions.contains(dimensionKey);
@@ -83,8 +96,14 @@ public final class FeatureRegistry {
             && disabledTickDimensionIds.contains(dimensionKey.identifier().toString());
     }
 
+    /**
+     * Checks whether AI is disabled globally or for the given entity type.
+     *
+     * @param entityType entity type to query
+     * @return {@code true} if AI is disabled
+     */
     public static boolean isEntityAiDisabled(final EntityType<?> entityType) {
-        if (isDisabled(Feature.AI_DISABLE_GLOBALLY)) {
+        if (isDisabled(Feature.AI_ENABLED)) {
             return true;
         }
         if (registriesResolved) {
@@ -110,64 +129,79 @@ public final class FeatureRegistry {
     }
 
     /**
-     * Phase 1: Applies config flags to primitive bitmasks before Minecraft registries are initialized.
+     * Phase 1: Applies positive capability flags to primitive kill-switch bitmasks before registries boot.
      *
      * @param config loaded UltraCore configuration
      */
     public static synchronized void applyEarly(final UltraCoreConfig config) {
         final long[] masks = new long[2];
-        // 1. Worlds
-        mark(masks, Feature.WORLDS_DISABLE_CUSTOM_WORLDS, config.worlds.disableCustomWorlds);
-        mark(masks, Feature.WORLDS_DISABLE_PORTALS, config.worlds.disablePortals);
+        // 1. Startup & Bootstrap
+        markIfDisabled(masks, Feature.STARTUP_DATAFIXERS, config.startup.datafixers);
+        markIfDisabled(masks, Feature.STARTUP_SEARCH_SPAWN_POINT, config.startup.searchSpawnPoint);
+        markIfDisabled(masks, Feature.STARTUP_INITIAL_CHUNK_LOAD, config.startup.initialChunkLoad);
+        markIfDisabled(masks, Feature.STARTUP_VALIDATE_REGISTRIES, config.startup.validateRegistries);
+        markIfDisabled(masks, Feature.STARTUP_MOJANG_SERVICE_DISCOVERY, config.startup.mojangServiceDiscovery);
+        markIfDisabled(masks, Feature.STARTUP_PAPER_VERSION_CHECK, config.startup.paperVersionCheck);
 
-        // 2. Entities & AI
-        mark(masks, Feature.AI_DISABLE_GLOBALLY, config.entities.ai.disableGlobally);
-        mark(masks, Feature.AI_DISABLE_GOAL_SELECTOR, config.entities.ai.disableGoalSelector);
-        mark(masks, Feature.AI_DISABLE_BRAIN, config.entities.ai.disableBrain);
-        mark(masks, Feature.AI_DISABLE_PATHFINDING, config.entities.ai.disablePathfinding);
-        mark(masks, Feature.AI_DISABLE_SENSORS, config.entities.ai.disableSensors);
-        mark(masks, Feature.ENTITIES_DISABLE_COLLISIONS, config.entities.ai.disableCollisions);
+        // 2. Worlds
+        markIfDisabled(masks, Feature.WORLDS_CUSTOM_WORLDS, config.worlds.customWorlds);
+        markIfDisabled(masks, Feature.WORLDS_PORTALS, config.worlds.portals);
 
-        // 3. Chunks & Generation
-        mark(masks, Feature.CHUNKS_DISABLE_STRUCTURES, config.chunks.disableStructures);
-        mark(masks, Feature.CHUNKS_DISABLE_BIOME_DECORATION, config.chunks.disableBiomeDecoration);
-        mark(masks, Feature.CHUNKS_DISABLE_TICKING, config.chunks.disableChunkTicking);
-        mark(masks, Feature.CHUNKS_DISABLE_RANDOM_TICKS, config.chunks.disableRandomTicks);
-        mark(masks, Feature.CHUNKS_DISABLE_BLOCK_TICKS, config.chunks.disableBlockTicks);
-        mark(masks, Feature.CHUNKS_DISABLE_FLUID_TICKS, config.chunks.disableFluidTicks);
+        // 3. Entities & AI
+        markIfDisabled(masks, Feature.AI_ENABLED, config.entities.ai.enabled);
+        markIfDisabled(masks, Feature.AI_GOAL_SELECTOR, config.entities.ai.goalSelector);
+        markIfDisabled(masks, Feature.AI_BRAIN, config.entities.ai.brain);
+        markIfDisabled(masks, Feature.AI_PATHFINDING, config.entities.ai.pathfinding);
+        markIfDisabled(masks, Feature.AI_SENSORS, config.entities.ai.sensors);
+        markIfDisabled(masks, Feature.ENTITIES_COLLISIONS, config.entities.ai.collisions);
 
-        // 4. Gameplay & Environment
-        mark(masks, Feature.GAMEPLAY_DISABLE_WEATHER, config.gameplay.disableWeather);
-        mark(masks, Feature.GAMEPLAY_DISABLE_RAIDS, config.gameplay.disableRaids);
-        mark(masks, Feature.GAMEPLAY_DISABLE_REDSTONE, config.gameplay.disableRedstone);
-        mark(masks, Feature.GAMEPLAY_DISABLE_NATURAL_SPAWNING, config.gameplay.disableNaturalSpawning);
-        mark(masks, Feature.GAMEPLAY_DISABLE_CUSTOM_SPAWNERS, config.gameplay.disableCustomSpawners);
-        mark(masks, Feature.GAMEPLAY_DISABLE_MONSTERS, config.gameplay.disableMonsters);
-        mark(masks, Feature.GAMEPLAY_DISABLE_ANIMALS, config.gameplay.disableAnimals);
+        // 4. Chunks & Generation
+        markIfDisabled(masks, Feature.CHUNKS_STRUCTURES, config.chunks.structures);
+        markIfDisabled(masks, Feature.CHUNKS_BIOME_DECORATION, config.chunks.biomeDecoration);
+        markIfDisabled(masks, Feature.CHUNKS_TICKING, config.chunks.chunkTicking);
+        markIfDisabled(masks, Feature.CHUNKS_RANDOM_TICKS, config.chunks.randomTicks);
+        markIfDisabled(masks, Feature.CHUNKS_BLOCK_TICKS, config.chunks.blockTicks);
+        markIfDisabled(masks, Feature.CHUNKS_FLUID_TICKS, config.chunks.fluidTicks);
 
-        // 5. Network & Analytics
-        mark(masks, Feature.ANALYTICS_DISABLE_METRICS_AND_PROFILER, config.network.analytics.disableMetricsAndProfiler);
-        mark(masks, Feature.ANALYTICS_DISABLE_DEBUG_SYNCHRONIZERS, config.network.analytics.disableDebugSynchronizers);
+        // 5. Gameplay & Environment
+        markIfDisabled(masks, Feature.GAMEPLAY_WEATHER, config.gameplay.weather);
+        markIfDisabled(masks, Feature.GAMEPLAY_RAIDS, config.gameplay.raids);
+        markIfDisabled(masks, Feature.GAMEPLAY_REDSTONE, config.gameplay.redstone);
+        markIfDisabled(masks, Feature.GAMEPLAY_NATURAL_SPAWNING, config.gameplay.naturalSpawning);
+        markIfDisabled(masks, Feature.GAMEPLAY_CUSTOM_SPAWNERS, config.gameplay.customSpawners);
+        markIfDisabled(masks, Feature.GAMEPLAY_MONSTERS, config.gameplay.monsters);
+        markIfDisabled(masks, Feature.GAMEPLAY_ANIMALS, config.gameplay.animals);
+        markIfDisabled(masks, Feature.GAMEPLAY_ADVANCEMENTS, config.gameplay.advancements);
+        markIfDisabled(masks, Feature.GAMEPLAY_RECIPES, config.gameplay.recipes);
+        markIfDisabled(masks, Feature.GAMEPLAY_WARDEN_AND_SLEEP, config.gameplay.wardenAndSleep);
+        markIfDisabled(masks, Feature.GAMEPLAY_COMMAND_FUNCTIONS, config.gameplay.commandFunctions);
 
-        // 6. Ephemeral Container Lifecycle & Storage
-        mark(masks, Feature.STORAGE_EPHEMERAL_MEMORY_ONLY_WORLD, config.storage.ephemeral.memoryOnlyWorld);
-        mark(masks, Feature.STORAGE_EPHEMERAL_FAST_SHUTDOWN, config.storage.ephemeral.fastShutdown);
+        // 6. Network & Analytics
+        markIfDisabled(masks, Feature.NETWORK_GENERATE_KEYPAIR, config.network.generateKeypair);
+        markIfDisabled(masks, Feature.ANALYTICS_METRICS_AND_PROFILER, config.network.analytics.metricsAndProfiler);
+        markIfDisabled(masks, Feature.ANALYTICS_DEBUG_SYNCHRONIZERS, config.network.analytics.debugSynchronizers);
+        markIfDisabled(masks, Feature.NETWORK_PLAYER_COLLISIONS, config.network.tracking.playerCollisions);
+        markIfDisabled(masks, Feature.NETWORK_FULL_PACKET_BROADCAST, config.network.tracking.fullPacketBroadcast);
+        markIfDisabled(masks, Feature.NETWORK_SERVER_PING_SAMPLE, config.network.tracking.serverPingSample);
+        markIfDisabled(masks, Feature.NETWORK_TAB_LATENCY_UPDATES, config.network.tracking.tabLatencyUpdates);
 
-        // 7. Network Tracking & Packet Filtering
-        mark(masks, Feature.NETWORK_DISABLE_PLAYER_COLLISIONS, config.network.tracking.disablePlayerCollisions);
-        mark(masks, Feature.NETWORK_FAST_PACKET_FILTERING, config.network.tracking.fastPacketFiltering);
-        mark(masks, Feature.NETWORK_DISABLE_SERVER_PING_SAMPLE, config.network.tracking.disableServerPingSample);
+        // 7. Ephemeral Container Lifecycle & Storage
+        markIfDisabled(masks, Feature.STORAGE_WORLD_SAVING, config.storage.ephemeral.worldSaving);
+        markIfDisabled(masks, Feature.STORAGE_GRACEFUL_SHUTDOWN, config.storage.ephemeral.gracefulShutdown);
 
-        // 8. Players Lifecycle & Inventory
-        mark(masks, Feature.PLAYERS_DISABLE_DATA_SAVING, config.players.lifecycle.disablePlayerDataSaving);
-        mark(masks, Feature.PLAYERS_DISABLE_ADVANCEMENTS, config.players.lifecycle.disableAdvancements);
-        mark(masks, Feature.PLAYERS_DISABLE_RECIPES, config.players.lifecycle.disableRecipes);
+        // 8. Players Lifecycle
+        markIfDisabled(masks, Feature.PLAYERS_DATA_SAVING, config.players.lifecycle.playerDataSaving);
+        markIfDisabled(masks, Feature.PLAYERS_HUNGER, config.players.lifecycle.hunger);
+        markIfDisabled(masks, Feature.PLAYERS_STATISTICS, config.players.lifecycle.statistics);
 
-        // 9. World Physics & Containers
-        mark(masks, Feature.PHYSICS_DISABLE_BLOCK_GRAVITY, config.world.physics.disableBlockGravity);
-        mark(masks, Feature.PHYSICS_DISABLE_HOPPER_TICKING, config.world.physics.disableHopperTicking);
-        mark(masks, Feature.PHYSICS_DISABLE_LEAF_DECAY, config.world.physics.disableLeafDecay);
-        mark(masks, Feature.PHYSICS_DISABLE_FIRE_SPREAD, config.world.physics.disableFireSpread);
+        // 9. World Time & Physics
+        markIfDisabled(masks, Feature.WORLD_DAYLIGHT_CYCLE, config.world.daylightCycle);
+        markIfDisabled(masks, Feature.PHYSICS_BLOCK_GRAVITY, config.world.physics.blockGravity);
+        markIfDisabled(masks, Feature.PHYSICS_HOPPER_TICKING, config.world.physics.hopperTicking);
+        markIfDisabled(masks, Feature.PHYSICS_BLOCK_ENTITY_TICKING, config.world.physics.blockEntityTicking);
+        markIfDisabled(masks, Feature.PHYSICS_ITEM_PHYSICS, config.world.physics.itemPhysics);
+        markIfDisabled(masks, Feature.PHYSICS_LEAF_DECAY, config.world.physics.leafDecay);
+        markIfDisabled(masks, Feature.PHYSICS_FIRE_SPREAD, config.world.physics.fireSpread);
 
         disabledMask0 = masks[0];
         disabledMask1 = masks[1];
@@ -175,88 +209,92 @@ public final class FeatureRegistry {
         disabledDimensionIds = normalizeIds(config.worlds.disabledDimensions);
         disabledTickDimensionIds = normalizeIds(config.worlds.disabledTickingDimensions);
         disabledAiEntityIds = normalizeIds(config.entities.ai.disabledTypes);
-        registriesResolved = false;
 
-        projectileTrackingRange = Math.max(0, config.network.tracking.projectileTrackingRange);
-        final double particleRange = Math.max(0.0d, config.network.tracking.particleBroadcastRange);
-        particleBroadcastRangeSq = particleRange * particleRange;
-        armorEquipmentRange = Math.max(0, config.network.tracking.armorEquipmentRange);
+        projectileTrackingRange = config.network.tracking.projectileTrackingRange;
+        final double radius = config.network.tracking.particleBroadcastRange;
+        particleBroadcastRangeSq = radius * radius;
+        armorEquipmentRange = config.network.tracking.armorEquipmentRange;
+        registriesResolved = false;
     }
 
     /**
-     * Phase 2: Resolves string identifiers against live Minecraft registries into O(1) ReferenceOpenHashSets.
+     * Phase 2: Resolves string IDs into O(1) identity sets once Minecraft registries exist.
      *
-     * @param registryAccess server registry access, or {@code null} to fall back to built-in registries
-     * @param logger         logger for invalid identifier warnings
+     * @param registryAccess server registry access (nullable in early tests)
+     * @param logger         diagnostic logger
      */
     public static synchronized void resolveRegistries(final @Nullable RegistryAccess registryAccess, final Logger logger) {
         final Set<ResourceKey<Level>> dimSet = new ReferenceOpenHashSet<>();
         for (final String raw : disabledDimensionIds) {
-            final Identifier id = Identifier.tryParse(raw);
-            if (id == null) {
-                logger.warn("[UltraCore] Invalid dimension identifier in worlds.disabled-dimensions: '{}'", raw);
+            final ResourceKey<Level> key = parseDimensionKey(raw, logger);
+            if (key == null) {
                 continue;
             }
-            final ResourceKey<Level> key = ResourceKey.create(Registries.DIMENSION, id);
             if (Level.OVERWORLD.equals(key)) {
-                logger.warn("[UltraCore] Refusing to disable primary dimension minecraft:overworld; ignoring.");
+                logger.warn("Refusing to disable primary dimension minecraft:overworld; ignoring.");
                 continue;
             }
             dimSet.add(key);
         }
+        disabledDimensions = ReferenceSets.unmodifiable((ReferenceOpenHashSet<ResourceKey<Level>>) dimSet);
 
         final Set<ResourceKey<Level>> tickDimSet = new ReferenceOpenHashSet<>();
         for (final String raw : disabledTickDimensionIds) {
-            final Identifier id = Identifier.tryParse(raw);
-            if (id == null) {
-                logger.warn("[UltraCore] Invalid dimension identifier in worlds.disabled-ticking-dimensions: '{}'", raw);
-                continue;
+            final ResourceKey<Level> key = parseDimensionKey(raw, logger);
+            if (key != null) {
+                tickDimSet.add(key);
             }
-            tickDimSet.add(ResourceKey.create(Registries.DIMENSION, id));
         }
+        disabledTickDimensions = ReferenceSets.unmodifiable((ReferenceOpenHashSet<ResourceKey<Level>>) tickDimSet);
 
-        final Set<EntityType<?>> entitySet = new ReferenceOpenHashSet<>();
         final Registry<EntityType<?>> entityRegistry = registryAccess != null
             ? registryAccess.lookupOrThrow(Registries.ENTITY_TYPE)
             : BuiltInRegistries.ENTITY_TYPE;
 
+        final ReferenceOpenHashSet<EntityType<?>> aiSet = new ReferenceOpenHashSet<>();
         for (final String raw : disabledAiEntityIds) {
-            final Identifier id = Identifier.tryParse(raw);
+            final @Nullable Identifier id = Identifier.tryParse(normalizeNamespace(raw));
             if (id == null) {
-                logger.warn("[UltraCore] Invalid entity type identifier in entities.ai.disabled-types: '{}'", raw);
+                logger.warn("Invalid entity type ID in entities.ai.disabled-types: '{}'", raw);
                 continue;
             }
-            final Optional<EntityType<?>> resolved = entityRegistry.getOptional(id);
-            if (resolved.isEmpty()) {
-                logger.warn("[UltraCore] Unknown entity type in entities.ai.disabled-types: '{}'", raw);
+            final Optional<EntityType<?>> type = entityRegistry.getOptional(id);
+            if (type.isEmpty()) {
+                logger.warn("Unknown entity type in entities.ai.disabled-types: '{}'", raw);
                 continue;
             }
-            entitySet.add(resolved.get());
+            aiSet.add(type.get());
         }
-
-        disabledDimensions = dimSet.isEmpty() ? Set.of() : ReferenceSets.unmodifiable((ReferenceOpenHashSet<ResourceKey<Level>>) dimSet);
-        disabledTickDimensions = tickDimSet.isEmpty() ? Set.of() : ReferenceSets.unmodifiable((ReferenceOpenHashSet<ResourceKey<Level>>) tickDimSet);
-        disabledAiEntityTypes = entitySet.isEmpty() ? Set.of() : ReferenceSets.unmodifiable((ReferenceOpenHashSet<EntityType<?>>) entitySet);
+        disabledAiEntityTypes = ReferenceSets.unmodifiable(aiSet);
         registriesResolved = true;
     }
 
     /**
-     * Returns an ordered list of currently disabled feature config keys for diagnostics.
+     * Returns all currently active kill-switches (every option set to {@code false} plus non-empty blocklists).
      *
-     * @return immutable list of disabled feature keys
+     * @return immutable list of active kill-switch identifiers
      */
     public static List<String> activeKillSwitches() {
         final List<String> active = new ArrayList<>();
         for (final Feature feature : Feature.values()) {
             if (isDisabled(feature)) {
-                active.add(feature.configKey());
+                active.add(feature.configKey() + "=false");
             }
+        }
+        if (!disabledDimensionIds.isEmpty()) {
+            active.add("worlds.disabled-dimensions=" + disabledDimensionIds);
+        }
+        if (!disabledTickDimensionIds.isEmpty()) {
+            active.add("worlds.disabled-ticking-dimensions=" + disabledTickDimensionIds);
+        }
+        if (!disabledAiEntityIds.isEmpty()) {
+            active.add("entities.ai.disabled-types=" + disabledAiEntityIds);
         }
         return Collections.unmodifiableList(active);
     }
 
     /**
-     * Resets all masks and sets (intended for unit tests).
+     * Clears registry state between unit tests.
      */
     public static synchronized void resetForTesting() {
         disabledMask0 = 0L;
@@ -268,31 +306,37 @@ public final class FeatureRegistry {
         disabledTickDimensions = Set.of();
         disabledAiEntityTypes = Set.of();
         registriesResolved = false;
-        projectileTrackingRange = 32;
-        particleBroadcastRangeSq = 256.0d;
-        armorEquipmentRange = 32;
     }
 
-    private static void mark(final long[] masks, final Feature feature, final boolean disabled) {
-        if (disabled) {
+    private static void markIfDisabled(final long[] masks, final Feature feature, final boolean enabled) {
+        if (!enabled) {
             masks[feature.word] |= feature.bit;
         }
     }
 
-    private static Set<String> normalizeIds(final List<String> rawIds) {
-        if (rawIds.isEmpty()) {
+    private static Set<String> normalizeIds(final @Nullable List<String> raw) {
+        if (raw == null || raw.isEmpty()) {
             return Set.of();
         }
-        final Set<String> normalized = new HashSet<>(rawIds.size());
-        for (final String raw : rawIds) {
-            if (raw == null) {
-                continue;
-            }
-            final String trimmed = raw.trim().toLowerCase(Locale.ROOT);
-            if (!trimmed.isEmpty()) {
-                normalized.add(trimmed.indexOf(':') >= 0 ? trimmed : "minecraft:" + trimmed);
+        final Set<String> out = new HashSet<>(raw.size());
+        for (final String entry : raw) {
+            if (entry != null && !entry.isBlank()) {
+                out.add(normalizeNamespace(entry.trim().toLowerCase(Locale.ROOT)));
             }
         }
-        return normalized.isEmpty() ? Set.of() : Collections.unmodifiableSet(normalized);
+        return Set.copyOf(out);
+    }
+
+    private static String normalizeNamespace(final String id) {
+        return id.contains(":") ? id : "minecraft:" + id;
+    }
+
+    private static @Nullable ResourceKey<Level> parseDimensionKey(final String raw, final Logger logger) {
+        final @Nullable Identifier id = Identifier.tryParse(normalizeNamespace(raw));
+        if (id == null) {
+            logger.warn("Invalid dimension identifier: '{}'", raw);
+            return null;
+        }
+        return ResourceKey.create(Registries.DIMENSION, id);
     }
 }

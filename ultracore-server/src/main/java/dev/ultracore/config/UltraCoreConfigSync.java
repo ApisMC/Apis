@@ -52,6 +52,11 @@ public final class UltraCoreConfigSync {
     public static void syncGlobal(final GlobalConfiguration global) {
         global.misc.enableNether = !UltraCoreHooks.isDimensionDisabled(Level.NETHER);
         global.collisions.enablePlayerCollisions = !UltraCoreHooks.isPlayerCollisionDisabled();
+        global.spark.enabled = !UltraCoreHooks.isMetricsAndProfilerDisabled();
+        if (UltraCoreHooks.isMetricsAndProfilerDisabled()) {
+            global.spark.enableImmediately = false;
+        }
+        global.updateChecker.enabled = UltraCoreHooks.isPaperVersionCheckEnabled();
     }
 
     /**

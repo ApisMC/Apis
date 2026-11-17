@@ -1,0 +1,22 @@
+--- a/net/minecraft/world/item/crafting/RecipeManager.java
++++ b/net/minecraft/world/item/crafting/RecipeManager.java
+@@ -54,6 +_,11 @@
+     private Collection<RecipeHolder<?>> learnableRecipes;
+ 
+     public RecipeManager(final HolderLookup.Provider registries) {
++        if (dev.ultracore.hooks.UltraCoreHooks.isRecipesDisabled()) { // UltraCore
++            this.recipes = RecipeMap.EMPTY;
++            this.learnableRecipes = List.of();
++            return;
++        } // UltraCore
+         HolderLookup.RegistryLookup<Recipe<?>> recipeRegistries = registries.lookupOrThrow(Registries.RECIPE);
+         this.recipes = RecipeMap.create(recipeRegistries);
+         this.learnableRecipes = this.recipes.values().stream().filter(r -> !r.value().isSpecial()).collect(Collectors.toUnmodifiableList());
+@@ -79,6 +_,7 @@
+ 
+     public void finalizeRecipeLoading(final FeatureFlagSet enabledFlags) {
+         this.enabledFlags = enabledFlags;
++        if (dev.ultracore.hooks.UltraCoreHooks.isRecipesDisabled()) return; // UltraCore
+         // CraftBukkit end
+         List<SelectableRecipe.SingleInputEntry<StonecutterRecipe>> stonecutterRecipes = new ArrayList<>();
+         List<RecipeManager.IngredientCollector> propertySetCollectors = RECIPE_PROPERTY_SETS.entrySet()

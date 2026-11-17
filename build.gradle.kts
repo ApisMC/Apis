@@ -65,11 +65,18 @@ subprojects {
         "checkstyle"(project(":ultracore-checkstyle"))
     }
 
+    val isRelease = providers.gradleProperty("release").map { it.toBoolean() }.getOrElse(false)
     tasks.withType<JavaCompile> {
         options.encoding = Charsets.UTF_8.name()
         options.release = 25
         options.isFork = true
-        options.compilerArgs.addAll(listOf("-Xlint:-deprecation", "-Xlint:-removal"))
+        options.compilerArgs.addAll(
+            listOf(
+                "-Xlint:-deprecation",
+                "-Xlint:-removal",
+                if (isRelease) "-g:lines,source" else "-g",
+            )
+        )
     }
     tasks.withType<Javadoc> {
         options.encoding = Charsets.UTF_8.name()

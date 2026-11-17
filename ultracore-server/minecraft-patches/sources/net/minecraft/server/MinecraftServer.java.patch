@@ -24,6 +24,47 @@
              new PhantomSpawner(), new PatrolSpawner(), new CatSpawner(), new VillageSiege(), new WanderingTraderSpawner(savedDataStorage) // Paper - save to world data
          );
          final org.bukkit.generator.ChunkGenerator chunkGenerator = this.server.getGenerator(loading.data().bukkitName());
+@@ -822,6 +_,10 @@
+                 }
+             }
+             // CraftBukkit end
++            if (!dev.ultracore.hooks.UltraCoreHooks.isSearchSpawnPointEnabled()) { // UltraCore
++                levelData.setSpawn(LevelData.RespawnData.of(level.dimension(), new BlockPos(0, level.getSeaLevel(), 0), 0.0F, 0.0F));
++                return;
++            } // UltraCore
+             ChunkPos spawnChunk = chunkSource.getGenerator().getOrigin(chunkSource.randomState());
+             levelLoadListener.start(LevelLoadListener.Stage.PREPARE_GLOBAL_SPAWN, 0);
+             levelLoadListener.updateFocus(level.dimension(), spawnChunk);
+@@ -882,21 +_,23 @@
+         // CraftBukkit end
+         ChunkLoadCounter chunkLoadCounter = new ChunkLoadCounter();
+ 
+-        if (true) { // CraftBukkit
++        if (dev.ultracore.hooks.UltraCoreHooks.isInitialChunkLoadEnabled()) { // UltraCore
+             chunkLoadCounter.track(level, () -> {
+                 TicketStorage savedTickets = level.getDataStorage().get(TicketStorage.TYPE);
+                 if (savedTickets != null) {
+                     savedTickets.activateAllDeactivatedTickets();
+                 }
+             });
+-        }
++        } // UltraCore
+ 
+         level.levelLoadListener.start(LevelLoadListener.Stage.LOAD_INITIAL_CHUNKS, chunkLoadCounter.totalChunks()); // Paper - per world load listener
+ 
+-        do {
+-            level.levelLoadListener.update(LevelLoadListener.Stage.LOAD_INITIAL_CHUNKS, chunkLoadCounter.readyChunks(), chunkLoadCounter.totalChunks()); // Paper - per world load listener
+-            this.executeModerately(); // CraftBukkit
+-        } while (chunkLoadCounter.pendingChunks() > 0);
++        if (dev.ultracore.hooks.UltraCoreHooks.isInitialChunkLoadEnabled()) { // UltraCore
++            do {
++                level.levelLoadListener.update(LevelLoadListener.Stage.LOAD_INITIAL_CHUNKS, chunkLoadCounter.readyChunks(), chunkLoadCounter.totalChunks()); // Paper - per world load listener
++                this.executeModerately(); // CraftBukkit
++            } while (chunkLoadCounter.pendingChunks() > 0);
++        } // UltraCore
+ 
+         level.levelLoadListener.finish(LevelLoadListener.Stage.LOAD_INITIAL_CHUNKS); // Paper - per world load listener
+         level.setSpawnSettings(level.isSpawningMonsters()); // Paper - per level difficulty (from setDifficulty(ServerLevel, Difficulty, boolean))
 @@ -930,6 +_,14 @@
      }
      public boolean saveAllChunks(final boolean silent, final boolean flush, final boolean force, final boolean close) {
@@ -67,6 +108,24 @@
          // CraftBukkit start
          if (this.server != null) {
              this.server.spark.disable(); // Paper - spark
+@@ -1255,7 +_,7 @@
+             this.statusIcon = this.loadStatusIcon().orElse(null);
+             this.status = this.buildServerStatus();
+ 
+-            this.server.spark.enableBeforePlugins(); // Paper - spark
++            if (!dev.ultracore.hooks.UltraCoreHooks.isMetricsAndProfilerDisabled()) this.server.spark.enableBeforePlugins(); // Paper - spark // UltraCore
+             // Spigot start
+             // Paper start
+             LOGGER.info("Running delayed init tasks");
+@@ -1281,7 +_,7 @@
+             }
+             // Paper end - Add onboarding message for initial server start
+             // Paper start - Improve outdated version checking
+-            if (System.getProperty("paper.disableStartupVersionCheck") == null && io.papermc.paper.configuration.GlobalConfiguration.get().updateChecker.enabled) {
++            if (dev.ultracore.hooks.UltraCoreHooks.isPaperVersionCheckEnabled() && System.getProperty("paper.disableStartupVersionCheck") == null && io.papermc.paper.configuration.GlobalConfiguration.get().updateChecker.enabled) { // UltraCore
+                 CompletableFuture.runAsync(com.destroystokyo.paper.PaperVersionFetcher::getUpdateStatusStartupMessage, io.papermc.paper.util.MCUtil.ASYNC_EXECUTOR);
+             }
+             // Paper end - Improve outdated version checking
 @@ -1726,7 +_,7 @@
      private ServerStatus.Players buildPlayerStatus() {
          List<ServerPlayer> players = this.playerList.getPlayers();
@@ -76,6 +135,32 @@
              return new ServerStatus.Players(maxPlayers, players.size(), List.of());
          }
  
+@@ -1762,10 +_,12 @@
+         // Paper end - Folia scheduler API
+         io.papermc.paper.adventure.providers.ClickCallbackProviderImpl.ADVENTURE_CLICK_MANAGER.handleQueue(this.tickCount); // Paper
+         io.papermc.paper.adventure.providers.ClickCallbackProviderImpl.DIALOG_CLICK_MANAGER.handleQueue(this.tickCount); // Paper
+-        profiler.push("commandFunctions");
+-        this.getFunctions().tick();
+-        profiler.pop();
+-        if (this.tickRateManager.runsNormally()) {
++        if (dev.ultracore.hooks.UltraCoreHooks.isCommandFunctionsEnabled()) { // UltraCore
++            profiler.push("commandFunctions");
++            this.getFunctions().tick();
++            profiler.pop();
++        } // UltraCore
++        if (this.tickRateManager.runsNormally() && dev.ultracore.hooks.UltraCoreHooks.isDaylightCycleEnabled()) { // UltraCore
+             profiler.push("clocks");
+             // Paper start - per-world time
+             if (io.papermc.paper.configuration.GlobalConfiguration.get().time.affectsAllWorlds) {
+@@ -1779,7 +_,7 @@
+             profiler.pop();
+         }
+ 
+-        if (this.tickCount % 20 == 0) {
++        if (this.tickCount % 20 == 0 && dev.ultracore.hooks.UltraCoreHooks.isDaylightCycleEnabled()) { // UltraCore
+             profiler.push("timeSync");
+             this.forceGameTimeSynchronization();
+             profiler.pop();
 @@ -1796,6 +_,7 @@
  
          this.isIteratingOverLevels = true; // Paper - Throw exception on world create while being ticked
@@ -95,3 +180,11 @@
      }
  
      // Paper start - per world respawn data
+@@ -1980,6 +_,7 @@
+     }
+ 
+     public KeyPair getKeyPair() {
++        if (this.keyPair == null) this.initializeKeyPair(); // UltraCore
+         return Objects.requireNonNull(this.keyPair);
+     }
+ 

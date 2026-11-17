@@ -17,7 +17,7 @@ public final class UltraCorePaths {
 
     public static final String CONFIG_DIR = "config";
     public static final String USERS_DIR = "users";
-    private static final Logger LOGGER = LoggerFactory.getLogger("UltraCore");
+    private static final Logger LOGGER = LoggerFactory.getLogger("Minecraft");
 
     private static final List<String> DEFAULT_GITIGNORE_LINES = List.of(
         "*.jar",
@@ -109,7 +109,7 @@ public final class UltraCorePaths {
         try {
             Files.write(gitIgnore, DEFAULT_GITIGNORE_LINES, StandardCharsets.UTF_8);
         } catch (final IOException ex) {
-            LOGGER.warn("[UltraCore] Could not generate default {}: {}", gitIgnore.toAbsolutePath(), ex.getMessage());
+            LOGGER.warn("Could not generate default {}: {}", gitIgnore.toAbsolutePath(), ex.getMessage());
         }
     }
 
@@ -130,7 +130,7 @@ public final class UltraCorePaths {
         try {
             Files.createDirectories(dir);
         } catch (final IOException ex) {
-            LOGGER.warn("[UltraCore] Could not create directory {}: {}", dir.toAbsolutePath(), ex.getMessage());
+            LOGGER.warn("Could not create directory {}: {}", dir.toAbsolutePath(), ex.getMessage());
         }
     }
 }

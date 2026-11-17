@@ -1,5 +1,8 @@
 package dev.ultracore.hooks;
 
+import com.mojang.datafixers.schemas.Schema;
+import com.mojang.datafixers.types.Type;
+import com.mojang.datafixers.types.templates.TypeTemplate;
 import dev.ultracore.config.UltraCoreConfig;
 import dev.ultracore.config.UltraCorePaths;
 import dev.ultracore.feature.Feature;
@@ -7,6 +10,9 @@ import dev.ultracore.feature.FeatureRegistry;
 import io.papermc.paper.adventure.PaperAdventure;
 import java.nio.file.Path;
 import java.util.Locale;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.Supplier;
 import net.kyori.adventure.key.Key;
 import net.minecraft.core.RegistryAccess;
 import net.minecraft.core.registries.Registries;
@@ -28,16 +34,19 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * Minimal static guard facade invoked from 1-3 line upstream micro-guards.
- * Keeps all UltraCore logic decoupled from Vanilla/Paper patches for painless rebases.
+ * Minimal static guard facade invoked from 1-line upstream micro-guards.
+ * Encapsulates all UltraCore capability checks so Vanilla/Paper patches stay rebase-friendly.
  */
 public final class UltraCoreHooks {
 
-    private static final Logger LOGGER = LoggerFactory.getLogger("UltraCore");
+    private static final Logger LOGGER = LoggerFactory.getLogger("Minecraft");
 
     private UltraCoreHooks() {
     }
 
+    /**
+     * Generates default .gitignore (if absent) and loads config/ultracore.yml early before Bootstrap.
+     */
     public static void bootstrapEarly() {
         UltraCorePaths.ensureGitIgnore(Path.of("."));
         final @Nullable String overridePath = System.getProperty("ultracore.config");
@@ -47,32 +56,86 @@ public final class UltraCoreHooks {
         UltraCoreConfig.loadEarly(resolved);
     }
 
+    /**
+     * Phase 2 registry resolution and active kill-switch summary logging.
+     *
+     * @param registryAccess server registry access
+     */
     public static void resolveRegistries(final RegistryAccess registryAccess) {
         FeatureRegistry.resolveRegistries(registryAccess, LOGGER);
         if (!FeatureRegistry.activeKillSwitches().isEmpty()) {
-            LOGGER.info("[UltraCore] Active kill-switches: {}", String.join(", ", FeatureRegistry.activeKillSwitches()));
+            LOGGER.info("Active kill-switches: {}", String.join(", ", FeatureRegistry.activeKillSwitches()));
         }
     }
 
-    // 1. Worlds & Dimensions
+    // 1. Startup & Bootstrap
+    public static boolean isDataFixersEnabled() {
+        return FeatureRegistry.isEnabled(Feature.STARTUP_DATAFIXERS);
+    }
+
+    public static boolean isSearchSpawnPointEnabled() {
+        return FeatureRegistry.isEnabled(Feature.STARTUP_SEARCH_SPAWN_POINT);
+    }
+
+    public static boolean isInitialChunkLoadEnabled() {
+        return FeatureRegistry.isEnabled(Feature.STARTUP_INITIAL_CHUNK_LOAD);
+    }
+
+    public static boolean isValidateRegistriesEnabled() {
+        return FeatureRegistry.isEnabled(Feature.STARTUP_VALIDATE_REGISTRIES);
+    }
+
+    public static boolean isMojangServiceDiscoveryEnabled() {
+        return FeatureRegistry.isEnabled(Feature.STARTUP_MOJANG_SERVICE_DISCOVERY);
+    }
+
+    public static boolean isPaperVersionCheckEnabled() {
+        return FeatureRegistry.isEnabled(Feature.STARTUP_PAPER_VERSION_CHECK);
+    }
+
+    public static Schema createEmptyDataFixerSchema(final int versionKey, final @Nullable Schema parent) {
+        return new Schema(versionKey, parent) {
+            @Override
+            public Map<String, Supplier<TypeTemplate>> registerEntities(final Schema schema) {
+                return new ConcurrentHashMap<>();
+            }
+
+            @Override
+            public Map<String, Supplier<TypeTemplate>> registerBlockEntities(final Schema schema) {
+                return new ConcurrentHashMap<>();
+            }
+
+            @Override
+            public void registerTypes(
+                final Schema schema,
+                final Map<String, Supplier<TypeTemplate>> entityTypes,
+                final Map<String, Supplier<TypeTemplate>> blockEntityTypes
+            ) {
+            }
+
+            @Override
+            protected Map<String, Type<?>> buildTypes() {
+                return new ConcurrentHashMap<>();
+            }
+        };
+    }
+
+    // 2. Worlds & Dimensions
     public static boolean isDimensionDisabled(final ResourceKey<Level> dimensionKey) {
         return FeatureRegistry.isDimensionDisabled(dimensionKey);
     }
 
     public static boolean isWorldCreationBlocked(final WorldCreator creator) {
-        if (FeatureRegistry.isDisabled(Feature.WORLDS_DISABLE_CUSTOM_WORLDS)) {
+        if (FeatureRegistry.isDisabled(Feature.WORLDS_CUSTOM_WORLDS)) {
             UltraCoreDiagnostics.warnBlocked(
-                Feature.WORLDS_DISABLE_CUSTOM_WORLDS.configKey(),
+                Feature.WORLDS_CUSTOM_WORLDS.configKey(),
                 "CraftServer.createWorld",
                 creator.name()
             );
             return true;
         }
         final NamespacedKey key = creator.key();
-        final ResourceKey<Level> dimensionKey = CraftNamespacedKey.toResourceKey(
-            Registries.DIMENSION,
-            key
-        );
+        final ResourceKey<Level> dimensionKey = CraftNamespacedKey.toResourceKey(Registries.DIMENSION, key);
         if (FeatureRegistry.isDimensionDisabled(dimensionKey)) {
             UltraCoreDiagnostics.warnBlocked(
                 "worlds.disabled-dimensions",
@@ -118,21 +181,21 @@ public final class UltraCoreHooks {
 
     public static void warnDisabledStructureLookup(final Level level, final String structure) {
         UltraCoreDiagnostics.warnBlocked(
-            Feature.CHUNKS_DISABLE_STRUCTURES.configKey(),
+            Feature.CHUNKS_STRUCTURES.configKey(),
             "World.locateNearestStructure@" + level.dimension().identifier(),
             structure
         );
     }
 
     public static boolean isPortalsDisabled() {
-        return FeatureRegistry.isDisabled(Feature.WORLDS_DISABLE_PORTALS);
+        return FeatureRegistry.isDisabled(Feature.WORLDS_PORTALS);
     }
 
     public static boolean isWorldTickDisabled(final Level level) {
         return FeatureRegistry.isWorldTickDisabled(level.dimension());
     }
 
-    // 2. Entities & AI
+    // 3. Entities & AI
     public static boolean isAiDisabled(final EntityType<?> entityType) {
         return FeatureRegistry.isEntityAiDisabled(entityType);
     }
@@ -142,133 +205,151 @@ public final class UltraCoreHooks {
     }
 
     public static boolean isGoalSelectorDisabled() {
-        return FeatureRegistry.isDisabled(Feature.AI_DISABLE_GLOBALLY)
-            || FeatureRegistry.isDisabled(Feature.AI_DISABLE_GOAL_SELECTOR);
+        return FeatureRegistry.isDisabled(Feature.AI_ENABLED)
+            || FeatureRegistry.isDisabled(Feature.AI_GOAL_SELECTOR);
     }
 
     public static boolean isBrainDisabled() {
-        return FeatureRegistry.isDisabled(Feature.AI_DISABLE_GLOBALLY)
-            || FeatureRegistry.isDisabled(Feature.AI_DISABLE_BRAIN);
+        return FeatureRegistry.isDisabled(Feature.AI_ENABLED)
+            || FeatureRegistry.isDisabled(Feature.AI_BRAIN);
     }
 
     public static boolean isPathfindingDisabled() {
-        return FeatureRegistry.isDisabled(Feature.AI_DISABLE_GLOBALLY)
-            || FeatureRegistry.isDisabled(Feature.AI_DISABLE_PATHFINDING);
+        return FeatureRegistry.isDisabled(Feature.AI_ENABLED)
+            || FeatureRegistry.isDisabled(Feature.AI_PATHFINDING);
     }
 
     public static boolean isSensorsDisabled() {
-        return FeatureRegistry.isDisabled(Feature.AI_DISABLE_GLOBALLY)
-            || FeatureRegistry.isDisabled(Feature.AI_DISABLE_SENSORS);
+        return FeatureRegistry.isDisabled(Feature.AI_ENABLED)
+            || FeatureRegistry.isDisabled(Feature.AI_SENSORS);
     }
 
     public static boolean isEntityCollisionDisabled(final Entity a, final Entity b) {
-        if (FeatureRegistry.isDisabled(Feature.ENTITIES_DISABLE_COLLISIONS)) {
+        if (FeatureRegistry.isDisabled(Feature.ENTITIES_COLLISIONS)) {
             return true;
         }
-        return FeatureRegistry.isDisabled(Feature.NETWORK_DISABLE_PLAYER_COLLISIONS)
+        return FeatureRegistry.isDisabled(Feature.NETWORK_PLAYER_COLLISIONS)
             && a instanceof Player
             && b instanceof Player;
     }
 
     public static boolean isEntityPushEntitiesDisabled(final Entity entity) {
-        if (FeatureRegistry.isDisabled(Feature.ENTITIES_DISABLE_COLLISIONS)) {
+        if (FeatureRegistry.isDisabled(Feature.ENTITIES_COLLISIONS)) {
             return true;
         }
-        return FeatureRegistry.isDisabled(Feature.NETWORK_DISABLE_PLAYER_COLLISIONS)
+        return FeatureRegistry.isDisabled(Feature.NETWORK_PLAYER_COLLISIONS)
             && entity instanceof Player;
     }
 
     public static boolean isPlayerCollisionDisabled() {
-        return FeatureRegistry.isDisabled(Feature.NETWORK_DISABLE_PLAYER_COLLISIONS)
-            || FeatureRegistry.isDisabled(Feature.ENTITIES_DISABLE_COLLISIONS);
+        return FeatureRegistry.isDisabled(Feature.NETWORK_PLAYER_COLLISIONS)
+            || FeatureRegistry.isDisabled(Feature.ENTITIES_COLLISIONS);
     }
 
-    // 3. Chunks & Generation
+    // 4. Chunks & Generation
     public static boolean isStructuresDisabled() {
-        return FeatureRegistry.isDisabled(Feature.CHUNKS_DISABLE_STRUCTURES);
+        return FeatureRegistry.isDisabled(Feature.CHUNKS_STRUCTURES);
     }
 
     public static boolean isBiomeDecorationDisabled() {
-        return FeatureRegistry.isDisabled(Feature.CHUNKS_DISABLE_BIOME_DECORATION);
+        return FeatureRegistry.isDisabled(Feature.CHUNKS_BIOME_DECORATION);
     }
 
     public static boolean isChunkTickingDisabled() {
-        return FeatureRegistry.isDisabled(Feature.CHUNKS_DISABLE_TICKING);
+        return FeatureRegistry.isDisabled(Feature.CHUNKS_TICKING);
     }
 
     public static boolean isRandomTicksDisabled() {
-        return FeatureRegistry.isDisabled(Feature.CHUNKS_DISABLE_RANDOM_TICKS);
+        return FeatureRegistry.isDisabled(Feature.CHUNKS_RANDOM_TICKS);
     }
 
     public static boolean isBlockTicksDisabled() {
-        return FeatureRegistry.isDisabled(Feature.CHUNKS_DISABLE_BLOCK_TICKS);
+        return FeatureRegistry.isDisabled(Feature.CHUNKS_BLOCK_TICKS);
     }
 
     public static boolean isFluidTicksDisabled() {
-        return FeatureRegistry.isDisabled(Feature.CHUNKS_DISABLE_FLUID_TICKS);
+        return FeatureRegistry.isDisabled(Feature.CHUNKS_FLUID_TICKS);
     }
 
-    // 4. Gameplay & Environment
+    // 5. Gameplay & Environment
     public static boolean isWeatherDisabled() {
-        return FeatureRegistry.isDisabled(Feature.GAMEPLAY_DISABLE_WEATHER);
+        return FeatureRegistry.isDisabled(Feature.GAMEPLAY_WEATHER);
     }
 
     public static boolean isRaidsDisabled() {
-        return FeatureRegistry.isDisabled(Feature.GAMEPLAY_DISABLE_RAIDS);
+        return FeatureRegistry.isDisabled(Feature.GAMEPLAY_RAIDS);
     }
 
     public static boolean isRedstoneDisabled() {
-        return FeatureRegistry.isDisabled(Feature.GAMEPLAY_DISABLE_REDSTONE);
+        return FeatureRegistry.isDisabled(Feature.GAMEPLAY_REDSTONE);
     }
 
     public static boolean isNaturalSpawningDisabled() {
-        return FeatureRegistry.isDisabled(Feature.GAMEPLAY_DISABLE_NATURAL_SPAWNING);
+        return FeatureRegistry.isDisabled(Feature.GAMEPLAY_NATURAL_SPAWNING);
     }
 
     public static boolean isCustomSpawnersDisabled() {
-        return FeatureRegistry.isDisabled(Feature.GAMEPLAY_DISABLE_CUSTOM_SPAWNERS);
+        return FeatureRegistry.isDisabled(Feature.GAMEPLAY_CUSTOM_SPAWNERS);
     }
 
     public static boolean isMonstersDisabled() {
-        return FeatureRegistry.isDisabled(Feature.GAMEPLAY_DISABLE_MONSTERS);
+        return FeatureRegistry.isDisabled(Feature.GAMEPLAY_MONSTERS);
     }
 
     public static boolean isAnimalsDisabled() {
-        return FeatureRegistry.isDisabled(Feature.GAMEPLAY_DISABLE_ANIMALS);
+        return FeatureRegistry.isDisabled(Feature.GAMEPLAY_ANIMALS);
     }
 
     public static boolean isMobCategoryDisabled(final MobCategory category) {
         if (category == MobCategory.MONSTER) {
-            return FeatureRegistry.isDisabled(Feature.GAMEPLAY_DISABLE_MONSTERS);
+            return FeatureRegistry.isDisabled(Feature.GAMEPLAY_MONSTERS);
         }
-        return category != MobCategory.MISC && FeatureRegistry.isDisabled(Feature.GAMEPLAY_DISABLE_ANIMALS);
+        return category != MobCategory.MISC && FeatureRegistry.isDisabled(Feature.GAMEPLAY_ANIMALS);
     }
 
-    // 5. Network & Analytics
+    public static boolean isAdvancementsDisabled() {
+        return FeatureRegistry.isDisabled(Feature.GAMEPLAY_ADVANCEMENTS);
+    }
+
+    public static boolean isRecipesDisabled() {
+        return FeatureRegistry.isDisabled(Feature.GAMEPLAY_RECIPES);
+    }
+
+    public static boolean isWardenAndSleepEnabled() {
+        return FeatureRegistry.isEnabled(Feature.GAMEPLAY_WARDEN_AND_SLEEP);
+    }
+
+    public static boolean isCommandFunctionsEnabled() {
+        return FeatureRegistry.isEnabled(Feature.GAMEPLAY_COMMAND_FUNCTIONS);
+    }
+
+    // 6. Network & Analytics
+    public static boolean isGenerateKeypairEnabled() {
+        return FeatureRegistry.isEnabled(Feature.NETWORK_GENERATE_KEYPAIR);
+    }
+
     public static boolean isMetricsAndProfilerDisabled() {
-        return FeatureRegistry.isDisabled(Feature.ANALYTICS_DISABLE_METRICS_AND_PROFILER);
+        return FeatureRegistry.isDisabled(Feature.ANALYTICS_METRICS_AND_PROFILER);
     }
 
     public static boolean isDebugSynchronizersDisabled() {
-        return FeatureRegistry.isDisabled(Feature.ANALYTICS_DISABLE_DEBUG_SYNCHRONIZERS);
+        return FeatureRegistry.isDisabled(Feature.ANALYTICS_DEBUG_SYNCHRONIZERS);
     }
 
-    // 6. Ephemeral Storage & Lifecycle
-    public static boolean isMemoryOnlyWorld() {
-        return FeatureRegistry.isDisabled(Feature.STORAGE_EPHEMERAL_MEMORY_ONLY_WORLD);
-    }
-
-    public static boolean isFastShutdown() {
-        return FeatureRegistry.isDisabled(Feature.STORAGE_EPHEMERAL_FAST_SHUTDOWN);
-    }
-
-    // 7. Network Tracking & Packet Filtering
     public static boolean isServerPingSampleDisabled() {
-        return FeatureRegistry.isDisabled(Feature.NETWORK_DISABLE_SERVER_PING_SAMPLE);
+        return FeatureRegistry.isDisabled(Feature.NETWORK_SERVER_PING_SAMPLE);
+    }
+
+    public static boolean isTabLatencyUpdatesEnabled() {
+        return FeatureRegistry.isEnabled(Feature.NETWORK_TAB_LATENCY_UPDATES);
+    }
+
+    public static boolean isFastPacketFilteringEnabled() {
+        return FeatureRegistry.isDisabled(Feature.NETWORK_FULL_PACKET_BROADCAST);
     }
 
     public static int clampEntityTrackingRange(final Entity entity, final int vanillaRange) {
-        if (!FeatureRegistry.isDisabled(Feature.NETWORK_FAST_PACKET_FILTERING)) {
+        if (FeatureRegistry.isEnabled(Feature.NETWORK_FULL_PACKET_BROADCAST)) {
             return vanillaRange;
         }
         if (entity instanceof Projectile) {
@@ -278,18 +359,18 @@ public final class UltraCoreHooks {
     }
 
     public static boolean shouldDropParticlePacket(final double distSq) {
-        return FeatureRegistry.isDisabled(Feature.NETWORK_FAST_PACKET_FILTERING)
+        return FeatureRegistry.isDisabled(Feature.NETWORK_FULL_PACKET_BROADCAST)
             && distSq > FeatureRegistry.particleBroadcastRangeSq();
     }
 
     public static int equipmentTrackingRange(final int defaultRange) {
-        return FeatureRegistry.isDisabled(Feature.NETWORK_FAST_PACKET_FILTERING)
+        return FeatureRegistry.isDisabled(Feature.NETWORK_FULL_PACKET_BROADCAST)
             ? Math.min(defaultRange, FeatureRegistry.armorEquipmentRange())
             : defaultRange;
     }
 
     public static boolean shouldFilterEquipmentPacket(final Entity entity, final ServerPlayer viewer) {
-        if (!FeatureRegistry.isDisabled(Feature.NETWORK_FAST_PACKET_FILTERING)) {
+        if (FeatureRegistry.isEnabled(Feature.NETWORK_FULL_PACKET_BROADCAST)) {
             return false;
         }
         if (entity == viewer) {
@@ -299,34 +380,55 @@ public final class UltraCoreHooks {
         return entity.distanceToSqr(viewer) > (double) range * (double) range;
     }
 
-    // 8. Players Lifecycle & Inventory
+    // 7. Ephemeral Storage & Shutdown
+    public static boolean isMemoryOnlyWorld() {
+        return FeatureRegistry.isDisabled(Feature.STORAGE_WORLD_SAVING);
+    }
+
+    public static boolean isFastShutdown() {
+        return FeatureRegistry.isDisabled(Feature.STORAGE_GRACEFUL_SHUTDOWN);
+    }
+
+    // 8. Players Lifecycle
     public static boolean isPlayerDataSavingDisabled() {
-        return FeatureRegistry.isDisabled(Feature.PLAYERS_DISABLE_DATA_SAVING)
-            || FeatureRegistry.isDisabled(Feature.STORAGE_EPHEMERAL_MEMORY_ONLY_WORLD);
+        return FeatureRegistry.isDisabled(Feature.PLAYERS_DATA_SAVING)
+            || FeatureRegistry.isDisabled(Feature.STORAGE_WORLD_SAVING);
     }
 
-    public static boolean isAdvancementsDisabled() {
-        return FeatureRegistry.isDisabled(Feature.PLAYERS_DISABLE_ADVANCEMENTS);
+    public static boolean isHungerEnabled() {
+        return FeatureRegistry.isEnabled(Feature.PLAYERS_HUNGER);
     }
 
-    public static boolean isRecipesDisabled() {
-        return FeatureRegistry.isDisabled(Feature.PLAYERS_DISABLE_RECIPES);
+    public static boolean isStatisticsEnabled() {
+        return FeatureRegistry.isEnabled(Feature.PLAYERS_STATISTICS);
     }
 
-    // 9. World Physics & Containers
+    // 9. World Time & Physics
+    public static boolean isDaylightCycleEnabled() {
+        return FeatureRegistry.isEnabled(Feature.WORLD_DAYLIGHT_CYCLE);
+    }
+
     public static boolean isBlockGravityDisabled() {
-        return FeatureRegistry.isDisabled(Feature.PHYSICS_DISABLE_BLOCK_GRAVITY);
+        return FeatureRegistry.isDisabled(Feature.PHYSICS_BLOCK_GRAVITY);
     }
 
     public static boolean isHopperTickingDisabled() {
-        return FeatureRegistry.isDisabled(Feature.PHYSICS_DISABLE_HOPPER_TICKING);
+        return FeatureRegistry.isDisabled(Feature.PHYSICS_HOPPER_TICKING);
+    }
+
+    public static boolean isBlockEntityTickingEnabled() {
+        return FeatureRegistry.isEnabled(Feature.PHYSICS_BLOCK_ENTITY_TICKING);
+    }
+
+    public static boolean isItemPhysicsEnabled() {
+        return FeatureRegistry.isEnabled(Feature.PHYSICS_ITEM_PHYSICS);
     }
 
     public static boolean isLeafDecayDisabled() {
-        return FeatureRegistry.isDisabled(Feature.PHYSICS_DISABLE_LEAF_DECAY);
+        return FeatureRegistry.isDisabled(Feature.PHYSICS_LEAF_DECAY);
     }
 
     public static boolean isFireSpreadDisabled() {
-        return FeatureRegistry.isDisabled(Feature.PHYSICS_DISABLE_FIRE_SPREAD);
+        return FeatureRegistry.isDisabled(Feature.PHYSICS_FIRE_SPREAD);
     }
 }

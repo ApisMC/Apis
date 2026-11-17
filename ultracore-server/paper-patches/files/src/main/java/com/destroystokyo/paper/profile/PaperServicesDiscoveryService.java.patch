@@ -1,0 +1,12 @@
+--- a/src/main/java/com/destroystokyo/paper/profile/PaperServicesDiscoveryService.java
++++ b/src/main/java/com/destroystokyo/paper/profile/PaperServicesDiscoveryService.java
+@@ -31,6 +_,9 @@
+         final boolean servicesKeySetEnabled,
+         final Environment environment
+     ) {
++        if (!dev.ultracore.hooks.UltraCoreHooks.isMojangServiceDiscoveryEnabled()) { // UltraCore
++            return new PaperServicesDiscoveryService(proxy, false, DiscoveryResponse::offline);
++        } // UltraCore
+         LOGGER.info("Environment: {}", environment);
+         return new PaperServicesDiscoveryService(
+             proxy,

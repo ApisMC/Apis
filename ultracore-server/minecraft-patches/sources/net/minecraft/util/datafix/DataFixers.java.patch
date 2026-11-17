@@ -1,0 +1,15 @@
+--- a/net/minecraft/util/datafix/DataFixers.java
++++ b/net/minecraft/util/datafix/DataFixers.java
+@@ -1743,7 +_,11 @@
+         int dataVersion = SharedConstants.getCurrentVersion().dataVersion().version();
+         DataFixerBuilder fixerUpper = new DataFixerBuilder(dataVersion);
+         FileFixerUpper.Builder fileFixerUpper = new FileFixerUpper.Builder(dataVersion);
+-        addFixers(fixerUpper, fileFixerUpper);
++        if (dev.ultracore.hooks.UltraCoreHooks.isDataFixersEnabled()) { // UltraCore
++            addFixers(fixerUpper, fileFixerUpper);
++        } else {
++            fixerUpper.addSchema(dataVersion, dev.ultracore.hooks.UltraCoreHooks::createEmptyDataFixerSchema);
++        } // UltraCore
+         DATA_FIXER = fixerUpper.build();
+         FILE_FIXER = fileFixerUpper.build(DATA_FIXER);
+     }

@@ -25,11 +25,12 @@ for (name in listOf("ultracore-api", "ultracore-server", "ultracore-checkstyle")
 gradle.lifecycle.beforeProject {
     val mcVersion = providers.gradleProperty("mcVersion").get().trim()
     val channel = providers.gradleProperty("channel").get().trim()
+    val isRelease = providers.gradleProperty("release").map { it.toBoolean() }.getOrElse(false)
     val buildNumber = providers.environmentVariable("BUILD_NUMBER").orNull?.trim()?.toInt()
-    val versionString = if (buildNumber == null) {
-        "$mcVersion.local-SNAPSHOT"
-    } else {
-        "$mcVersion.build.$buildNumber-${channel.lowercase()}"
+    val versionString = when {
+        isRelease -> "$mcVersion-release"
+        buildNumber == null -> "$mcVersion.local-SNAPSHOT"
+        else -> "$mcVersion.build.$buildNumber-${channel.lowercase()}"
     }
     version = versionString
 }

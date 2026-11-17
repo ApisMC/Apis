@@ -1,11 +1,10 @@
 --- a/paper-server/build.gradle.kts
 +++ b/paper-server/build.gradle.kts
-@@ -23,15 +23,31 @@
+@@ -23,13 +_,29 @@
      minecraftVersion = providers.gradleProperty("mcVersion")
      gitFilePatches = false
  
 -    updatingMinecraft {
--        //oldPaperCommit = "e5fe71723e2ffde7cc9fafc085ac3bb73e63175e"
 +    // UltraCore start - Rebrand
 +    val ultracore = forks.register("ultracore") {
 +        upstream.patchDir("paperServer") {
@@ -14,28 +13,27 @@
 +            patchesDir = rootDirectory.dir("ultracore-server/paper-patches")
 +            outputDir = rootDirectory.dir("paper-server")
 +        }
-     }
++    }
 +    activeFork = ultracore
 +    // UltraCore end - Rebrand
 +
 +    /*updatingMinecraft {
-+        //oldPaperCommit = "e5fe71723e2ffde7cc9fafc085ac3bb73e63175e"
+         //oldPaperCommit = "e5fe71723e2ffde7cc9fafc085ac3bb73e63175e"
+-    }
 +    }*/
  }
  
  paperCheckstyle {
 -    directoriesToSkipFile = layout.projectDirectory.file(".checkstyle/ignored_directories.txt")
 +    directoriesToSkipFile = layout.projectDirectory.file("../paper-server/.checkstyle/ignored_directories.txt")
- }
- 
-+tasks.named<io.papermc.paperweight.checkstyle.tasks.MergeCheckstyleConfigs>("mergeCheckstyleConfigs") {
-+    overrideConfigFile.set(layout.projectDirectory.file("../paper-server/.checkstyle/checkstyle.xml"))
 +}
 +
++tasks.named<io.papermc.paperweight.checkstyle.tasks.MergeCheckstyleConfigs>("mergeCheckstyleConfigs") {
++    overrideConfigFile.set(layout.projectDirectory.file("../paper-server/.checkstyle/checkstyle.xml"))
+ }
+ 
  tasks.generateDevelopmentBundle {
-     libraryRepositories.addAll(
-         "https://repo.maven.apache.org/maven2/",
-@@ -91,7 +107,21 @@
+@@ -91,7 +_,21 @@
      }
  }
  
@@ -58,7 +56,7 @@
  configurations.named(log4jPlugins.compileClasspathConfigurationName) {
      extendsFrom(configurations.compileClasspath.get())
  }
-@@ -114,7 +144,7 @@
+@@ -114,7 +_,7 @@
  }
  
  dependencies {
@@ -67,7 +65,7 @@
      implementation(platform("ca.spottedleaf.leafpile:bom:1.3.2"))
      implementation("ca.spottedleaf.leafpile:common")
      implementation("ca.spottedleaf.leafpile:concurrentutil")
-@@ -165,6 +195,8 @@
+@@ -165,28 +_,32 @@
      // Spark
      implementation("me.lucko:spark-api:0.1-20240720.200737-2")
      implementation("me.lucko:spark-paper:1.10.191")
@@ -76,7 +74,18 @@
  }
  
  tasks.jar {
-@@ -179,14 +211,14 @@
+     manifest {
+         val git = Git(rootProject.layout.projectDirectory.path)
+         val mcVersion = rootProject.providers.gradleProperty("mcVersion").get()
++        val isRelease = providers.gradleProperty("release").map { it.toBoolean() }.getOrElse(false)
+         val build = System.getenv("BUILD_NUMBER") ?: null
+-        val buildTime = providers.environmentVariable("BUILD_STARTED_AT").map(Instant::parse).orElse(Instant.EPOCH).get()
++        val buildTime = providers.environmentVariable("BUILD_STARTED_AT").map(Instant::parse)
++            .orElse(if (isRelease) Instant.now() else Instant.EPOCH).get()
+         val gitHash = git.exec(providers, "rev-parse", "--short=7", "HEAD").get().trim()
+-        val implementationVersion = "$mcVersion-${build ?: "DEV"}-$gitHash"
++        val implementationVersion = if (isRelease) "$mcVersion-RELEASE-$gitHash" else "$mcVersion-${build ?: "DEV"}-$gitHash"
+         val date = git.exec(providers, "show", "-s", "--format=%ci", gitHash).get().trim()
          val gitBranch = git.exec(providers, "rev-parse", "--abbrev-ref", "HEAD").get().trim()
          attributes(
              "Main-Class" to "org.bukkit.craftbukkit.Main",
@@ -96,7 +105,7 @@
              "Build-Number" to (build ?: ""),
              "Build-Time" to buildTime.toString(),
              "Git-Branch" to gitBranch,
-@@ -264,7 +296,7 @@
+@@ -264,7 +_,7 @@
      )
  }
  
@@ -105,7 +114,7 @@
  idea {
      module {
          generatedSourceDirs.add(generatedDir.toFile())
-@@ -346,7 +378,7 @@
+@@ -346,7 +_,7 @@
      mainClass.set(null as String?)
  }
  
@@ -114,7 +123,7 @@
      project("paper")
      versionFamily(paperweight.minecraftVersion.map { it.split(".", "-").takeWhile { part -> part.toIntOrNull() != null }.take(2).joinToString(".") })
      version(paperweight.minecraftVersion)
-@@ -361,4 +393,4 @@
+@@ -361,4 +_,4 @@
              }
          }
      }

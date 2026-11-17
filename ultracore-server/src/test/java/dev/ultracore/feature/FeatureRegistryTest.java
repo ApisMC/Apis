@@ -39,58 +39,78 @@ class FeatureRegistryTest {
     }
 
     @Test
-    void appliesAndQueriesAllNineCategoriesInO1() {
+    void positiveDefaultsLeaveZeroKillSwitchesAndFalseValuesActivateGuards() {
         final UltraCoreConfig cfg = new UltraCoreConfig();
-        cfg.worlds.disableCustomWorlds = true;
-        cfg.worlds.disablePortals = true;
-        cfg.entities.ai.disableGlobally = true;
-        cfg.chunks.disableStructures = true;
-        cfg.gameplay.disableRedstone = true;
-        cfg.gameplay.disableMonsters = true;
-        cfg.gameplay.disableAnimals = true;
-        cfg.network.analytics.disableMetricsAndProfiler = true;
-        cfg.storage.ephemeral.memoryOnlyWorld = true;
-        cfg.storage.ephemeral.fastShutdown = true;
-        cfg.network.tracking.disablePlayerCollisions = true;
-        cfg.network.tracking.fastPacketFiltering = true;
-        cfg.network.tracking.disableServerPingSample = true;
-        cfg.players.lifecycle.disablePlayerDataSaving = true;
-        cfg.players.lifecycle.disableAdvancements = true;
-        cfg.players.lifecycle.disableRecipes = true;
-        cfg.world.physics.disableBlockGravity = true;
-        cfg.world.physics.disableHopperTicking = true;
-        cfg.world.physics.disableLeafDecay = true;
-        cfg.world.physics.disableFireSpread = true;
+        FeatureRegistry.applyEarly(cfg);
+        assertEquals(0, FeatureRegistry.activeKillSwitches().size());
+        assertTrue(UltraCoreHooks.isDataFixersEnabled());
+        assertTrue(UltraCoreHooks.isDaylightCycleEnabled());
+
+        cfg.startup.datafixers = false;
+        cfg.startup.searchSpawnPoint = false;
+        cfg.startup.initialChunkLoad = false;
+        cfg.startup.validateRegistries = false;
+        cfg.startup.mojangServiceDiscovery = false;
+        cfg.startup.paperVersionCheck = false;
+        cfg.worlds.customWorlds = false;
+        cfg.worlds.portals = false;
+        cfg.entities.ai.enabled = false;
+        cfg.chunks.structures = false;
+        cfg.gameplay.redstone = false;
+        cfg.gameplay.monsters = false;
+        cfg.gameplay.animals = false;
+        cfg.gameplay.advancements = false;
+        cfg.gameplay.recipes = false;
+        cfg.gameplay.wardenAndSleep = false;
+        cfg.gameplay.commandFunctions = false;
+        cfg.network.generateKeypair = false;
+        cfg.network.analytics.metricsAndProfiler = false;
+        cfg.network.tracking.playerCollisions = false;
+        cfg.network.tracking.fullPacketBroadcast = false;
+        cfg.network.tracking.serverPingSample = false;
+        cfg.network.tracking.tabLatencyUpdates = false;
+        cfg.storage.ephemeral.worldSaving = false;
+        cfg.storage.ephemeral.gracefulShutdown = false;
+        cfg.players.lifecycle.playerDataSaving = false;
+        cfg.players.lifecycle.hunger = false;
+        cfg.players.lifecycle.statistics = false;
+        cfg.world.daylightCycle = false;
+        cfg.world.physics.blockGravity = false;
+        cfg.world.physics.hopperTicking = false;
+        cfg.world.physics.blockEntityTicking = false;
+        cfg.world.physics.itemPhysics = false;
+        cfg.world.physics.leafDecay = false;
+        cfg.world.physics.fireSpread = false;
 
         FeatureRegistry.applyEarly(cfg);
 
-        assertTrue(FeatureRegistry.isDisabled(Feature.WORLDS_DISABLE_CUSTOM_WORLDS));
-        assertTrue(FeatureRegistry.isDisabled(Feature.WORLDS_DISABLE_PORTALS));
-        assertTrue(FeatureRegistry.isDisabled(Feature.AI_DISABLE_GLOBALLY));
-        assertTrue(FeatureRegistry.isDisabled(Feature.CHUNKS_DISABLE_STRUCTURES));
-        assertTrue(FeatureRegistry.isDisabled(Feature.GAMEPLAY_DISABLE_REDSTONE));
-        assertTrue(FeatureRegistry.isDisabled(Feature.GAMEPLAY_DISABLE_MONSTERS));
-        assertTrue(FeatureRegistry.isDisabled(Feature.GAMEPLAY_DISABLE_ANIMALS));
-        assertTrue(FeatureRegistry.isDisabled(Feature.ANALYTICS_DISABLE_METRICS_AND_PROFILER));
-        assertTrue(FeatureRegistry.isDisabled(Feature.STORAGE_EPHEMERAL_MEMORY_ONLY_WORLD));
-        assertTrue(FeatureRegistry.isDisabled(Feature.STORAGE_EPHEMERAL_FAST_SHUTDOWN));
-        assertTrue(FeatureRegistry.isDisabled(Feature.NETWORK_DISABLE_PLAYER_COLLISIONS));
-        assertTrue(FeatureRegistry.isDisabled(Feature.NETWORK_FAST_PACKET_FILTERING));
-        assertTrue(FeatureRegistry.isDisabled(Feature.NETWORK_DISABLE_SERVER_PING_SAMPLE));
-        assertTrue(FeatureRegistry.isDisabled(Feature.PLAYERS_DISABLE_DATA_SAVING));
-        assertTrue(FeatureRegistry.isDisabled(Feature.PLAYERS_DISABLE_ADVANCEMENTS));
-        assertTrue(FeatureRegistry.isDisabled(Feature.PLAYERS_DISABLE_RECIPES));
-        assertTrue(FeatureRegistry.isDisabled(Feature.PHYSICS_DISABLE_BLOCK_GRAVITY));
-        assertTrue(FeatureRegistry.isDisabled(Feature.PHYSICS_DISABLE_HOPPER_TICKING));
-        assertTrue(FeatureRegistry.isDisabled(Feature.PHYSICS_DISABLE_LEAF_DECAY));
-        assertTrue(FeatureRegistry.isDisabled(Feature.PHYSICS_DISABLE_FIRE_SPREAD));
+        assertFalse(UltraCoreHooks.isDataFixersEnabled());
+        assertFalse(UltraCoreHooks.isSearchSpawnPointEnabled());
+        assertFalse(UltraCoreHooks.isInitialChunkLoadEnabled());
+        assertFalse(UltraCoreHooks.isValidateRegistriesEnabled());
+        assertFalse(UltraCoreHooks.isMojangServiceDiscoveryEnabled());
+        assertFalse(UltraCoreHooks.isPaperVersionCheckEnabled());
+        assertFalse(UltraCoreHooks.isGenerateKeypairEnabled());
+        assertFalse(UltraCoreHooks.isWardenAndSleepEnabled());
+        assertFalse(UltraCoreHooks.isCommandFunctionsEnabled());
+        assertFalse(UltraCoreHooks.isTabLatencyUpdatesEnabled());
+        assertFalse(UltraCoreHooks.isHungerEnabled());
+        assertFalse(UltraCoreHooks.isStatisticsEnabled());
+        assertFalse(UltraCoreHooks.isDaylightCycleEnabled());
+        assertFalse(UltraCoreHooks.isBlockEntityTickingEnabled());
+        assertFalse(UltraCoreHooks.isItemPhysicsEnabled());
 
-        assertFalse(FeatureRegistry.isDisabled(Feature.GAMEPLAY_DISABLE_WEATHER));
-        assertTrue(FeatureRegistry.isEnabled(Feature.GAMEPLAY_DISABLE_WEATHER));
-        assertEquals(20, FeatureRegistry.activeKillSwitches().size());
+        assertTrue(UltraCoreHooks.isMemoryOnlyWorld());
+        assertTrue(UltraCoreHooks.isFastShutdown());
+        assertTrue(UltraCoreHooks.isAdvancementsDisabled());
+        assertTrue(UltraCoreHooks.isRecipesDisabled());
         assertTrue(UltraCoreHooks.isMobCategoryDisabled(MobCategory.MONSTER));
         assertTrue(UltraCoreHooks.isMobCategoryDisabled(MobCategory.CREATURE));
         assertFalse(UltraCoreHooks.isMobCategoryDisabled(MobCategory.MISC));
+
+        assertTrue(FeatureRegistry.isEnabled(Feature.GAMEPLAY_WEATHER));
+        assertFalse(FeatureRegistry.isDisabled(Feature.GAMEPLAY_WEATHER));
+        assertEquals(35, FeatureRegistry.activeKillSwitches().size());
     }
 
     @Test
