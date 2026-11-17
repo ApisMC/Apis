@@ -1,0 +1,45 @@
+# JVM crash related
+core.*
+hs_err_pid*
+
+# Intellij
+/.idea/*
+*.iml
+*.ipr
+*.iws
+out/
+
+# Eclipse
+.classpath
+.project
+.settings/
+
+# Gradle
+!gradle-wrapper.jar
+.gradle/
+build/
+*/build/
+
+# Mac
+.DS_Store/
+.DS_Store
+
+# vim / temp
+.*.sw[a-p]
+*~
+
+# Runtime
+/run
+/logs
+*.jar
+test-plugin.settings.gradle.kts
+
+# Generated upstream/fork outputs
+/ultracore-server/build.gradle.kts
+/ultracore-server/src/minecraft
+/paper-server
+/ultracore-api/build.gradle.kts
+/paper-api
+/paper-checkstyle
+/.checkstyle
+/ultracore-checkstyle/build.gradle.kts
