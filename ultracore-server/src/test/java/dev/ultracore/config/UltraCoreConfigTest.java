@@ -28,6 +28,13 @@ class UltraCoreConfigTest {
         final Path cfgFile = tempDir.resolve("ultracore.yml");
         final UltraCoreConfig initial = UltraCoreConfig.loadEarly(cfgFile);
         assertTrue(initial.startup.datafixers);
+        assertTrue(initial.startup.eagerBlockstateCache);
+        assertTrue(initial.startup.eagerCraftblockdataCache);
+        assertTrue(initial.gameplay.lootTables);
+        assertTrue(initial.compatibility.legacy.pluginBytecodeRerouting);
+        assertTrue(initial.compatibility.legacy.bootstrapDataTables);
+        assertTrue(initial.compatibility.legacy.eagerMapColorCache);
+        assertTrue(initial.compatibility.legacy.validateEntityAttributes);
         assertTrue(initial.storage.ephemeral.worldSaving);
         assertTrue(initial.world.physics.blockEntityTicking);
         assertTrue(Files.exists(cfgFile));
@@ -38,6 +45,13 @@ class UltraCoreConfigTest {
         assertTrue(yamlText.contains("true = standard Vanilla/Paper behavior enabled"),
             "Generated header must explain positive true/false semantics");
         assertTrue(yamlText.contains("datafixers: true"));
+        assertTrue(yamlText.contains("eager-blockstate-cache: true"));
+        assertTrue(yamlText.contains("eager-craftblockdata-cache: true"));
+        assertTrue(yamlText.contains("loot-tables: true"));
+        assertTrue(yamlText.contains("plugin-bytecode-rerouting: true"));
+        assertTrue(yamlText.contains("bootstrap-data-tables: true"));
+        assertTrue(yamlText.contains("eager-map-color-cache: true"));
+        assertTrue(yamlText.contains("validate-entity-attributes: true"));
         assertTrue(yamlText.contains("world-saving: true"));
         assertTrue(yamlText.contains("player-collisions: true"));
         assertTrue(yamlText.contains("block-entity-ticking: true"));
@@ -45,6 +59,8 @@ class UltraCoreConfigTest {
 
         final String updated = yamlText
             .replace("datafixers: true", "datafixers: false")
+            .replace("eager-blockstate-cache: true", "eager-blockstate-cache: false")
+            .replace("plugin-bytecode-rerouting: true", "plugin-bytecode-rerouting: false")
             .replace("world-saving: true", "world-saving: false")
             .replace("graceful-shutdown: true", "graceful-shutdown: false")
             .replace("player-collisions: true", "player-collisions: false")
@@ -53,13 +69,17 @@ class UltraCoreConfigTest {
 
         final UltraCoreConfig reloaded = UltraCoreConfig.loadEarly(cfgFile);
         assertFalse(reloaded.startup.datafixers);
+        assertFalse(reloaded.startup.eagerBlockstateCache);
+        assertFalse(reloaded.compatibility.legacy.pluginBytecodeRerouting);
         assertFalse(reloaded.storage.ephemeral.worldSaving);
         assertFalse(reloaded.storage.ephemeral.gracefulShutdown);
         assertFalse(reloaded.network.tracking.playerCollisions);
         assertEquals(256, reloaded.network.tracking.projectileTrackingRange, "Out-of-bounds tracking range must be clamped");
         assertTrue(FeatureRegistry.isDisabled(Feature.STARTUP_DATAFIXERS));
+        assertTrue(FeatureRegistry.isDisabled(Feature.STARTUP_EAGER_BLOCKSTATE_CACHE));
+        assertTrue(FeatureRegistry.isDisabled(Feature.LEGACY_PLUGIN_BYTECODE_REROUTING));
         assertTrue(FeatureRegistry.isDisabled(Feature.STORAGE_WORLD_SAVING));
-        assertEquals(4, FeatureRegistry.activeKillSwitches().size());
+        assertEquals(6, FeatureRegistry.activeKillSwitches().size());
     }
 
     @Test

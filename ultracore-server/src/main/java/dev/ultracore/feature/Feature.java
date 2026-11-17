@@ -12,6 +12,8 @@ public enum Feature {
     STARTUP_VALIDATE_REGISTRIES("startup.validate-registries"),
     STARTUP_MOJANG_SERVICE_DISCOVERY("startup.mojang-service-discovery"),
     STARTUP_PAPER_VERSION_CHECK("startup.paper-version-check"),
+    STARTUP_EAGER_BLOCKSTATE_CACHE("startup.eager-blockstate-cache"),
+    STARTUP_EAGER_CRAFTBLOCKDATA_CACHE("startup.eager-craftblockdata-cache"),
 
     // 2. Worlds & Dimensions
     WORLDS_CUSTOM_WORLDS("worlds.custom-worlds"),
@@ -43,6 +45,7 @@ public enum Feature {
     GAMEPLAY_ANIMALS("gameplay.animals"),
     GAMEPLAY_ADVANCEMENTS("gameplay.advancements"),
     GAMEPLAY_RECIPES("gameplay.recipes"),
+    GAMEPLAY_LOOT_TABLES("gameplay.loot-tables"),
     GAMEPLAY_WARDEN_AND_SLEEP("gameplay.warden-and-sleep"),
     GAMEPLAY_COMMAND_FUNCTIONS("gameplay.command-functions"),
 
@@ -71,7 +74,13 @@ public enum Feature {
     PHYSICS_BLOCK_ENTITY_TICKING("world.physics.block-entity-ticking"),
     PHYSICS_ITEM_PHYSICS("world.physics.item-physics"),
     PHYSICS_LEAF_DECAY("world.physics.leaf-decay"),
-    PHYSICS_FIRE_SPREAD("world.physics.fire-spread");
+    PHYSICS_FIRE_SPREAD("world.physics.fire-spread"),
+
+    // 10. Compatibility & Legacy
+    LEGACY_PLUGIN_BYTECODE_REROUTING("compatibility.legacy.plugin-bytecode-rerouting"),
+    LEGACY_BOOTSTRAP_DATA_TABLES("compatibility.legacy.bootstrap-data-tables"),
+    LEGACY_EAGER_MAP_COLOR_CACHE("compatibility.legacy.eager-map-color-cache"),
+    LEGACY_VALIDATE_ENTITY_ATTRIBUTES("compatibility.legacy.validate-entity-attributes");
 
     static final int MAX_SUPPORTED_FEATURES = 128;
 

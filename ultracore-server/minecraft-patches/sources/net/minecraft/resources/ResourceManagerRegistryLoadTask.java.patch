@@ -1,0 +1,29 @@
+--- a/net/minecraft/resources/ResourceManagerRegistryLoadTask.java
++++ b/net/minecraft/resources/ResourceManagerRegistryLoadTask.java
+@@ -42,8 +_,16 @@
+ 
+     @Override
+     public CompletableFuture<?> load(final RegistryOps.RegistryInfoLookup context, final Executor executor) {
+-        FileToIdConverter lister = FileToIdConverter.registry(this.registryKey());
+         final io.papermc.paper.registry.data.util.Conversions conversions = new io.papermc.paper.registry.data.util.Conversions(context); // Paper - create conversions
++        if (dev.ultracore.hooks.UltraCoreHooks.shouldPruneRegistryAtLoad(this.registryKey())) { // UltraCore - Early datapack registry pruning before scanning/parsing
++            this.registerElements(java.util.stream.Stream.empty(), conversions);
++            io.papermc.paper.registry.PaperRegistryAccess.instance().lockReferenceHolders(this.registryKey());
++            io.papermc.paper.registry.PaperRegistryListenerManager.INSTANCE.runFreezeListeners(this.registryKey(), conversions);
++            this.registerTags(java.util.Collections.emptyMap());
++            return CompletableFuture.completedFuture(null);
++        } // UltraCore
++        FileToIdConverter lister = FileToIdConverter.registry(this.registryKey());
++        final com.mojang.serialization.Decoder<T> elementDecoder = dev.ultracore.hooks.UltraCoreHooks.resolveRegistryDecoder(this.registryKey(), this.data.elementCodec()); // UltraCore
+         return CompletableFuture.<Map<Identifier, Resource>>supplyAsync(() -> lister.listMatchingResources(this.resourceManager), executor)
+             .thenCompose(
+                 registryResources -> {
+@@ -55,7 +_,7 @@
+                             RegistrationInfo registrationInfo = REGISTRATION_INFO_CACHE.apply(thunk.knownPackInfo());
+                             return new RegistryLoadTask.PendingRegistration<>(
+                                 elementKey,
+-                                RegistryLoadTask.PendingRegistration.loadFromResource(this.data.elementCodec(), ops, elementKey, thunk),
++                                RegistryLoadTask.PendingRegistration.loadFromResource(elementDecoder, ops, elementKey, thunk), // UltraCore
+                                 registrationInfo
+                             );
+                         },

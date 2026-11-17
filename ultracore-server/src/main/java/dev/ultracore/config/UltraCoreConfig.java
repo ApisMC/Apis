@@ -78,6 +78,10 @@ public final class UltraCoreConfig {
     @Comment("World time & block/item physics (true = active, false = cut) | Час світу та фізика блоків/предметів (true = увімкнено, false = вирізано)")
     public WorldSection world = new WorldSection();
 
+    @Setting("compatibility")
+    @Comment("Legacy Bukkit/Minecraft compatibility layers (true = standard, false = disabled for speed/RAM) | Застарілі механізми сумісності (true = стандарт, false = вимкнено для швидкості і RAM)")
+    public CompatibilitySection compatibility = new CompatibilitySection();
+
     public static UltraCoreConfig get() {
         return instance;
     }
@@ -262,6 +266,8 @@ public final class UltraCoreConfig {
         if (this.players.lifecycle == null) this.players.lifecycle = new PlayerLifecycleSection();
         if (this.world == null) this.world = new WorldSection();
         if (this.world.physics == null) this.world.physics = new PhysicsSection();
+        if (this.compatibility == null) this.compatibility = new CompatibilitySection();
+        if (this.compatibility.legacy == null) this.compatibility.legacy = new LegacySection();
 
         this.network.tracking.projectileTrackingRange = clampInt(
             this.network.tracking.projectileTrackingRange, 0, 256, "network.tracking.projectile-tracking-range", logger
@@ -318,6 +324,14 @@ public final class UltraCoreConfig {
         @Setting("paper-version-check")
         @Comment("true = query fill.papermc.io / api.github.com for Paper build updates; false = disable startup version check | true = перевіряти оновлення Paper на старті, false = вимкнути мережеву перевірку версії")
         public boolean paperVersionCheck = true;
+
+        @Setting("eager-blockstate-cache")
+        @Comment("true = precompute collision, occlusion & shape caches for all 27k+ BlockStates at boot; false = lazy on-demand per state | true = прогрівати кеш усіх станів блоків на старті, false = ледачий розрахунок по запиту")
+        public boolean eagerBlockstateCache = true;
+
+        @Setting("eager-craftblockdata-cache")
+        @Comment("true = pre-populate CraftBlockData ENCODER_CACHE & clones on class init; false = lazy on-demand parsing & caching | true = заповнювати кеш CraftBlockData на старті, false = ледаче кешування")
+        public boolean eagerCraftblockdataCache = true;
     }
 
     @ConfigSerializable
@@ -441,6 +455,10 @@ public final class UltraCoreConfig {
         @Setting("recipes")
         @Comment("true = compile & sync server recipe book; false = skip RecipeManager compilation & sync | true = рецепти, false = вирізати компіляцію і синхронізацію")
         public boolean recipes = true;
+
+        @Setting("loot-tables")
+        @Comment("true = parse datapack loot_table JSON definitions; false = skip loot table loading (returns LootTable.EMPTY) | true = завантажувати таблиці луту, false = пропустити на старті")
+        public boolean lootTables = true;
 
         @Setting("warden-and-sleep")
         @Comment("true = tick warden spawn tracker, sleep night-skip & dragon fight; false = skip all three | true = варден/сон/дракон, false = вимкнути")
@@ -584,5 +602,31 @@ public final class UltraCoreConfig {
         @Setting("fire-spread")
         @Comment("true = allow fire spread & burn ticks; false = disable fire spread | true = поширення вогню, false = вимкнути")
         public boolean fireSpread = true;
+    }
+
+    @ConfigSerializable
+    public static final class CompatibilitySection {
+        @Setting("legacy")
+        @Comment("Granular kill-switches for legacy Bukkit/Mojang subsystems | Окремі рубильники застарілих підсистем сумісності")
+        public LegacySection legacy = new LegacySection();
+    }
+
+    @ConfigSerializable
+    public static final class LegacySection {
+        @Setting("plugin-bytecode-rerouting")
+        @Comment("true = run ASM Commodore bytecode rerouting for old Bukkit plugins; false = load plugin bytecode directly | true = ASM-переписування плагінів Commodore, false = без трансформації байткоду")
+        public boolean pluginBytecodeRerouting = true;
+
+        @Setting("bootstrap-data-tables")
+        @Comment("true = build pre-1.13 block/item conversion tables in Bootstrap; false = skip legacy conversion maps | true = таблиці конвертації до 1.13 у Bootstrap, false = пропустити")
+        public boolean bootstrapDataTables = true;
+
+        @Setting("eager-map-color-cache")
+        @Comment("true = enable 16 MB CraftMapColorCache lookup table & background build; false = direct lazy color matching (0 MB) | true = таблиця кольорів карт 16 МБ, false = лінивий підбір без буфера")
+        public boolean eagerMapColorCache = true;
+
+        @Setting("validate-entity-attributes")
+        @Comment("true = eagerly load all mob classes & validate attributes in Bootstrap; false = lazy attribute resolution | true = валідація атрибутів усіх мобів на старті, false = лінива ініціалізація")
+        public boolean validateEntityAttributes = true;
     }
 }

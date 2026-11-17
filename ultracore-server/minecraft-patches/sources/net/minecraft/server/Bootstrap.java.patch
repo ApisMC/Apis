@@ -1,6 +1,6 @@
 --- a/net/minecraft/server/Bootstrap.java
 +++ b/net/minecraft/server/Bootstrap.java
-@@ -58,8 +_,10 @@
+@@ -58,13 +_,16 @@
              DispenseItemBehavior.bootStrap();
              CauldronInteractions.bootStrap();
              BuiltInRegistries.bootStrap(io.papermc.paper.world.worldgen.OptionallyFlatBedrockCondition::bootstrap); // Paper - Flat bedrock generator settings
@@ -13,3 +13,28 @@
              wrapStreams();
              bootstrapDuration.set(Duration.between(start, Instant.now()).toMillis());
              // CraftBukkit start
+             // TODO Check what of this is needed, maybe report it to Mojira. if deemed relevant, move to the respective classes
+             //  Used in CraftLegacy
++            if (dev.ultracore.hooks.UltraCoreHooks.isBootstrapDataTablesEnabled()) { // UltraCore
+             for (int i = 0; i <= 15; i++) {
+                 net.minecraft.util.datafix.fixes.BlockStateData.register(
+                     1008 + i,
+@@ -131,6 +_,7 @@
+             net.minecraft.util.datafix.fixes.ItemIdFix.ITEM_NAMES.put(453, "minecraft:knowledge_book");
+ 
+             net.minecraft.util.datafix.fixes.ItemSpawnEggFix.ID_TO_ENTITY[23] = "Arrow";
++            } // UltraCore
+             // CraftBukkit end
+         }
+     }
+@@ -194,7 +_,9 @@
+             Commands.validate();
+         }
+ 
+-        DefaultAttributes.validate();
++        if (dev.ultracore.hooks.UltraCoreHooks.isValidateEntityAttributesEnabled()) { // UltraCore
++            DefaultAttributes.validate();
++        } // UltraCore
+     }
+ 
+     private static void wrapStreams() {

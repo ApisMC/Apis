@@ -142,6 +142,8 @@ public final class FeatureRegistry {
         markIfDisabled(masks, Feature.STARTUP_VALIDATE_REGISTRIES, config.startup.validateRegistries);
         markIfDisabled(masks, Feature.STARTUP_MOJANG_SERVICE_DISCOVERY, config.startup.mojangServiceDiscovery);
         markIfDisabled(masks, Feature.STARTUP_PAPER_VERSION_CHECK, config.startup.paperVersionCheck);
+        markIfDisabled(masks, Feature.STARTUP_EAGER_BLOCKSTATE_CACHE, config.startup.eagerBlockstateCache);
+        markIfDisabled(masks, Feature.STARTUP_EAGER_CRAFTBLOCKDATA_CACHE, config.startup.eagerCraftblockdataCache);
 
         // 2. Worlds
         markIfDisabled(masks, Feature.WORLDS_CUSTOM_WORLDS, config.worlds.customWorlds);
@@ -173,6 +175,7 @@ public final class FeatureRegistry {
         markIfDisabled(masks, Feature.GAMEPLAY_ANIMALS, config.gameplay.animals);
         markIfDisabled(masks, Feature.GAMEPLAY_ADVANCEMENTS, config.gameplay.advancements);
         markIfDisabled(masks, Feature.GAMEPLAY_RECIPES, config.gameplay.recipes);
+        markIfDisabled(masks, Feature.GAMEPLAY_LOOT_TABLES, config.gameplay.lootTables);
         markIfDisabled(masks, Feature.GAMEPLAY_WARDEN_AND_SLEEP, config.gameplay.wardenAndSleep);
         markIfDisabled(masks, Feature.GAMEPLAY_COMMAND_FUNCTIONS, config.gameplay.commandFunctions);
 
@@ -202,6 +205,12 @@ public final class FeatureRegistry {
         markIfDisabled(masks, Feature.PHYSICS_ITEM_PHYSICS, config.world.physics.itemPhysics);
         markIfDisabled(masks, Feature.PHYSICS_LEAF_DECAY, config.world.physics.leafDecay);
         markIfDisabled(masks, Feature.PHYSICS_FIRE_SPREAD, config.world.physics.fireSpread);
+
+        // 10. Compatibility & Legacy
+        markIfDisabled(masks, Feature.LEGACY_PLUGIN_BYTECODE_REROUTING, config.compatibility.legacy.pluginBytecodeRerouting);
+        markIfDisabled(masks, Feature.LEGACY_BOOTSTRAP_DATA_TABLES, config.compatibility.legacy.bootstrapDataTables);
+        markIfDisabled(masks, Feature.LEGACY_EAGER_MAP_COLOR_CACHE, config.compatibility.legacy.eagerMapColorCache);
+        markIfDisabled(masks, Feature.LEGACY_VALIDATE_ENTITY_ATTRIBUTES, config.compatibility.legacy.validateEntityAttributes);
 
         disabledMask0 = masks[0];
         disabledMask1 = masks[1];

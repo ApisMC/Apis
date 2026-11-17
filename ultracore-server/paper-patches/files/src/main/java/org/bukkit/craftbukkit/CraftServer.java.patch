@@ -1,5 +1,20 @@
 --- a/src/main/java/org/bukkit/craftbukkit/CraftServer.java
 +++ b/src/main/java/org/bukkit/craftbukkit/CraftServer.java
+@@ -453,10 +_,12 @@
+         this.minimumAPI = ApiVersion.getOrCreateVersion(this.configuration.getString("settings.minimum-api"));
+         this.loadIcon();
+         this.loadCompatibilities();
+-        CraftMagicNumbers.INSTANCE.getCommodore().updateReroute(activeCompatibilities::contains);
++        if (dev.ultracore.hooks.UltraCoreHooks.isPluginBytecodeReroutingEnabled()) { // UltraCore
++            CraftMagicNumbers.INSTANCE.getCommodore().updateReroute(activeCompatibilities::contains);
++        } // UltraCore
+ 
+         // Set map color cache
+-        if (this.configuration.getBoolean("settings.use-map-color-cache")) {
++        if (dev.ultracore.hooks.UltraCoreHooks.isEagerMapColorCacheEnabled() && this.configuration.getBoolean("settings.use-map-color-cache")) { // UltraCore
+             MapPalette.setMapColorCache(new CraftMapColorCache(this.logger));
+         }
+         this.potionBrewer = new io.papermc.paper.potion.PaperPotionBrewer(console); // Paper - custom potion mixes
 @@ -486,6 +_,7 @@
  
      private void saveConfig() {
@@ -17,6 +32,17 @@
      }
  
      @Override
+@@ -953,7 +_,9 @@
+         this.console.autosavePeriod = this.configuration.getInt("ticks-per.autosave");
+         this.loadIcon();
+         this.loadCompatibilities();
+-        CraftMagicNumbers.INSTANCE.getCommodore().updateReroute(activeCompatibilities::contains);
++        if (dev.ultracore.hooks.UltraCoreHooks.isPluginBytecodeReroutingEnabled()) { // UltraCore
++            CraftMagicNumbers.INSTANCE.getCommodore().updateReroute(activeCompatibilities::contains);
++        } // UltraCore
+ 
+         try {
+             this.playerList.getIpBans().load();
 @@ -1150,6 +_,9 @@
          Preconditions.checkState(this.console.getAllLevels().iterator().hasNext(), "Cannot create additional worlds on STARTUP");
          //Preconditions.checkState(!this.console.isIteratingOverLevels, "Cannot create a world while worlds are being ticked"); // Paper - Cat - Temp disable. We'll see how this goes.

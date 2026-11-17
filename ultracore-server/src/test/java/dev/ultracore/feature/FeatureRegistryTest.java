@@ -1,25 +1,41 @@
 package dev.ultracore.feature;
 
+import com.google.gson.JsonElement;
+import com.google.gson.JsonPrimitive;
 import com.mojang.datafixers.DSL;
 import com.mojang.datafixers.DataFixer;
 import com.mojang.datafixers.DataFixerBuilder;
 import com.mojang.datafixers.schemas.Schema;
+import com.mojang.serialization.DataResult;
 import com.mojang.serialization.Dynamic;
+import com.mojang.serialization.JsonOps;
+import com.mojang.serialization.Lifecycle;
 import dev.ultracore.config.UltraCoreConfig;
 import dev.ultracore.hooks.UltraCoreHooks;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.stream.Stream;
+import net.minecraft.core.HolderLookup;
+import net.minecraft.core.HolderSet;
+import net.minecraft.core.MappedRegistry;
 import net.minecraft.core.registries.Registries;
+import net.minecraft.core.registries.codec.RegistryCodecs;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.NbtOps;
 import net.minecraft.nbt.Tag;
 import net.minecraft.resources.Identifier;
+import net.minecraft.resources.RegistryOps;
 import net.minecraft.resources.ResourceKey;
+import net.minecraft.tags.TagKey;
 import net.minecraft.util.datafix.fixes.References;
 import net.minecraft.world.entity.EntityTypes;
 import net.minecraft.world.entity.MobCategory;
+import net.minecraft.world.entity.ai.attributes.DefaultAttributes;
 import net.minecraft.world.level.Level;
+import net.minecraft.world.level.biome.Biome;
+import net.minecraft.world.level.levelgen.structure.Structure;
+import net.minecraft.world.level.storage.loot.LootTable;
 import org.bukkit.support.environment.AllFeatures;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
@@ -61,15 +77,19 @@ class FeatureRegistryTest {
         cfg.startup.validateRegistries = false;
         cfg.startup.mojangServiceDiscovery = false;
         cfg.startup.paperVersionCheck = false;
+        cfg.startup.eagerBlockstateCache = false;
+        cfg.startup.eagerCraftblockdataCache = false;
         cfg.worlds.customWorlds = false;
         cfg.worlds.portals = false;
         cfg.entities.ai.enabled = false;
         cfg.chunks.structures = false;
+        cfg.chunks.biomeDecoration = false;
         cfg.gameplay.redstone = false;
         cfg.gameplay.monsters = false;
         cfg.gameplay.animals = false;
         cfg.gameplay.advancements = false;
         cfg.gameplay.recipes = false;
+        cfg.gameplay.lootTables = false;
         cfg.gameplay.wardenAndSleep = false;
         cfg.gameplay.commandFunctions = false;
         cfg.network.generateKeypair = false;
@@ -90,6 +110,10 @@ class FeatureRegistryTest {
         cfg.world.physics.itemPhysics = false;
         cfg.world.physics.leafDecay = false;
         cfg.world.physics.fireSpread = false;
+        cfg.compatibility.legacy.pluginBytecodeRerouting = false;
+        cfg.compatibility.legacy.bootstrapDataTables = false;
+        cfg.compatibility.legacy.eagerMapColorCache = false;
+        cfg.compatibility.legacy.validateEntityAttributes = false;
 
         FeatureRegistry.applyEarly(cfg);
 
@@ -99,6 +123,8 @@ class FeatureRegistryTest {
         assertFalse(UltraCoreHooks.isValidateRegistriesEnabled());
         assertFalse(UltraCoreHooks.isMojangServiceDiscoveryEnabled());
         assertFalse(UltraCoreHooks.isPaperVersionCheckEnabled());
+        assertFalse(UltraCoreHooks.isEagerBlockStateCacheEnabled());
+        assertFalse(UltraCoreHooks.isEagerCraftBlockDataCacheEnabled());
         assertFalse(UltraCoreHooks.isGenerateKeypairEnabled());
         assertFalse(UltraCoreHooks.isWardenAndSleepEnabled());
         assertFalse(UltraCoreHooks.isCommandFunctionsEnabled());
@@ -108,6 +134,21 @@ class FeatureRegistryTest {
         assertFalse(UltraCoreHooks.isDaylightCycleEnabled());
         assertFalse(UltraCoreHooks.isBlockEntityTickingEnabled());
         assertFalse(UltraCoreHooks.isItemPhysicsEnabled());
+        assertFalse(UltraCoreHooks.isPluginBytecodeReroutingEnabled());
+        assertFalse(UltraCoreHooks.isBootstrapDataTablesEnabled());
+        assertFalse(UltraCoreHooks.isEagerMapColorCacheEnabled());
+        assertFalse(UltraCoreHooks.isValidateEntityAttributesEnabled());
+
+        assertTrue(UltraCoreHooks.shouldPruneRegistryAtLoad(Registries.RECIPE));
+        assertTrue(UltraCoreHooks.shouldPruneRegistryAtLoad(Registries.ADVANCEMENT));
+        assertTrue(UltraCoreHooks.shouldPruneRegistryAtLoad(Registries.LOOT_TABLE));
+        assertTrue(UltraCoreHooks.shouldPruneRegistryAtLoad(Registries.PLACED_FEATURE));
+        assertTrue(UltraCoreHooks.shouldPruneRegistryAtLoad(Registries.STRUCTURE));
+        assertTrue(UltraCoreHooks.shouldPruneRegistryAtLoad(Registries.TEST_INSTANCE));
+        assertFalse(UltraCoreHooks.shouldPruneRegistryAtLoad(Registries.BIOME));
+        assertEquals(Biome.NETWORK_CODEC, UltraCoreHooks.resolveRegistryDecoder(Registries.BIOME, Biome.DIRECT_CODEC));
+        assertTrue(DefaultAttributes.hasSupplier(EntityTypes.ZOMBIE));
+        assertTrue(DefaultAttributes.getSupplier(EntityTypes.PLAYER) != null);
 
         assertTrue(UltraCoreHooks.isMemoryOnlyWorld());
         assertTrue(UltraCoreHooks.isFastShutdown());
@@ -119,7 +160,7 @@ class FeatureRegistryTest {
 
         assertTrue(FeatureRegistry.isEnabled(Feature.GAMEPLAY_WEATHER));
         assertFalse(FeatureRegistry.isDisabled(Feature.GAMEPLAY_WEATHER));
-        assertEquals(35, FeatureRegistry.activeKillSwitches().size());
+        assertEquals(43, FeatureRegistry.activeKillSwitches().size());
     }
 
     @Test
@@ -161,5 +202,40 @@ class FeatureRegistryTest {
         final Dynamic<Tag> input = new Dynamic<>(NbtOps.INSTANCE, sample);
         final Dynamic<Tag> updated = fixer.update(References.BLOCK_STATE, input, 1343, 5016);
         assertEquals(sample, updated.getValue());
+    }
+
+    @Test
+    void prunedRegistryReturnsEmptyBoundTagsForHolderSetCodecAndFallbackHolders() {
+        final UltraCoreConfig cfg = new UltraCoreConfig();
+        cfg.chunks.structures = false;
+        cfg.gameplay.lootTables = false;
+        FeatureRegistry.applyEarly(cfg);
+
+        final MappedRegistry<Structure> structureRegistry = new MappedRegistry<>(Registries.STRUCTURE, Lifecycle.stable());
+        structureRegistry.bindAllTagsToEmpty();
+        structureRegistry.freeze();
+
+        final TagKey<Structure> treasureMaps = TagKey.create(Registries.STRUCTURE, Identifier.withDefaultNamespace("on_treasure_maps"));
+        final HolderSet.Named<Structure> emptyTag = structureRegistry.get(treasureMaps).orElseThrow();
+        assertTrue(emptyTag.isBound());
+        assertEquals(0, emptyTag.size());
+
+        final RegistryOps<JsonElement> ops = RegistryOps.create(
+            JsonOps.INSTANCE,
+            HolderLookup.Provider.create(Stream.of(structureRegistry))
+        );
+        final DataResult<HolderSet<Structure>> decoded = RegistryCodecs
+            .holderSet(Registries.STRUCTURE)
+            .parse(ops, new JsonPrimitive("#minecraft:on_treasure_maps"));
+        assertTrue(decoded.isSuccess(), () -> "Expected empty HolderSet but got error: " + decoded.error());
+        assertEquals(0, decoded.getOrThrow().size());
+
+        final MappedRegistry<LootTable> lootRegistry = new MappedRegistry<>(Registries.LOOT_TABLE, Lifecycle.stable());
+        final ResourceKey<LootTable> chestKey = ResourceKey.create(Registries.LOOT_TABLE, Identifier.withDefaultNamespace("chests/shipwreck_map"));
+        lootRegistry.createRegistrationLookup().getOrThrow(chestKey);
+        lootRegistry.bindAllTagsToEmpty();
+        UltraCoreHooks.bindPrunedFallbackHolders(lootRegistry);
+        lootRegistry.freeze();
+        assertEquals(LootTable.EMPTY, lootRegistry.getValue(chestKey));
     }
 }

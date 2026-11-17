@@ -34,3 +34,34 @@
          LOGGER.info("Starting Minecraft server on {}:{}", this.getLocalIp().isEmpty() ? "*" : this.getLocalIp(), this.getPort());
  
          try {
+@@ -298,25 +_,14 @@
+         this.server.enablePlugins(org.bukkit.plugin.PluginLoadOrder.STARTUP);
+         // CraftBukkit end
+ 
+-        // Paper start - Add Velocity IP Forwarding Support
+-        boolean usingProxy = org.spigotmc.SpigotConfig.bungee || io.papermc.paper.configuration.GlobalConfiguration.get().proxies.velocity.enabled;
+-        String proxyFlavor = (io.papermc.paper.configuration.GlobalConfiguration.get().proxies.velocity.enabled) ? "Velocity" : "BungeeCord";
+-        String proxyLink = (io.papermc.paper.configuration.GlobalConfiguration.get().proxies.velocity.enabled) ? "https://docs.papermc.io/velocity/security" : "http://www.spigotmc.org/wiki/firewall-guide/";
+-        // Paper end - Add Velocity IP Forwarding Support
+-        if (!this.usesAuthentication()) {
+-            LOGGER.warn("**** SERVER IS RUNNING IN OFFLINE/INSECURE MODE!");
+-            LOGGER.warn("The server will make no attempt to authenticate usernames. Beware.");
+-            // Spigot start
+-            // Paper start - Add Velocity IP Forwarding Support
++        if (!this.usesAuthentication()) { // UltraCore - Compact single-line offline-mode warning
++            final boolean usingProxy = org.spigotmc.SpigotConfig.bungee || io.papermc.paper.configuration.GlobalConfiguration.get().proxies.velocity.enabled;
+             if (usingProxy) {
+-                LOGGER.warn("Whilst this makes it possible to use {}, unless access to your server is properly restricted, it also opens up the ability for hackers to connect with any username they choose.", proxyFlavor);
+-                LOGGER.warn("Please see {} for further information.", proxyLink);
+-                // Paper end - Add Velocity IP Forwarding Support
++                final String proxyFlavor = io.papermc.paper.configuration.GlobalConfiguration.get().proxies.velocity.enabled ? "Velocity" : "BungeeCord";
++                LOGGER.warn("Server running in offline mode behind {} proxy (online-mode=false).", proxyFlavor);
+             } else {
+-                LOGGER.warn("While this makes the game possible to play without internet access, it also opens up the ability for hackers to connect with any username they choose.");
++                LOGGER.warn("Server running in offline/insecure mode without Mojang authentication (online-mode=false).");
+             }
+-            // Spigot end
+-            LOGGER.warn("To change this, set \"online-mode\" to \"true\" in the server.properties file.");
+         }
+ 
+         // CraftBukkit start

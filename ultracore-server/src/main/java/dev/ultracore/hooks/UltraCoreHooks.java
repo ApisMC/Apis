@@ -6,6 +6,7 @@ import com.mojang.datafixers.TypeRewriteRule;
 import com.mojang.datafixers.schemas.Schema;
 import com.mojang.datafixers.types.Type;
 import com.mojang.datafixers.types.templates.TypeTemplate;
+import com.mojang.serialization.Decoder;
 import dev.ultracore.config.UltraCoreConfig;
 import dev.ultracore.config.UltraCorePaths;
 import dev.ultracore.feature.Feature;
@@ -17,6 +18,8 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Supplier;
 import net.kyori.adventure.key.Key;
+import net.minecraft.core.MappedRegistry;
+import net.minecraft.core.Registry;
 import net.minecraft.core.RegistryAccess;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.resources.Identifier;
@@ -29,6 +32,8 @@ import net.minecraft.world.entity.MobCategory;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.entity.projectile.Projectile;
 import net.minecraft.world.level.Level;
+import net.minecraft.world.level.biome.Biome;
+import net.minecraft.world.level.storage.loot.LootTable;
 import org.bukkit.NamespacedKey;
 import org.bukkit.WorldCreator;
 import org.bukkit.craftbukkit.util.CraftNamespacedKey;
@@ -94,6 +99,96 @@ public final class UltraCoreHooks {
 
     public static boolean isPaperVersionCheckEnabled() {
         return FeatureRegistry.isEnabled(Feature.STARTUP_PAPER_VERSION_CHECK);
+    }
+
+    public static boolean isEagerBlockStateCacheEnabled() {
+        return FeatureRegistry.isEnabled(Feature.STARTUP_EAGER_BLOCKSTATE_CACHE);
+    }
+
+    public static boolean isEagerCraftBlockDataCacheEnabled() {
+        return FeatureRegistry.isEnabled(Feature.STARTUP_EAGER_CRAFTBLOCKDATA_CACHE);
+    }
+
+    /**
+     * Checks whether a data-driven registry can be pruned before scanning or parsing JSON resources.
+     *
+     * @param registryKey registry key being loaded
+     * @return {@code true} if the registry can remain empty and frozen
+     */
+    public static boolean shouldPruneRegistryAtLoad(final ResourceKey<? extends Registry<?>> registryKey) {
+        if (Registries.RECIPE.equals(registryKey)) {
+            return FeatureRegistry.isDisabled(Feature.GAMEPLAY_RECIPES);
+        }
+        if (Registries.ADVANCEMENT.equals(registryKey)) {
+            return FeatureRegistry.isDisabled(Feature.GAMEPLAY_ADVANCEMENTS);
+        }
+        if (Registries.LOOT_TABLE.equals(registryKey)) {
+            return FeatureRegistry.isDisabled(Feature.GAMEPLAY_LOOT_TABLES);
+        }
+        if (Registries.CARVER.equals(registryKey)
+            || Registries.FEATURE.equals(registryKey)
+            || Registries.PLACED_FEATURE.equals(registryKey)) {
+            return FeatureRegistry.isDisabled(Feature.CHUNKS_BIOME_DECORATION);
+        }
+        if (Registries.STRUCTURE.equals(registryKey)
+            || Registries.STRUCTURE_SET.equals(registryKey)
+            || Registries.PROCESSOR_LIST.equals(registryKey)
+            || Registries.TEMPLATE_POOL.equals(registryKey)) {
+            return FeatureRegistry.isDisabled(Feature.CHUNKS_STRUCTURES);
+        }
+        if (Registries.TEST_ENVIRONMENT.equals(registryKey) || Registries.TEST_INSTANCE.equals(registryKey)) {
+            return FeatureRegistry.isDisabled(Feature.STARTUP_VALIDATE_REGISTRIES);
+        }
+        return false;
+    }
+
+    /**
+     * Selects a lightweight decoder for registries whose heavy sub-fields belong to disabled capabilities.
+     *
+     * @param registryKey    registry key being loaded
+     * @param vanillaDecoder default element decoder
+     * @param <T>            registry element type
+     * @return decoder to use during JSON deserialization
+     */
+    @SuppressWarnings("unchecked")
+    public static <T> Decoder<T> resolveRegistryDecoder(
+        final ResourceKey<? extends Registry<T>> registryKey,
+        final Decoder<T> vanillaDecoder
+    ) {
+        if (Registries.BIOME.equals(registryKey) && FeatureRegistry.isDisabled(Feature.CHUNKS_BIOME_DECORATION)) {
+            return (Decoder<T>) Biome.NETWORK_CODEC;
+        }
+        return vanillaDecoder;
+    }
+
+    /**
+     * Binds any dangling reference holders created by cross-registry references to pruned registries.
+     *
+     * @param registry pruned registry about to freeze
+     * @param <T>      registry element type
+     */
+    @SuppressWarnings("unchecked")
+    public static <T> void bindPrunedFallbackHolders(final MappedRegistry<T> registry) {
+        if (Registries.LOOT_TABLE.equals(registry.key())) {
+            registry.bindUnboundHoldersToFallback((T) LootTable.EMPTY);
+        }
+    }
+
+    // 10. Compatibility & Legacy
+    public static boolean isPluginBytecodeReroutingEnabled() {
+        return FeatureRegistry.isEnabled(Feature.LEGACY_PLUGIN_BYTECODE_REROUTING);
+    }
+
+    public static boolean isBootstrapDataTablesEnabled() {
+        return FeatureRegistry.isEnabled(Feature.LEGACY_BOOTSTRAP_DATA_TABLES);
+    }
+
+    public static boolean isEagerMapColorCacheEnabled() {
+        return FeatureRegistry.isEnabled(Feature.LEGACY_EAGER_MAP_COLOR_CACHE);
+    }
+
+    public static boolean isValidateEntityAttributesEnabled() {
+        return FeatureRegistry.isEnabled(Feature.LEGACY_VALIDATE_ENTITY_ATTRIBUTES);
     }
 
     public static Schema createEmptyDataFixerSchema(final int versionKey, final @Nullable Schema parent) {
