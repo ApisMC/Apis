@@ -1,13 +1,22 @@
 package dev.ultracore.feature;
 
+import com.mojang.datafixers.DSL;
+import com.mojang.datafixers.DataFixer;
+import com.mojang.datafixers.DataFixerBuilder;
+import com.mojang.datafixers.schemas.Schema;
+import com.mojang.serialization.Dynamic;
 import dev.ultracore.config.UltraCoreConfig;
 import dev.ultracore.hooks.UltraCoreHooks;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import net.minecraft.core.registries.Registries;
+import net.minecraft.nbt.CompoundTag;
+import net.minecraft.nbt.NbtOps;
+import net.minecraft.nbt.Tag;
 import net.minecraft.resources.Identifier;
 import net.minecraft.resources.ResourceKey;
+import net.minecraft.util.datafix.fixes.References;
 import net.minecraft.world.entity.EntityTypes;
 import net.minecraft.world.entity.MobCategory;
 import net.minecraft.world.level.Level;
@@ -134,5 +143,23 @@ class FeatureRegistryTest {
         assertTrue(FeatureRegistry.isEntityAiDisabled(EntityTypes.ZOMBIE));
         assertTrue(FeatureRegistry.isEntityAiDisabled(EntityTypes.VILLAGER));
         assertFalse(FeatureRegistry.isEntityAiDisabled(EntityTypes.CREEPER));
+    }
+
+    @Test
+    void emptyDfuSchemaReturnsPassthroughTypesWithoutExceptions() {
+        final DataFixerBuilder builder = new DataFixerBuilder(5016);
+        final Schema schema = builder.addSchema(0, UltraCoreHooks::createEmptyDataFixerSchema);
+        builder.addFixer(UltraCoreHooks.createNoopDataFix(schema));
+        final DataFixer fixer = builder.build().fixer();
+
+        assertEquals(DSL.remainderType(), schema.getTypeRaw(References.BLOCK_STATE));
+        assertEquals(DSL.remainderType(), schema.getType(References.BLOCK_STATE));
+        assertEquals(DSL.remainderType(), schema.getChoiceType(References.ENTITY, "minecraft:pig"));
+
+        final CompoundTag sample = new CompoundTag();
+        sample.putString("Name", "minecraft:stone");
+        final Dynamic<Tag> input = new Dynamic<>(NbtOps.INSTANCE, sample);
+        final Dynamic<Tag> updated = fixer.update(References.BLOCK_STATE, input, 1343, 5016);
+        assertEquals(sample, updated.getValue());
     }
 }

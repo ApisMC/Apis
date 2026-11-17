@@ -1,5 +1,8 @@
 package dev.ultracore.hooks;
 
+import com.mojang.datafixers.DSL;
+import com.mojang.datafixers.DataFix;
+import com.mojang.datafixers.TypeRewriteRule;
 import com.mojang.datafixers.schemas.Schema;
 import com.mojang.datafixers.types.Type;
 import com.mojang.datafixers.types.templates.TypeTemplate;
@@ -116,6 +119,35 @@ public final class UltraCoreHooks {
             @Override
             protected Map<String, Type<?>> buildTypes() {
                 return new ConcurrentHashMap<>();
+            }
+
+            @Override
+            public Type<?> getTypeRaw(final DSL.TypeReference type) {
+                return DSL.remainderType();
+            }
+
+            @Override
+            public Type<?> getType(final DSL.TypeReference type) {
+                return DSL.remainderType();
+            }
+
+            @Override
+            public Type<?> getChoiceType(final DSL.TypeReference type, final String choiceName) {
+                return DSL.remainderType();
+            }
+
+            @Override
+            public TypeTemplate resolveTemplate(final String name) {
+                return DSL.remainder();
+            }
+        };
+    }
+
+    public static DataFix createNoopDataFix(final Schema outputSchema) {
+        return new DataFix(outputSchema, false) {
+            @Override
+            protected TypeRewriteRule makeRule() {
+                return TypeRewriteRule.nop();
             }
         };
     }
