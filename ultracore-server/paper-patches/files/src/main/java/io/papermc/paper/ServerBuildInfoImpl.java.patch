@@ -1,0 +1,28 @@
+--- a/src/main/java/io/papermc/paper/ServerBuildInfoImpl.java
++++ b/src/main/java/io/papermc/paper/ServerBuildInfoImpl.java
+@@ -33,6 +_,16 @@
+     private static final String BRAND_PAPER_NAME = "Paper";
+ 
+     private static final String BUILD_DEV = "DEV";
++    private static final String BUILD_RELEASE = "RELEASE";
++    private static final boolean IS_RELEASE_MANIFEST = isReleaseManifest(JarManifests.manifest(CraftServer.class));
++
++    private static boolean isReleaseManifest(final org.jspecify.annotations.Nullable Manifest manifest) {
++        if (manifest == null) {
++            return false;
++        }
++        final String spec = manifest.getMainAttributes().getValue("Specification-Version");
++        return spec != null && spec.endsWith("-release");
++    }
+ 
+     public ServerBuildInfoImpl() {
+         this(JarManifests.manifest(CraftServer.class));
+@@ -72,7 +_,7 @@
+         if (this.buildNumber.isPresent()) {
+             sb.append(this.buildNumber.getAsInt());
+         } else {
+-            sb.append(BUILD_DEV);
++            sb.append(IS_RELEASE_MANIFEST ? BUILD_RELEASE : BUILD_DEV);
+         }
+         final boolean hasGitBranch = this.gitBranch.isPresent();
+         final boolean hasGitCommit = this.gitCommit.isPresent();
