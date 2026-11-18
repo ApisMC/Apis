@@ -48,8 +48,17 @@ import org.slf4j.LoggerFactory;
 public final class UltraCoreHooks {
 
     private static final Logger LOGGER = LoggerFactory.getLogger("Minecraft");
+    private static volatile boolean aotInternalWarmup;
 
     private UltraCoreHooks() {
+    }
+
+    public static boolean isAotInternalWarmup() {
+        return aotInternalWarmup;
+    }
+
+    public static void setAotInternalWarmup(final boolean warmup) {
+        aotInternalWarmup = warmup;
     }
 
     /**

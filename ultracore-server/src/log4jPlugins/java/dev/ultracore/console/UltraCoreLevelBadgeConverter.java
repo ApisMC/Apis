@@ -14,13 +14,14 @@ import org.apache.logging.log4j.core.pattern.PatternConverter;
  * Intended strictly for the TerminalConsole appender; file appenders do not reference this converter.
  */
 @Plugin(name = "levelBadge", category = PatternConverter.CATEGORY)
-@ConverterKeys({"levelBadge"})
+@ConverterKeys("levelBadge")
 public final class UltraCoreLevelBadgeConverter extends LogEventPatternConverter {
 
-    private static final String ERROR_BADGE_PREFIX = "\u001b[0;1;30;101m ";
-    private static final String ERROR_TEXT_RESTORE = " \u001b[0;31;1m";
-    private static final String WARN_BADGE_PREFIX = "\u001b[0;1;30;103m ";
-    private static final String WARN_TEXT_RESTORE = " \u001b[0;33;1m";
+    private static final char ESC = 27;
+    private static final String ERROR_BADGE_PREFIX = ESC + "[0;1;30;101m ";
+    private static final String ERROR_TEXT_RESTORE = " " + ESC + "[0;31;1m";
+    private static final String WARN_BADGE_PREFIX = ESC + "[0;1;30;103m ";
+    private static final String WARN_TEXT_RESTORE = " " + ESC + "[0;33;1m";
 
     private UltraCoreLevelBadgeConverter() {
         super("levelBadge", "levelBadge");
