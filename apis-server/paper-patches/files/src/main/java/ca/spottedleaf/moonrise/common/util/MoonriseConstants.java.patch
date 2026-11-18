@@ -1,0 +1,13 @@
+--- a/src/main/java/ca/spottedleaf/moonrise/common/util/MoonriseConstants.java
++++ b/src/main/java/ca/spottedleaf/moonrise/common/util/MoonriseConstants.java
+@@ -14,7 +_,9 @@
+     public static final boolean NUMA_ENABLE;
+     static {
+         final boolean numaScheduling = Boolean.getBoolean(PlatformHooks.get().getBrand() + ".NumaScheduling");
+-        if (!numaScheduling) {
++        if (!org.apismc.apis.hooks.ApisHooks.isLinuxOs()) { // Apis - Skip LinuxNuma/JNA probing on non-Linux OS
++            NUMA_ENABLE = false;
++        } else if (!numaScheduling) {
+             NUMA_ENABLE = false;
+             if (OSNuma.getNativeInstance().isAvailable()) {
+                 LOGGER.info("NUMA enable flag is not set; however there is NUMA interaction support for this OS.");

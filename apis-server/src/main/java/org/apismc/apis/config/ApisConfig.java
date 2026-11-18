@@ -10,8 +10,11 @@ import java.nio.file.StandardCopyOption;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Deque;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
+import java.util.Set;
 import org.apismc.apis.feature.FeatureRegistry;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
@@ -125,6 +128,14 @@ public final class ApisConfig {
     }
 
     /**
+     * Resets static config singleton state between unit tests.
+     */
+    public static void resetForTesting() {
+        instance = new ApisConfig();
+        configPath = Path.of(ApisPaths.DEFAULT_CONFIGS_DIR, DEFAULT_FILE_NAME);
+    }
+
+    /**
      * Loads config/apis.yml as early as possible (before Minecraft Bootstrap / DataFixers / world allocation).
      *
      * @param path path to the YAML configuration file
@@ -174,10 +185,20 @@ public final class ApisConfig {
         try {
             final boolean existed = Files.exists(path);
             final CommentedConfigurationNode root = existed ? loader.load() : loader.createNode();
+            final Set<String> keysBefore = existed ? collectNodePaths(root) : Set.of();
             final @Nullable ApisConfig cfg = root.get(ApisConfig.class);
             final ApisConfig effective = cfg != null ? cfg : new ApisConfig();
-            root.set(ApisConfig.class, effective);
-            saveWithComments(path, loader, root);
+            final boolean missingOrEmpty = !existed || cfg == null;
+            if (missingOrEmpty) {
+                root.set(ApisConfig.class, effective);
+                saveWithComments(path, loader, root);
+            } else {
+                root.set(ApisConfig.class, effective);
+                final Set<String> keysAfter = collectNodePaths(root);
+                if (!keysBefore.containsAll(keysAfter)) {
+                    saveWithComments(path, loader, root);
+                }
+            }
             return effective;
         } catch (final IOException ex) {
             logger.error("Failed to parse {}. Backing up broken config and using defaults.", path, ex);
@@ -191,6 +212,31 @@ public final class ApisConfig {
                 logger.warn("Could not write default config to {}", path, saveEx);
             }
             return fallback;
+        }
+    }
+
+    private static Set<String> collectNodePaths(final CommentedConfigurationNode root) {
+        final Set<String> paths = new HashSet<>();
+        collectNodePaths("", root, paths);
+        return paths;
+    }
+
+    private static void collectNodePaths(
+        final String prefix,
+        final CommentedConfigurationNode node,
+        final Set<String> out
+    ) {
+        if (!node.isMap()) {
+            if (!prefix.isEmpty()) {
+                out.add(prefix);
+            }
+            return;
+        }
+        for (final Map.Entry<Object, CommentedConfigurationNode> entry : node.childrenMap().entrySet()) {
+            final String segment = String.valueOf(entry.getKey());
+            final String nextPrefix = prefix.isEmpty() ? segment : prefix + '.' + segment;
+            out.add(nextPrefix);
+            collectNodePaths(nextPrefix, entry.getValue(), out);
         }
     }
 

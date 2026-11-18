@@ -1,0 +1,11 @@
+--- a/src/main/java/ca/spottedleaf/moonrise/common/util/MoonriseCommon.java
++++ b/src/main/java/ca/spottedleaf/moonrise/common/util/MoonriseCommon.java
+@@ -40,7 +_,7 @@
+     public static final BalancedPrioritisedThreadPool.OrderedStreamGroup SERVER_GROUP = MoonriseCommon.WORKER_POOL.createOrderedStreamGroup();
+ 
+     public static void adjustWorkerThreads(final int configWorkerThreads, final int configIoThreads) {
+-        int defaultWorkerThreads = OSNuma.getNativeInstance().getTotalCores()  / 2;
++        int defaultWorkerThreads = org.apismc.apis.hooks.ApisHooks.resolveNumaTotalCores() / 2; // Apis - Guard LinuxNuma/JNA on non-Linux OS
+         if (defaultWorkerThreads <= 4) {
+             defaultWorkerThreads = defaultWorkerThreads <= 3 ? 1 : 2;
+         } else {

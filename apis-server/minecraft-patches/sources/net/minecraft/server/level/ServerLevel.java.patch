@@ -9,6 +9,20 @@
          // CraftBukkit start
          // Paper start - per-world time
          if (!io.papermc.paper.configuration.GlobalConfiguration.get().time.affectsAllWorlds) {
+@@ -663,7 +_,12 @@
+         }
+ 
+         if (biomeProvider != null) {
+-            net.minecraft.world.level.biome.BiomeSource biomeSource = new org.bukkit.craftbukkit.generator.CustomWorldChunkManager(this.getWorld(), biomeProvider, generator.getBiomeSource()); // Paper - add vanillaBiomeProvider
++            net.minecraft.world.level.biome.BiomeSource biomeSource = org.apismc.apis.hooks.ApisHooks.resolveLevelBiomeSource(
++                server.registryAccess(),
++                biomeProvider,
++                generator.getBiomeSource(),
++                this.getWorld()
++            ); // Apis - Use FixedBiomeSource(THE_VOID) directly for VOID_BIOME_PROVIDER
+             if (generator instanceof net.minecraft.world.level.levelgen.NoiseBasedChunkGenerator noiseBased) {
+                 generator = new net.minecraft.world.level.levelgen.NoiseBasedChunkGenerator(biomeSource, noiseBased.generatorSettings());
+             } else if (generator instanceof net.minecraft.world.level.levelgen.FlatLevelSource flatLevel) {
 @@ -810,13 +_,15 @@
          if (runs) {
              profiler.push("world border");

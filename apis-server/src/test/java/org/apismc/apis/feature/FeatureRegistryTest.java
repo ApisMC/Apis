@@ -1,5 +1,6 @@
 package org.apismc.apis.feature;
 
+import ca.spottedleaf.concurrentutil.numa.OSNuma;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonPrimitive;
 import com.mojang.datafixers.DSL;
@@ -30,10 +31,13 @@ import net.minecraft.util.datafix.fixes.References;
 import net.minecraft.world.entity.EntityTypes;
 import net.minecraft.world.entity.MobCategory;
 import net.minecraft.world.entity.ai.attributes.DefaultAttributes;
+import net.minecraft.world.item.slot.SlotSource;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.biome.Biome;
 import net.minecraft.world.level.levelgen.structure.Structure;
 import net.minecraft.world.level.storage.loot.LootTable;
+import net.minecraft.world.level.storage.loot.functions.LootItemFunction;
+import net.minecraft.world.level.storage.loot.predicates.LootItemCondition;
 import org.apismc.apis.config.ApisConfig;
 import org.apismc.apis.hooks.ApisHooks;
 import org.bukkit.support.environment.AllFeatures;
@@ -327,5 +331,88 @@ class FeatureRegistryTest {
         ApisHooks.bindPrunedFallbackHolders(lootRegistry);
         lootRegistry.freeze();
         assertEquals(LootTable.EMPTY, lootRegistry.getValue(chestKey));
+
+        final MappedRegistry<LootItemCondition> predRegistry = new MappedRegistry<>(
+            Registries.PREDICATE,
+            Lifecycle.stable()
+        );
+        final ResourceKey<LootItemCondition> predKey = ResourceKey.create(
+            Registries.PREDICATE,
+            Identifier.withDefaultNamespace("block/fast_cooking")
+        );
+        predRegistry.createRegistrationLookup().getOrThrow(predKey);
+        predRegistry.bindAllTagsToEmpty();
+        ApisHooks.bindPrunedFallbackHolders(predRegistry);
+        predRegistry.freeze();
+        assertNotNull(predRegistry.getValue(predKey));
+
+        final MappedRegistry<LootItemFunction> modRegistry = new MappedRegistry<>(
+            Registries.ITEM_MODIFIER,
+            Lifecycle.stable()
+        );
+        final ResourceKey<LootItemFunction> modKey = ResourceKey.create(
+            Registries.ITEM_MODIFIER,
+            Identifier.withDefaultNamespace("test_modifier")
+        );
+        modRegistry.createRegistrationLookup().getOrThrow(modKey);
+        modRegistry.bindAllTagsToEmpty();
+        ApisHooks.bindPrunedFallbackHolders(modRegistry);
+        modRegistry.freeze();
+        assertNotNull(modRegistry.getValue(modKey));
+
+        final MappedRegistry<SlotSource> slotRegistry = new MappedRegistry<>(
+            Registries.SLOT_SOURCE,
+            Lifecycle.stable()
+        );
+        final ResourceKey<SlotSource> slotKey = ResourceKey.create(
+            Registries.SLOT_SOURCE,
+            Identifier.withDefaultNamespace("test_slot")
+        );
+        slotRegistry.createRegistrationLookup().getOrThrow(slotKey);
+        slotRegistry.bindAllTagsToEmpty();
+        ApisHooks.bindPrunedFallbackHolders(slotRegistry);
+        slotRegistry.freeze();
+        assertNotNull(slotRegistry.getValue(slotKey));
+    }
+
+    @Test
+    void prunesLootSubRegistriesAndGeneratorPresetsBasedOnConfig() {
+        final ApisConfig vanillaNoLoot = new ApisConfig();
+        vanillaNoLoot.dimensions.mode = ApisConfig.MODE_VANILLA;
+        vanillaNoLoot.gameplay.lootTables = false;
+        FeatureRegistry.applyEarly(vanillaNoLoot);
+
+        assertTrue(ApisHooks.shouldPruneRegistryAtLoad(Registries.LOOT_TABLE));
+        assertTrue(ApisHooks.shouldPruneRegistryAtLoad(Registries.PREDICATE));
+        assertTrue(ApisHooks.shouldPruneRegistryAtLoad(Registries.ITEM_MODIFIER));
+        assertTrue(ApisHooks.shouldPruneRegistryAtLoad(Registries.SLOT_SOURCE));
+        assertFalse(ApisHooks.shouldPruneRegistryAtLoad(Registries.WORLD_PRESET));
+        assertFalse(ApisHooks.shouldPruneRegistryAtLoad(Registries.FLAT_LEVEL_GENERATOR_PRESET));
+
+        final ApisConfig standaloneWithLoot = new ApisConfig();
+        standaloneWithLoot.dimensions.mode = ApisConfig.MODE_STANDALONE;
+        standaloneWithLoot.gameplay.lootTables = true;
+        FeatureRegistry.applyEarly(standaloneWithLoot);
+
+        assertFalse(ApisHooks.shouldPruneRegistryAtLoad(Registries.LOOT_TABLE));
+        assertFalse(ApisHooks.shouldPruneRegistryAtLoad(Registries.PREDICATE));
+        assertFalse(ApisHooks.shouldPruneRegistryAtLoad(Registries.ITEM_MODIFIER));
+        assertFalse(ApisHooks.shouldPruneRegistryAtLoad(Registries.SLOT_SOURCE));
+        assertTrue(ApisHooks.shouldPruneRegistryAtLoad(Registries.WORLD_PRESET));
+        assertTrue(ApisHooks.shouldPruneRegistryAtLoad(Registries.FLAT_LEVEL_GENERATOR_PRESET));
+    }
+
+    @Test
+    void numaGuardRespectsHostOperatingSystem() {
+        assertTrue(ApisHooks.resolveNumaTotalCores() >= 1);
+        final String osName = System.getProperty("os.name", "");
+        final boolean expectedLinux = osName.regionMatches(true, 0, "Linux", 0, 5);
+        assertEquals(expectedLinux, ApisHooks.isLinuxOs());
+        if (!expectedLinux) {
+            assertEquals(
+                "NoOp",
+                OSNuma.getNativeInstance().getClass().getSimpleName()
+            );
+        }
     }
 }

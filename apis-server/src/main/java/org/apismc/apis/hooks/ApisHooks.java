@@ -1,5 +1,7 @@
 package org.apismc.apis.hooks;
 
+import ca.spottedleaf.concurrentutil.numa.OSNuma;
+import com.google.common.collect.ImmutableMap;
 import com.mojang.datafixers.DSL;
 import com.mojang.datafixers.DataFix;
 import com.mojang.datafixers.TypeRewriteRule;
@@ -9,6 +11,8 @@ import com.mojang.datafixers.types.templates.TypeTemplate;
 import com.mojang.serialization.Decoder;
 import io.papermc.paper.adventure.PaperAdventure;
 import java.io.File;
+import java.io.IOException;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Locale;
 import java.util.Map;
@@ -17,6 +21,7 @@ import java.util.function.Supplier;
 import joptsimple.OptionSet;
 import net.kyori.adventure.key.Key;
 import net.minecraft.core.HolderLookup;
+import net.minecraft.core.HolderSet;
 import net.minecraft.core.MappedRegistry;
 import net.minecraft.core.Registry;
 import net.minecraft.core.RegistryAccess;
@@ -24,6 +29,7 @@ import net.minecraft.core.registries.Registries;
 import net.minecraft.resources.Identifier;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.server.MinecraftServer;
+import net.minecraft.server.dedicated.DedicatedServerProperties;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.Entity;
@@ -31,12 +37,21 @@ import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.MobCategory;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.entity.projectile.Projectile;
+import net.minecraft.world.item.slot.EmptySlotSource;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.biome.Biome;
+import net.minecraft.world.level.biome.BiomeSource;
+import net.minecraft.world.level.biome.Biomes;
+import net.minecraft.world.level.biome.FixedBiomeSource;
 import net.minecraft.world.level.chunk.ChunkGenerator;
+import net.minecraft.world.level.dimension.BuiltinDimensionTypes;
+import net.minecraft.world.level.dimension.DimensionType;
+import net.minecraft.world.level.dimension.LevelStem;
 import net.minecraft.world.level.levelgen.WorldDimensions;
 import net.minecraft.world.level.portal.TeleportTransition;
 import net.minecraft.world.level.storage.loot.LootTable;
+import net.minecraft.world.level.storage.loot.functions.SequenceFunction;
+import net.minecraft.world.level.storage.loot.predicates.AllOfCondition;
 import org.apismc.apis.config.ApisConfig;
 import org.apismc.apis.config.ApisPaths;
 import org.apismc.apis.feature.Feature;
@@ -44,8 +59,10 @@ import org.apismc.apis.feature.FeatureRegistry;
 import org.apismc.apis.world.ApisVoidChunkGenerator;
 import org.apismc.apis.world.StandaloneWorldManager;
 import org.bukkit.NamespacedKey;
+import org.bukkit.World;
 import org.bukkit.WorldCreator;
 import org.bukkit.configuration.file.YamlConfiguration;
+import org.bukkit.craftbukkit.generator.CustomWorldChunkManager;
 import org.bukkit.craftbukkit.util.CraftNamespacedKey;
 import org.bukkit.generator.BiomeProvider;
 import org.jspecify.annotations.Nullable;
@@ -59,9 +76,23 @@ import org.slf4j.LoggerFactory;
 public final class ApisHooks {
 
     private static final Logger LOGGER = LoggerFactory.getLogger("Minecraft");
+    private static final boolean IS_LINUX = System.getProperty("os.name", "")
+        .toLowerCase(Locale.ROOT)
+        .contains("linux");
     private static volatile boolean aotInternalWarmup;
 
     private ApisHooks() {
+    }
+
+    public static boolean isLinuxOs() {
+        return IS_LINUX;
+    }
+
+    public static int resolveNumaTotalCores() {
+        if (!IS_LINUX) {
+            return Runtime.getRuntime().availableProcessors();
+        }
+        return OSNuma.getNativeInstance().getTotalCores();
     }
 
     public static boolean isAotInternalWarmup() {
@@ -73,15 +104,29 @@ public final class ApisHooks {
     }
 
     /**
-     * Generates default .gitignore (if absent) and loads config/apis.yml early before Bootstrap.
+     * Generates default .gitignore (if absent), configures native cache dir, and loads configs/apis.yml early.
      */
     public static void bootstrapEarly() {
         ApisPaths.ensureGitIgnore(Path.of("."));
+        configureNettyNativesDir();
         final @Nullable String overridePath = System.getProperty("apis.config");
         final Path resolved = overridePath != null && !overridePath.isBlank()
             ? Path.of(overridePath)
             : ApisPaths.resolveConfigPath(ApisConfig.DEFAULT_FILE_NAME);
         ApisConfig.loadEarly(resolved);
+    }
+
+    private static void configureNettyNativesDir() {
+        if (System.getProperty("io.netty.native.workdir") != null) {
+            return;
+        }
+        final Path nativesDir = Path.of("cache", "natives").toAbsolutePath().normalize();
+        try {
+            Files.createDirectories(nativesDir);
+            System.setProperty("io.netty.native.workdir", nativesDir.toString());
+        } catch (final IOException ex) {
+            LOGGER.warn("Failed to prepare Netty natives cache directory '{}': {}", nativesDir, ex.getMessage());
+        }
     }
 
     /**
@@ -117,6 +162,10 @@ public final class ApisHooks {
         return FeatureRegistry.isEnabled(Feature.STARTUP_VALIDATE_LOOT);
     }
 
+    public static boolean isLootTablesEnabled() {
+        return FeatureRegistry.isEnabled(Feature.GAMEPLAY_LOOT_TABLES);
+    }
+
     public static boolean isMojangServiceDiscoveryEnabled() {
         return FeatureRegistry.isEnabled(Feature.STARTUP_MOJANG_SERVICE_DISCOVERY);
     }
@@ -146,8 +195,14 @@ public final class ApisHooks {
         if (Registries.ADVANCEMENT.equals(registryKey)) {
             return FeatureRegistry.isDisabled(Feature.GAMEPLAY_ADVANCEMENTS);
         }
-        if (Registries.LOOT_TABLE.equals(registryKey)) {
+        if (Registries.LOOT_TABLE.equals(registryKey)
+            || Registries.PREDICATE.equals(registryKey)
+            || Registries.ITEM_MODIFIER.equals(registryKey)
+            || Registries.SLOT_SOURCE.equals(registryKey)) {
             return FeatureRegistry.isDisabled(Feature.GAMEPLAY_LOOT_TABLES);
+        }
+        if (Registries.WORLD_PRESET.equals(registryKey) || Registries.FLAT_LEVEL_GENERATOR_PRESET.equals(registryKey)) {
+            return FeatureRegistry.isStandaloneMode();
         }
         if (Registries.CARVER.equals(registryKey)
             || Registries.FEATURE.equals(registryKey)
@@ -195,6 +250,12 @@ public final class ApisHooks {
     public static <T> void bindPrunedFallbackHolders(final MappedRegistry<T> registry) {
         if (Registries.LOOT_TABLE.equals(registry.key())) {
             registry.bindUnboundHoldersToFallback((T) LootTable.EMPTY);
+        } else if (Registries.PREDICATE.equals(registry.key())) {
+            registry.bindUnboundHoldersToFallback((T) AllOfCondition.allOf(HolderSet.empty()));
+        } else if (Registries.ITEM_MODIFIER.equals(registry.key())) {
+            registry.bindUnboundHoldersToFallback((T) new SequenceFunction(HolderSet.empty()));
+        } else if (Registries.SLOT_SOURCE.equals(registry.key())) {
+            registry.bindUnboundHoldersToFallback((T) new EmptySlotSource());
         }
     }
 
@@ -674,6 +735,34 @@ public final class ApisHooks {
 
     public static void registerStandaloneWorldFolder(final ResourceKey<Level> dimensionKey, final String folderName) {
         StandaloneWorldManager.registerDimensionFolder(dimensionKey, folderName);
+    }
+
+    public static WorldDimensions createInitialWorldDimensions(
+        final HolderLookup.Provider registries,
+        final DedicatedServerProperties properties
+    ) {
+        if (!StandaloneWorldManager.isStandaloneMode()) {
+            return properties.createDimensions(registries);
+        }
+        final HolderLookup.RegistryLookup<DimensionType> dimensionTypes =
+            registries.lookupOrThrow(Registries.DIMENSION_TYPE);
+        final LevelStem overworldStem = new LevelStem(
+            dimensionTypes.getOrThrow(BuiltinDimensionTypes.OVERWORLD),
+            StandaloneWorldManager.createVoidFlatLevelSource(registries)
+        );
+        return new WorldDimensions(ImmutableMap.of(LevelStem.OVERWORLD, overworldStem));
+    }
+
+    public static BiomeSource resolveLevelBiomeSource(
+        final RegistryAccess registryAccess,
+        final BiomeProvider biomeProvider,
+        final BiomeSource fallbackSource,
+        final World bukkitWorld
+    ) {
+        if (biomeProvider == ApisVoidChunkGenerator.VOID_BIOME_PROVIDER) {
+            return new FixedBiomeSource(registryAccess.lookupOrThrow(Registries.BIOME).getOrThrow(Biomes.THE_VOID));
+        }
+        return new CustomWorldChunkManager(bukkitWorld, biomeProvider, fallbackSource);
     }
 
     public static WorldDimensions resolveInitialStandaloneDimensions(

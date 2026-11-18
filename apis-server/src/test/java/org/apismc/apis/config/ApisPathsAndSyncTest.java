@@ -30,6 +30,7 @@ class ApisPathsAndSyncTest {
         ApisDiagnostics.resetForTesting();
         ApisPaths.resetForTesting();
         StandaloneWorldManager.resetForTesting();
+        ApisConfig.resetForTesting();
     }
 
     @Test

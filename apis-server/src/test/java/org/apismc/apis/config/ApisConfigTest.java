@@ -3,6 +3,7 @@ package org.apismc.apis.config;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.attribute.FileTime;
 import org.apismc.apis.feature.Feature;
 import org.apismc.apis.feature.FeatureRegistry;
 import org.bukkit.support.environment.Normal;
@@ -146,6 +147,36 @@ class ApisConfigTest {
         assertEquals(
             ApisConfig.CommandMessagesSection.DEFAULT_PLAYER_NOT_FOUND,
             loaded.messages.commands.playerNotFound
+        );
+    }
+
+    @Test
+    void doesNotRewriteCompleteExistingConfigAndRewritesOnlyWhenKeysAreMissing(
+        final @TempDir Path tempDir
+    ) throws IOException {
+        final Path cfgFile = tempDir.resolve("apis.yml");
+        final var logger = LoggerFactory.getLogger("ApisTest");
+        ApisConfig.loadOrCreate(cfgFile, logger);
+
+        final FileTime sentinelTime = FileTime.fromMillis(1_000_000_000_000L);
+        Files.setLastModifiedTime(cfgFile, sentinelTime);
+
+        ApisConfig.loadOrCreate(cfgFile, logger);
+        assertEquals(
+            sentinelTime.toMillis(),
+            Files.getLastModifiedTime(cfgFile).toMillis(),
+            "Unchanged config with all keys present must not be rewritten"
+        );
+
+        final String stripped = Files.readString(cfgFile).replace("  spark: true\n", "");
+        Files.writeString(cfgFile, stripped);
+        Files.setLastModifiedTime(cfgFile, sentinelTime);
+
+        final ApisConfig repaired = ApisConfig.loadOrCreate(cfgFile, logger);
+        assertTrue(repaired.network.analytics.spark);
+        assertTrue(
+            Files.readString(cfgFile).contains("spark: true"),
+            "Config missing a default key must be rewritten with the restored default"
         );
     }
 }

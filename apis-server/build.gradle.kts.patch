@@ -1,6 +1,14 @@
 --- a/paper-server/build.gradle.kts
 +++ b/paper-server/build.gradle.kts
-@@ -23,13 +_,29 @@
+@@ -16,20 +_,36 @@
+ 
+ dependencies {
+     mache("io.papermc:mache:26.3+build.2")
+-    paperclip("io.papermc:paperclip:3.0.4")
++    paperclip(project(":apis-paperclip")) // Apis - Fast stamped Paperclip
+ }
+ 
+ paperweight {
      minecraftVersion = providers.gradleProperty("mcVersion")
      gitFilePatches = false
  

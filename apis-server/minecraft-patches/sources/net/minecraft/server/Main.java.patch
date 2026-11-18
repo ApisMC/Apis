@@ -82,15 +82,25 @@
              } else {
                  levelDataTag = null;
              }
+@@ -266,7 +_,8 @@
+                                         , () -> {
+                                             final DedicatedServerProperties properties = settings.getProperties();
+                                             return new WorldGenSettings(
+-                                                properties.worldOptions, properties.createDimensions(context.datapackWorldRegistries())
++                                                properties.worldOptions,
++                                                org.apismc.apis.hooks.ApisHooks.createInitialWorldDimensions(context.datapackWorldRegistries(), properties) // Apis
+                                             );
+                                         }
+                                         // Paper end - pass dimension and regenerate missing world gen settings
 @@ -386,7 +_,10 @@
                  context.dataConfiguration()
              );
              worldOptions = bonusChest ? properties.worldOptions.withBonusChest(true) : properties.worldOptions;
 -            dimensions = properties.createDimensions(context.datapackWorldRegistries());
-+            dimensions = org.apismc.apis.hooks.ApisHooks.resolveInitialStandaloneDimensions(
++            dimensions = org.apismc.apis.hooks.ApisHooks.createInitialWorldDimensions(
 +                context.datapackWorldRegistries(),
-+                properties.createDimensions(context.datapackWorldRegistries())
-+            ); // Apis - Avoid allocating 3D noise terrain in standalone void mode
++                properties
++            ); // Apis - Directly construct void WorldDimensions in standalone mode without WorldPreset/Overworld noise
          }
  
          WorldDimensions.Complete finalDimensions = dimensions.bake(datapackDimensions);

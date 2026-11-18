@@ -1,0 +1,11 @@
+--- a/net/minecraft/util/Util.java
++++ b/net/minecraft/util/Util.java
+@@ -253,7 +_,7 @@
+ 
+     public static int maxAllowedExecutorThreads() {
+         // Paper start - Perf: use simpler thread pool that allows 1 thread and reduce worldgen thread worker count for low core count CPUs
+-        final int cpus = ca.spottedleaf.concurrentutil.numa.OSNuma.getNativeInstance().getTotalCores()  / 2;
++        final int cpus = org.apismc.apis.hooks.ApisHooks.resolveNumaTotalCores() / 2; // Apis - Guard LinuxNuma/JNA on non-Linux OS
+         int maxExecutorThreads;
+         if (cpus <= 4) {
+             maxExecutorThreads = cpus <= 2 ? 1 : 2;

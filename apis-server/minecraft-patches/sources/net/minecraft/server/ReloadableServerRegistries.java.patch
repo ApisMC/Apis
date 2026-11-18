@@ -4,7 +4,7 @@
      }
  
      private static void validateLootRegistries(final HolderLookup.Provider fullContextWithNewTags) {
-+        if (!org.apismc.apis.hooks.ApisHooks.isValidateLootEnabled()) return; // Apis
++        if (!org.apismc.apis.hooks.ApisHooks.isValidateLootEnabled() || !org.apismc.apis.hooks.ApisHooks.isLootTablesEnabled()) return; // Apis
          ProblemReporter.Collector problems = new ProblemReporter.Collector();
          ValidationContextSource contextSource = new ValidationContextSource(problems, fullContextWithNewTags);
          LootDataType.values().forEach(lootDataType -> lootDataType.runValidation(contextSource, fullContextWithNewTags));

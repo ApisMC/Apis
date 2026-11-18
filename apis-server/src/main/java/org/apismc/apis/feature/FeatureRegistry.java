@@ -53,6 +53,7 @@ public final class FeatureRegistry {
     private static volatile int projectileTrackingRange = 32;
     private static volatile double particleBroadcastRangeSq = 256.0d;
     private static volatile int armorEquipmentRange = 32;
+    private static volatile boolean standaloneMode = true;
 
     private FeatureRegistry() {
     }
@@ -273,6 +274,7 @@ public final class FeatureRegistry {
         tickingDimensionIds = normalizedTickDims;
 
         aiTypeFilterIds = normalizeIds(config.entities.ai.typeFilter);
+        standaloneMode = ApisConfig.MODE_STANDALONE.equals(config.dimensions.mode);
 
         projectileTrackingRange = config.network.packetRangeClamping.projectileTrackingRange;
         final double radius = config.network.packetRangeClamping.particleBroadcastRange;
@@ -391,6 +393,16 @@ public final class FeatureRegistry {
         projectileTrackingRange = 32;
         particleBroadcastRangeSq = 256.0d;
         armorEquipmentRange = 32;
+        standaloneMode = true;
+    }
+
+    /**
+     * Checks whether the last applied config selects standalone world architecture.
+     *
+     * @return {@code true} if {@code dimensions.mode} is standalone
+     */
+    public static boolean isStandaloneMode() {
+        return standaloneMode;
     }
 
     private static void markIfDisabled(final long[] masks, final Feature feature, final boolean enabled) {

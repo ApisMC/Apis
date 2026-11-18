@@ -1,0 +1,14 @@
+--- a/net/minecraft/world/level/biome/MultiNoiseBiomeSourceParameterList.java
++++ b/net/minecraft/world/level/biome/MultiNoiseBiomeSourceParameterList.java
+@@ -82,6 +_,11 @@
+             );
+ 
+         private static <T> Climate.ParameterList<T> generateOverworldBiomes(final Function<ResourceKey<Biome>, T> lookup) {
++            if (org.apismc.apis.hooks.ApisHooks.isStandaloneWorldsMode()) { // Apis - Skip 6D Climate.RTree generation in standalone void mode
++                return new Climate.ParameterList<>(
++                    List.of(Pair.of(Climate.parameters(0.0F, 0.0F, 0.0F, 0.0F, 0.0F, 0.0F, 0.0F), lookup.apply(Biomes.THE_VOID)))
++                );
++            }
+             Builder<Pair<Climate.ParameterPoint, T>> builder = ImmutableList.builder();
+             new OverworldBiomeBuilder().addBiomes(p -> builder.add(p.mapSecond(lookup)));
+             return new Climate.ParameterList<>(builder.build());
