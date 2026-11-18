@@ -1,0 +1,10 @@
+--- a/net/minecraft/world/level/block/entity/HopperBlockEntity.java
++++ b/net/minecraft/world/level/block/entity/HopperBlockEntity.java
+@@ -129,6 +_,7 @@
+     }
+ 
+     public static void pushItemsTick(final Level level, final BlockPos pos, final BlockState state, final HopperBlockEntity entity) {
++        if (org.apismc.apis.hooks.ApisHooks.isHopperTickingDisabled()) return; // Apis
+         entity.cooldownTime--;
+         entity.tickedGameTime = level.getGameTime();
+         if (!entity.isOnCooldown()) {

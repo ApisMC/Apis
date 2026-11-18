@@ -1,0 +1,10 @@
+--- a/net/minecraft/world/entity/ai/navigation/PathNavigation.java
++++ b/net/minecraft/world/entity/ai/navigation/PathNavigation.java
+@@ -272,6 +_,7 @@
+     }
+ 
+     public void tick() {
++        if (org.apismc.apis.hooks.ApisHooks.isPathfindingDisabled()) return; // Apis
+         this.tick++;
+         if (this.hasDelayedRecomputation) {
+             this.recomputePath();

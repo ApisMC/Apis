@@ -1,0 +1,11 @@
+--- a/src/main/java/org/spigotmc/SpigotConfig.java
++++ b/src/main/java/org/spigotmc/SpigotConfig.java
+@@ -96,6 +_,8 @@
+         }
+ 
+         try {
++            org.apismc.apis.config.ApisConfigSync.syncSpigot(); // Apis
++            org.apismc.apis.config.ApisConfigSync.stripLegacySpigotSettings(SpigotConfig.config); // Apis
+             SpigotConfig.config.save(SpigotConfig.CONFIG_FILE);
+         } catch (IOException ex) {
+             Bukkit.getLogger().log(Level.SEVERE, "Could not save " + SpigotConfig.CONFIG_FILE, ex);

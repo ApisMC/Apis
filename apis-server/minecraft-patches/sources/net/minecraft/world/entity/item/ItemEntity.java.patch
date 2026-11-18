@@ -1,0 +1,10 @@
+--- a/net/minecraft/world/entity/item/ItemEntity.java
++++ b/net/minecraft/world/entity/item/ItemEntity.java
+@@ -146,6 +_,7 @@
+         if (this.getItem().isEmpty()) {
+             this.discard(org.bukkit.event.entity.EntityRemoveEvent.Cause.DESPAWN); // CraftBukkit - add Bukkit remove cause
+         } else {
++            if (!org.apismc.apis.hooks.ApisHooks.isItemPhysicsEnabled()) { this.inactiveTick(); return; } // Apis
+             super.tick();
+             if (this.pickupDelay > 0 && this.pickupDelay != 32767) {
+                 this.pickupDelay--;

@@ -1,0 +1,96 @@
+--- a/net/minecraft/world/level/levelgen/flat/FlatLevelGeneratorSettings.java
++++ b/net/minecraft/world/level/levelgen/flat/FlatLevelGeneratorSettings.java
+@@ -35,19 +_,70 @@
+     private static final Logger LOGGER = LogUtils.getLogger();
+     public static final Codec<FlatLevelGeneratorSettings> CODEC = RecordCodecBuilder.<FlatLevelGeneratorSettings>create(
+             i -> i.group(
+-                    RegistryCodecs.holderSet(Registries.STRUCTURE_SET).lenientOptionalFieldOf("structure_overrides").forGetter(c -> c.structureOverrides),
++                    structureOverridesCodec().forGetter(c -> c.structureOverrides), // Apis
+                     FlatLayerInfo.CODEC.listOf().fieldOf("layers").forGetter(FlatLevelGeneratorSettings::getLayersInfo),
+                     ExtraCodecs.optionalAlwaysPresentFieldOf(Codec.BOOL, "lakes", false).forGetter(s -> s.addLakes),
+                     ExtraCodecs.optionalAlwaysPresentFieldOf(Codec.BOOL, "features", false).forGetter(s -> s.decoration),
+                     Biome.CODEC.lenientOptionalFieldOf("biome").orElseGet(Optional::empty).forGetter(s -> Optional.of(s.biome)),
+                     RegistryOps.retrieveElement(Biomes.PLAINS),
+-                    RegistryOps.retrieveElement(MiscOverworldPlacements.LAKE_LAVA_UNDERGROUND),
+-                    RegistryOps.retrieveElement(MiscOverworldPlacements.LAKE_LAVA_SURFACE)
++                    retrieveOptionalPlacedFeature(MiscOverworldPlacements.LAKE_LAVA_UNDERGROUND), // Apis
++                    retrieveOptionalPlacedFeature(MiscOverworldPlacements.LAKE_LAVA_SURFACE) // Apis
+                 )
+                 .apply(i, FlatLevelGeneratorSettings::new)
+         )
+         .comapFlatMap(FlatLevelGeneratorSettings::validateHeight, Function.identity())
+         .stable();
++
++    private static com.mojang.serialization.MapCodec<Optional<HolderSet<StructureSet>>> structureOverridesCodec() { // Apis
++        final com.mojang.serialization.MapCodec<Optional<HolderSet<StructureSet>>> delegate = RegistryCodecs
++            .holderSet(Registries.STRUCTURE_SET)
++            .lenientOptionalFieldOf("structure_overrides");
++        return new com.mojang.serialization.MapCodec<>() {
++            @Override
++            public <T> java.util.stream.Stream<T> keys(final com.mojang.serialization.DynamicOps<T> ops) {
++                return delegate.keys(ops);
++            }
++
++            @Override
++            public <T> DataResult<Optional<HolderSet<StructureSet>>> decode(
++                final com.mojang.serialization.DynamicOps<T> ops,
++                final com.mojang.serialization.MapLike<T> input
++            ) {
++                if (org.apismc.apis.hooks.ApisHooks.isStructuresDisabled()) {
++                    return DataResult.success(Optional.empty());
++                }
++                return delegate.decode(ops, input);
++            }
++
++            @Override
++            public <T> com.mojang.serialization.RecordBuilder<T> encode(
++                final Optional<HolderSet<StructureSet>> value,
++                final com.mojang.serialization.DynamicOps<T> ops,
++                final com.mojang.serialization.RecordBuilder<T> prefix
++            ) {
++                return delegate.encode(value, ops, prefix);
++            }
++        };
++    }
++
++    private static <O> RecordCodecBuilder<O, Optional<Holder.Reference<PlacedFeature>>> retrieveOptionalPlacedFeature(
++        final net.minecraft.resources.ResourceKey<PlacedFeature> key
++    ) { // Apis
++        return ExtraCodecs.retrieveContext(
++            ops -> {
++                if (org.apismc.apis.hooks.ApisHooks.isBiomeDecorationDisabled()) {
++                    return DataResult.success(Optional.<Holder.Reference<PlacedFeature>>empty());
++                }
++                if (ops instanceof RegistryOps<?> registryOps) {
++                    return registryOps.getter(Registries.PLACED_FEATURE)
++                        .flatMap(r -> r.get(key))
++                        .map(h -> DataResult.success(Optional.of((Holder.Reference<PlacedFeature>) h)))
++                        .orElseGet(() -> DataResult.error(() -> "Can't find value: " + key));
++                }
++                return DataResult.error(() -> "Not a registry ops");
++            }
++        ).forGetter(ignored -> Optional.empty());
++    }
+     private final Optional<HolderSet<StructureSet>> structureOverrides;
+     private final List<FlatLayerInfo> layersInfo = Lists.newArrayList();
+     private final Holder<Biome> biome;
+@@ -71,10 +_,16 @@
+         final boolean features,
+         final Optional<Holder<Biome>> biome,
+         final Holder.Reference<Biome> fallbackBiome,
+-        final Holder<PlacedFeature> lavaUnderground,
+-        final Holder<PlacedFeature> lavaSurface
++        final Optional<Holder.Reference<PlacedFeature>> lavaUnderground, // Apis
++        final Optional<Holder.Reference<PlacedFeature>> lavaSurface // Apis
+     ) {
+-        this(structureOverrides, getBiome(biome, fallbackBiome), List.of(lavaUnderground, lavaSurface));
++        this(
++            structureOverrides,
++            getBiome(biome, fallbackBiome),
++            lavaUnderground.isPresent() && lavaSurface.isPresent()
++                ? List.of(lavaUnderground.get(), lavaSurface.get())
++                : List.of()
++        );
+         if (lakes) {
+             this.setAddLakes();
+         }

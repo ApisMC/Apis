@@ -1,0 +1,200 @@
+--- a/net/minecraft/server/MinecraftServer.java
++++ b/net/minecraft/server/MinecraftServer.java
+@@ -640,8 +_,10 @@
+         }
+         // Paper end - Configurable player collision; Handle collideRule team for player collision toggle
+         this.server.enablePlugins(org.bukkit.plugin.PluginLoadOrder.POSTWORLD);
+-        this.server.spark.registerCommandBeforePlugins(this.server); // Paper - spark
+-        this.server.spark.enableAfterPlugins(this.server); // Paper - spark
++        if (!org.apismc.apis.hooks.ApisHooks.isMetricsAndProfilerDisabled()) { // Apis
++            this.server.spark.registerCommandBeforePlugins(this.server); // Paper - spark
++            this.server.spark.enableAfterPlugins(this.server); // Paper - spark
++        } // Apis
+         io.papermc.paper.command.brigadier.PaperCommands.INSTANCE.setValid(); // Paper - reset invalid state for event fire below
+         io.papermc.paper.plugin.lifecycle.event.LifecycleEventRunner.INSTANCE.callReloadableRegistrarEvent(io.papermc.paper.plugin.lifecycle.event.types.LifecycleEvents.COMMANDS, io.papermc.paper.command.brigadier.PaperCommands.INSTANCE, org.bukkit.plugin.Plugin.class, io.papermc.paper.plugin.lifecycle.event.registrar.ReloadableRegistrarEvent.Cause.INITIAL); // Paper - call commands event for regular plugins
+         this.server.getCommandMap().registerServerAliases(); // Paper - relocate initial CommandMap#registerServerAliases() call
+@@ -666,7 +_,9 @@
+         savedDataStorage.set(WorldGenSettings.TYPE, new WorldGenSettings(worldDataAndGenSettings.genSettings().options(), worldDataAndGenSettings.genSettings().dimensions()));
+         long seed = worldOptions.seed();
+         long biomeZoomSeed = BiomeManager.obfuscateSeed(seed);
+-        List<CustomSpawner> overworldCustomSpawners = ImmutableList.of(
++        List<CustomSpawner> overworldCustomSpawners = org.apismc.apis.hooks.ApisHooks.isCustomSpawnersDisabled()
++            ? Collections.emptyList()
++            : ImmutableList.of( // Apis - Disable custom spawners
+             new PhantomSpawner(), new PatrolSpawner(), new CatSpawner(), new VillageSiege(), new WanderingTraderSpawner(savedDataStorage) // Paper - save to world data
+         );
+         final org.bukkit.generator.ChunkGenerator chunkGenerator = this.server.getGenerator(loading.data().bukkitName());
+@@ -822,6 +_,10 @@
+                 }
+             }
+             // CraftBukkit end
++            if (!org.apismc.apis.hooks.ApisHooks.isSearchSpawnPointEnabled()) { // Apis
++                levelData.setSpawn(LevelData.RespawnData.of(level.dimension(), new BlockPos(0, level.getSeaLevel(), 0), 0.0F, 0.0F));
++                return;
++            } // Apis
+             ChunkPos spawnChunk = chunkSource.getGenerator().getOrigin(chunkSource.randomState());
+             levelLoadListener.start(LevelLoadListener.Stage.PREPARE_GLOBAL_SPAWN, 0);
+             levelLoadListener.updateFocus(level.dimension(), spawnChunk);
+@@ -882,21 +_,23 @@
+         // CraftBukkit end
+         ChunkLoadCounter chunkLoadCounter = new ChunkLoadCounter();
+ 
+-        if (true) { // CraftBukkit
++        if (org.apismc.apis.hooks.ApisHooks.isInitialChunkLoadEnabled()) { // Apis
+             chunkLoadCounter.track(level, () -> {
+                 TicketStorage savedTickets = level.getDataStorage().get(TicketStorage.TYPE);
+                 if (savedTickets != null) {
+                     savedTickets.activateAllDeactivatedTickets();
+                 }
+             });
+-        }
++        } // Apis
+ 
+         level.levelLoadListener.start(LevelLoadListener.Stage.LOAD_INITIAL_CHUNKS, chunkLoadCounter.totalChunks()); // Paper - per world load listener
+ 
+-        do {
+-            level.levelLoadListener.update(LevelLoadListener.Stage.LOAD_INITIAL_CHUNKS, chunkLoadCounter.readyChunks(), chunkLoadCounter.totalChunks()); // Paper - per world load listener
+-            this.executeModerately(); // CraftBukkit
+-        } while (chunkLoadCounter.pendingChunks() > 0);
++        if (org.apismc.apis.hooks.ApisHooks.isInitialChunkLoadEnabled()) { // Apis
++            do {
++                level.levelLoadListener.update(LevelLoadListener.Stage.LOAD_INITIAL_CHUNKS, chunkLoadCounter.readyChunks(), chunkLoadCounter.totalChunks()); // Paper - per world load listener
++                this.executeModerately(); // CraftBukkit
++            } while (chunkLoadCounter.pendingChunks() > 0);
++        } // Apis
+ 
+         level.levelLoadListener.finish(LevelLoadListener.Stage.LOAD_INITIAL_CHUNKS); // Paper - per world load listener
+         level.setSpawnSettings(level.isSpawningMonsters()); // Paper - per level difficulty (from setDifficulty(ServerLevel, Difficulty, boolean))
+@@ -930,6 +_,14 @@
+     }
+     public boolean saveAllChunks(final boolean silent, final boolean flush, final boolean force, final boolean close) {
+         // Paper end - add close param
++        if (org.apismc.apis.hooks.ApisHooks.isMemoryOnlyWorld()) { // Apis - Ephemeral memory-only world
++            if (close) {
++                for (ServerLevel level : this.getAllLevels()) {
++                    level.save(null, false, true, true);
++                }
++            }
++            return false;
++        }
+         this.saveGlobalData(flush); // Paper - move to saveGlobalData()
+         boolean result = false;
+ 
+@@ -1005,6 +_,27 @@
+ 
+         LOGGER.info("Stopping server");
+         Commands.COMMAND_SENDING_POOL.shutdownNow(); // Paper - Perf: Async command map building; Shutdown and don't bother finishing
++        if (org.apismc.apis.hooks.ApisHooks.isFastShutdown()) { // Apis - Fast ephemeral shutdown on SIGTERM
++            if (this.server != null) {
++                this.server.spark.disable();
++                this.server.disablePlugins();
++            }
++            this.getConnection().stop();
++            if (this.playerList != null) {
++                this.playerList.removeAll(this.isRestarting);
++                this.getConnection().handleAllDisconnections();
++            }
++            this.isSaving = false;
++            this.resources.close();
++            try { this.storageSource.close(); } catch (IOException ignored) {}
++            io.papermc.paper.util.MCUtil.ASYNC_EXECUTOR.shutdownNow();
++            if ((Object)this instanceof net.minecraft.server.dedicated.DedicatedServer) {
++                ca.spottedleaf.moonrise.common.util.MoonriseCommon.haltExecutors();
++            }
++            Util.shutdownExecutors();
++            this.onServerExit();
++            return;
++        }
+         // CraftBukkit start
+         if (this.server != null) {
+             this.server.spark.disable(); // Paper - spark
+@@ -1255,7 +_,7 @@
+             this.statusIcon = this.loadStatusIcon().orElse(null);
+             this.status = this.buildServerStatus();
+ 
+-            this.server.spark.enableBeforePlugins(); // Paper - spark
++            if (!org.apismc.apis.hooks.ApisHooks.isMetricsAndProfilerDisabled()) this.server.spark.enableBeforePlugins(); // Paper - spark // Apis
+             // Spigot start
+             // Paper start
+             LOGGER.info("Running delayed init tasks");
+@@ -1268,6 +_,9 @@
+             final long actualDoneTimeMs = System.currentTimeMillis() - org.bukkit.craftbukkit.Main.BOOT_TIME.toEpochMilli(); // Paper - Improve startup message
+             LOGGER.info("Done ({})! For help, type \"help\"", String.format(java.util.Locale.ROOT, "%.3fs", actualDoneTimeMs / 1000.00D)); // Paper - Improve startup message
+             this.hasStarted = true;
++            if (org.apismc.apis.hooks.ApisHooks.isAotInternalWarmup()) { // Apis - Auto-shutdown after 2s warmup for AOT profile recording
++                org.apismc.apis.aot.AotCacheGenerator.scheduleWarmupShutdown(this);
++            } // Apis
+             org.spigotmc.WatchdogThread.tick();
+             // Paper end
+             org.spigotmc.WatchdogThread.hasStarted = true; // Paper
+@@ -1281,7 +_,7 @@
+             }
+             // Paper end - Add onboarding message for initial server start
+             // Paper start - Improve outdated version checking
+-            if (System.getProperty("paper.disableStartupVersionCheck") == null && io.papermc.paper.configuration.GlobalConfiguration.get().updateChecker.enabled) {
++            if (org.apismc.apis.hooks.ApisHooks.isPaperVersionCheckEnabled() && System.getProperty("paper.disableStartupVersionCheck") == null && io.papermc.paper.configuration.GlobalConfiguration.get().updateChecker.enabled) { // Apis
+                 CompletableFuture.runAsync(com.destroystokyo.paper.PaperVersionFetcher::getUpdateStatusStartupMessage, io.papermc.paper.util.MCUtil.ASYNC_EXECUTOR);
+             }
+             // Paper end - Improve outdated version checking
+@@ -1726,7 +_,7 @@
+     private ServerStatus.Players buildPlayerStatus() {
+         List<ServerPlayer> players = this.playerList.getPlayers();
+         int maxPlayers = this.getMaxPlayers();
+-        if (this.hidesOnlinePlayers()) {
++        if (this.hidesOnlinePlayers() || org.apismc.apis.hooks.ApisHooks.isServerPingSampleDisabled()) { // Apis
+             return new ServerStatus.Players(maxPlayers, players.size(), List.of());
+         }
+ 
+@@ -1762,10 +_,12 @@
+         // Paper end - Folia scheduler API
+         io.papermc.paper.adventure.providers.ClickCallbackProviderImpl.ADVENTURE_CLICK_MANAGER.handleQueue(this.tickCount); // Paper
+         io.papermc.paper.adventure.providers.ClickCallbackProviderImpl.DIALOG_CLICK_MANAGER.handleQueue(this.tickCount); // Paper
+-        profiler.push("commandFunctions");
+-        this.getFunctions().tick();
+-        profiler.pop();
+-        if (this.tickRateManager.runsNormally()) {
++        if (org.apismc.apis.hooks.ApisHooks.isCommandFunctionsEnabled()) { // Apis
++            profiler.push("commandFunctions");
++            this.getFunctions().tick();
++            profiler.pop();
++        } // Apis
++        if (this.tickRateManager.runsNormally() && org.apismc.apis.hooks.ApisHooks.isDaylightCycleEnabled()) { // Apis
+             profiler.push("clocks");
+             // Paper start - per-world time
+             if (io.papermc.paper.configuration.GlobalConfiguration.get().time.affectsAllWorlds) {
+@@ -1779,7 +_,7 @@
+             profiler.pop();
+         }
+ 
+-        if (this.tickCount % 20 == 0) {
++        if (this.tickCount % 20 == 0 && org.apismc.apis.hooks.ApisHooks.isDaylightCycleEnabled()) { // Apis
+             profiler.push("timeSync");
+             this.forceGameTimeSynchronization();
+             profiler.pop();
+@@ -1796,6 +_,7 @@
+ 
+         this.isIteratingOverLevels = true; // Paper - Throw exception on world create while being ticked
+         for (ServerLevel level : this.getAllLevels()) {
++            if (org.apismc.apis.hooks.ApisHooks.isWorldTickDisabled(level)) continue; // Apis - Skip ticking disabled world
+             level.hasPhysicsEvent = org.bukkit.event.block.BlockPhysicsEvent.getHandlerList().getRegisteredListeners().length > 0; // Paper - BlockPhysicsEvent
+             level.hasEntityMoveEvent = io.papermc.paper.event.entity.EntityMoveEvent.getHandlerList().getRegisteredListeners().length > 0; // Paper - Add EntityMoveEvent
+             level.updateLagCompensationTick(); // Paper - lag compensation
+@@ -1842,7 +_,9 @@
+         }
+ 
+         profiler.pop();
+-        this.serverActivityMonitor.tick();
++        if (!org.apismc.apis.hooks.ApisHooks.isMetricsAndProfilerDisabled()) { // Apis
++            this.serverActivityMonitor.tick();
++        }
+     }
+ 
+     // Paper start - per world respawn data
+@@ -1980,6 +_,7 @@
+     }
+ 
+     public KeyPair getKeyPair() {
++        if (this.keyPair == null) this.initializeKeyPair(); // Apis
+         return Objects.requireNonNull(this.keyPair);
+     }
+ 

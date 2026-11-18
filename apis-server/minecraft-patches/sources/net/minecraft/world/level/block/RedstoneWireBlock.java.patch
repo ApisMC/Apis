@@ -1,0 +1,26 @@
+--- a/net/minecraft/world/level/block/RedstoneWireBlock.java
++++ b/net/minecraft/world/level/block/RedstoneWireBlock.java
+@@ -272,6 +_,7 @@
+      * Note: Added 'source' argument so as to help determine direction of information flow
+      */
+     private void updateSurroundingRedstone(Level worldIn, BlockPos pos, BlockState state, @Nullable Orientation orientation, boolean blockAdded) {
++        if (org.apismc.apis.hooks.ApisHooks.isRedstoneDisabled()) return; // Apis
+         if (worldIn.paperConfig().misc.redstoneImplementation == io.papermc.paper.configuration.WorldConfiguration.Misc.RedstoneImplementation.EIGENCRAFT) {
+             // since 24w33a the source pos is no longer given, but instead an Orientation parameter
+             // when this is not null, it can be used to find the source pos, which the turbo uses
+@@ -345,6 +_,7 @@
+ 
+     @Override
+     protected void onPlace(final BlockState state, final Level level, final BlockPos pos, final BlockState oldState, final boolean movedByPiston) {
++        if (org.apismc.apis.hooks.ApisHooks.isRedstoneDisabled()) return; // Apis
+         if (!oldState.is(state.getBlock()) && !level.isClientSide()) {
+             // Paper start - optimize redstone - replace call to updatePowerStrength
+             if (level.paperConfig().misc.redstoneImplementation == io.papermc.paper.configuration.WorldConfiguration.Misc.RedstoneImplementation.ALTERNATE_CURRENT) {
+@@ -399,6 +_,7 @@
+     protected void neighborChanged(
+         final BlockState state, final Level level, final BlockPos pos, final Block block, final @Nullable Orientation orientation, final boolean movedByPiston
+     ) {
++        if (org.apismc.apis.hooks.ApisHooks.isRedstoneDisabled()) return; // Apis
+         if (!level.isClientSide()) {
+             // Paper start - optimize redstone (Alternate Current)
+             // Alternate Current handles breaking of redstone wires in the WireHandler.

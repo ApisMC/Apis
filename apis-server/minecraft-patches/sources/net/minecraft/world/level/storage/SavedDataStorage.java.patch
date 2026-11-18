@@ -1,0 +1,10 @@
+--- a/net/minecraft/world/level/storage/SavedDataStorage.java
++++ b/net/minecraft/world/level/storage/SavedDataStorage.java
+@@ -215,6 +_,7 @@
+     }
+ 
+     public void saveAndJoin() {
++        if (org.apismc.apis.hooks.ApisHooks.isMemoryOnlyWorld()) return; // Apis - Ephemeral memory-only world
+         this.scheduleSave().join();
+     }
+ 

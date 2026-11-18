@@ -1,0 +1,60 @@
+--- a/src/main/java/io/papermc/paper/ServerBuildInfoImpl.java
++++ b/src/main/java/io/papermc/paper/ServerBuildInfoImpl.java
+@@ -12,6 +_,7 @@
+ import org.bukkit.craftbukkit.CraftServer;
+ import org.bukkit.craftbukkit.Main;
+ import org.jetbrains.annotations.NotNull;
++import org.jspecify.annotations.Nullable;
+ 
+ public record ServerBuildInfoImpl(
+     Key brandId,
+@@ -31,8 +_,19 @@
+     private static final String ATTRIBUTE_GIT_COMMIT = "Git-Commit";
+ 
+     private static final String BRAND_PAPER_NAME = "Paper";
++    private static final String BRAND_APIS_NAME = "Apis";
+ 
+     private static final String BUILD_DEV = "DEV";
++    private static final String BUILD_RELEASE = "RELEASE";
++    private static final boolean IS_RELEASE_MANIFEST = isReleaseManifest(JarManifests.manifest(CraftServer.class));
++
++    private static boolean isReleaseManifest(final @Nullable Manifest manifest) {
++        if (manifest == null) {
++            return false;
++        }
++        final String spec = manifest.getMainAttributes().getValue("Specification-Version");
++        return spec != null && spec.endsWith("-release");
++    }
+ 
+     public ServerBuildInfoImpl() {
+         this(JarManifests.manifest(CraftServer.class));
+@@ -42,9 +_,9 @@
+         this(
+             getManifestAttribute(manifest, ATTRIBUTE_BRAND_ID)
+                 .map(Key::key)
+-                .orElse(BRAND_PAPER_ID),
++                .orElse(BRAND_APIS_ID),
+             getManifestAttribute(manifest, ATTRIBUTE_BRAND_NAME)
+-                .orElse(BRAND_PAPER_NAME),
++                .orElse(BRAND_APIS_NAME),
+             SharedConstants.getCurrentVersion().id(),
+             SharedConstants.getCurrentVersion().name(),
+             getManifestAttribute(manifest, ATTRIBUTE_BUILD_NUMBER)
+@@ -61,7 +_,7 @@
+ 
+     @Override
+     public boolean isBrandCompatible(final @NotNull Key brandId) {
+-        return brandId.equals(this.brandId);
++        return brandId.equals(this.brandId) || brandId.equals(BRAND_PAPER_ID);
+     }
+ 
+     @Override
+@@ -72,7 +_,7 @@
+         if (this.buildNumber.isPresent()) {
+             sb.append(this.buildNumber.getAsInt());
+         } else {
+-            sb.append(BUILD_DEV);
++            sb.append(IS_RELEASE_MANIFEST ? BUILD_RELEASE : BUILD_DEV);
+         }
+         final boolean hasGitBranch = this.gitBranch.isPresent();
+         final boolean hasGitCommit = this.gitCommit.isPresent();

@@ -1,0 +1,65 @@
+--- a/net/minecraft/server/level/ServerPlayer.java
++++ b/net/minecraft/server/level/ServerPlayer.java
+@@ -731,7 +_,7 @@
+         // CraftBukkit end
+         this.connection.tickClientLoadTimeout();
+         this.gameMode.tick();
+-        this.wardenSpawnTracker.tick();
++        if (org.apismc.apis.hooks.ApisHooks.isWardenAndSleepEnabled()) this.wardenSpawnTracker.tick(); // Apis
+         if (this.damageCooldownTime > 0) {
+             this.damageCooldownTime--;
+         }
+@@ -764,10 +_,12 @@
+             }
+         }
+ 
+-        CriteriaTriggers.TICK.trigger(this);
+-        if (this.levitationStartPos != null) {
+-            CriteriaTriggers.LEVITATION.trigger(this, this.levitationStartPos, this.tickCount - this.levitationStartTime);
+-        }
++        if (org.apismc.apis.hooks.ApisHooks.isStatisticsEnabled()) { // Apis
++            CriteriaTriggers.TICK.trigger(this);
++            if (this.levitationStartPos != null) {
++                CriteriaTriggers.LEVITATION.trigger(this, this.levitationStartPos, this.tickCount - this.levitationStartTime);
++            }
++        } // Apis
+ 
+         this.trackStartFallingPosition();
+         this.trackEnteredOrExitedLavaOnVehicle();
+@@ -816,20 +_,22 @@
+                     this.containerMenu = this.inventoryMenu;
+                 }
+ 
+-                this.foodData.tick(this);
+-                this.awardStat(Stats.PLAY_TIME);
+-                this.awardStat(Stats.TOTAL_WORLD_TIME);
+-                if (this.isAlive()) {
+-                    this.awardStat(Stats.TIME_SINCE_DEATH);
+-                }
+-
+-                if (this.isDiscrete()) {
+-                    this.awardStat(Stats.CROUCH_TIME);
+-                }
+-
+-                if (!this.isSleeping()) {
+-                    this.awardStat(Stats.TIME_SINCE_REST);
+-                }
++                if (org.apismc.apis.hooks.ApisHooks.isHungerEnabled()) this.foodData.tick(this); // Apis
++                if (org.apismc.apis.hooks.ApisHooks.isStatisticsEnabled()) { // Apis
++                    this.awardStat(Stats.PLAY_TIME);
++                    this.awardStat(Stats.TOTAL_WORLD_TIME);
++                    if (this.isAlive()) {
++                        this.awardStat(Stats.TIME_SINCE_DEATH);
++                    }
++
++                    if (this.isDiscrete()) {
++                        this.awardStat(Stats.CROUCH_TIME);
++                    }
++
++                    if (!this.isSleeping()) {
++                        this.awardStat(Stats.TIME_SINCE_REST);
++                    }
++                } // Apis
+             }
+ 
+             for (int i = 0; i < this.getInventory().getContainerSize(); i++) {

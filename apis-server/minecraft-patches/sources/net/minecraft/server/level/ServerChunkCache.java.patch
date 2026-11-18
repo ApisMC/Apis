@@ -1,0 +1,44 @@
+--- a/net/minecraft/server/level/ServerChunkCache.java
++++ b/net/minecraft/server/level/ServerChunkCache.java
+@@ -519,7 +_,7 @@
+         if (!this.level.isDebug()) {
+             ProfilerFiller profiler = Profiler.get();
+             profiler.push("pollingChunks");
+-            if (this.level.tickRateManager().runsNormally() && this.level.paperConfig().unsupportedSettings.ticking.chunks) { // Paper - option to disable ticking
++            if (this.level.tickRateManager().runsNormally() && this.level.paperConfig().unsupportedSettings.ticking.chunks && !org.apismc.apis.hooks.ApisHooks.isChunkTickingDisabled()) { // Paper - option to disable ticking // Apis
+                 profiler.push("tickingChunks");
+                 this.tickChunks(profiler);
+                 profiler.pop();
+@@ -549,7 +_,9 @@
+         int chunkCount = this.distanceManager.getNaturalSpawnChunkCount();
+         // Paper start - Optional per player mob spawns
+         NaturalSpawner.SpawnState spawnCookie;
+-        if ((this.spawnFriendlies || this.spawnEnemies) && this.level.paperConfig().entities.spawning.perPlayerMobSpawns) { // don't count mobs when animals and monsters are disabled
++        boolean spawnFriendliesEffective = this.spawnFriendlies && !org.apismc.apis.hooks.ApisHooks.isAnimalsDisabled(); // Apis
++        boolean spawnEnemiesEffective = this.spawnEnemies && !org.apismc.apis.hooks.ApisHooks.isMonstersDisabled(); // Apis
++        if ((spawnFriendliesEffective || spawnEnemiesEffective) && this.level.paperConfig().entities.spawning.perPlayerMobSpawns) { // don't count mobs when animals and monsters are disabled
+             // re-set mob counts
+             for (ServerPlayer player : this.level.players()) {
+                 // Paper start - per player mob spawning backoff
+@@ -570,10 +_,10 @@
+         }
+         // Paper end - Optional per player mob spawns
+         this.lastSpawnState = spawnCookie;
+-        boolean doMobSpawning = this.level.getGameRules().get(GameRules.SPAWN_MOBS) && !this.level.players().isEmpty(); // CraftBukkit
++        boolean doMobSpawning = this.level.getGameRules().get(GameRules.SPAWN_MOBS) && !this.level.players().isEmpty() && !org.apismc.apis.hooks.ApisHooks.isNaturalSpawningDisabled(); // CraftBukkit // Apis
+         int tickSpeed = this.level.getGameRules().get(GameRules.RANDOM_TICK_SPEED);
+         List<MobCategory> spawningCategories;
+-        if (doMobSpawning && (this.spawnEnemies || this.spawnFriendlies)) { // Paper
++        if (doMobSpawning && (spawnEnemiesEffective || spawnFriendliesEffective)) { // Paper // Apis
+             // Paper start - PlayerNaturallySpawnCreaturesEvent
+             for (ServerPlayer player : this.level.players()) {
+                 int chunkRange = Math.min(level.spigotConfig.mobSpawnRange, player.getBukkitEntity().getViewDistance());
+@@ -583,7 +_,7 @@
+             }
+             // Paper end - PlayerNaturallySpawnCreaturesEvent
+             boolean spawnPersistent = this.level.ticksPerSpawnCategory.getLong(org.bukkit.entity.SpawnCategory.ANIMAL) != 0L && this.level.getGameTime() % this.level.ticksPerSpawnCategory.getLong(org.bukkit.entity.SpawnCategory.ANIMAL) == 0L; // CraftBukkit
+-            spawningCategories = NaturalSpawner.getFilteredSpawningCategories(spawnCookie, this.spawnFriendlies, this.spawnEnemies, spawnPersistent, this.level); // CraftBukkit
++            spawningCategories = NaturalSpawner.getFilteredSpawningCategories(spawnCookie, spawnFriendliesEffective, spawnEnemiesEffective, spawnPersistent, this.level); // CraftBukkit // Apis
+         } else {
+             spawningCategories = List.of();
+         }

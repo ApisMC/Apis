@@ -1,0 +1,12 @@
+--- a/net/minecraft/world/level/block/NetherPortalBlock.java
++++ b/net/minecraft/world/level/block/NetherPortalBlock.java
+@@ -138,7 +_,9 @@
+ 
+     @Override
+     public @Nullable TeleportTransition getPortalDestination(final ServerLevel currentLevel, final Entity entity, final BlockPos portalEntryPos) {
++        if (org.apismc.apis.hooks.ApisHooks.isPortalsDisabled()) return null; // Apis
+         ResourceKey<Level> newDimension = currentLevel.getTypeKey() == net.minecraft.world.level.dimension.LevelStem.NETHER ? Level.OVERWORLD : Level.NETHER; // CraftBukkit
++        if (org.apismc.apis.hooks.ApisHooks.isDimensionDisabled(newDimension)) return null; // Apis
+         ServerLevel newLevel = currentLevel.getServer().getLevel(newDimension);
+         // Paper start - Add EntityPortalReadyEvent
+         io.papermc.paper.event.entity.EntityPortalReadyEvent portalReadyEvent = new io.papermc.paper.event.entity.EntityPortalReadyEvent(entity.getBukkitEntity(), newLevel == null ? null : newLevel.getWorld(), org.bukkit.PortalType.NETHER);

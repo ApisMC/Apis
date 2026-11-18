@@ -35,11 +35,11 @@ build/
 test-plugin.settings.gradle.kts
 
 # Generated upstream/fork outputs
-/ultracore-server/build.gradle.kts
-/ultracore-server/src/minecraft
+/apis-server/build.gradle.kts
+/apis-server/src/minecraft
 /paper-server
-/ultracore-api/build.gradle.kts
+/apis-api/build.gradle.kts
 /paper-api
 /paper-checkstyle
 /.checkstyle
-/ultracore-checkstyle/build.gradle.kts
+/apis-checkstyle/build.gradle.kts

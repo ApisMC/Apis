@@ -1,0 +1,14 @@
+--- a/src/main/java/io/papermc/paper/ServerBuildInfo.java
++++ b/src/main/java/io/papermc/paper/ServerBuildInfo.java
+@@ -19,6 +_,11 @@
+     Key BRAND_PAPER_ID = Key.key("papermc", "paper");
+ 
+     /**
++     * The brand id for Apis.
++     */
++    Key BRAND_APIS_ID = Key.key("apismc", "apis");
++
++    /**
+      * Gets the {@code ServerBuildInfo}.
+      *
+      * @return the {@code ServerBuildInfo}

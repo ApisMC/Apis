@@ -1,0 +1,25 @@
+--- a/net/minecraft/server/players/PlayerList.java
++++ b/net/minecraft/server/players/PlayerList.java
+@@ -105,10 +_,10 @@
+ import org.slf4j.Logger;
+ 
+ public abstract class PlayerList {
+-    public static final File USERBANLIST_FILE = new File("banned-players.json");
+-    public static final File IPBANLIST_FILE = new File("banned-ips.json");
+-    public static final File OPLIST_FILE = new File("ops.json");
+-    public static final File WHITELIST_FILE = new File("whitelist.json");
++    public static final File USERBANLIST_FILE = org.apismc.apis.config.ApisPaths.resolveUserFile("banned-players.json"); // Apis
++    public static final File IPBANLIST_FILE = org.apismc.apis.config.ApisPaths.resolveUserFile("banned-ips.json"); // Apis
++    public static final File OPLIST_FILE = org.apismc.apis.config.ApisPaths.resolveUserFile("ops.json"); // Apis
++    public static final File WHITELIST_FILE = org.apismc.apis.config.ApisPaths.resolveUserFile("whitelist.json"); // Apis
+     public static final Component CHAT_FILTERED_FULL = Component.translatable("chat.filtered_full");
+     public static final Component DUPLICATE_LOGIN_DISCONNECT_MESSAGE = Component.translatable("multiplayer.disconnect.duplicate_login");
+     private static final Logger LOGGER = LogUtils.getLogger();
+@@ -742,6 +_,7 @@
+     }
+ 
+     public void tick() {
++        if (!org.apismc.apis.hooks.ApisHooks.isTabLatencyUpdatesEnabled()) return; // Apis
+         if (++this.sendAllPlayerInfoIn > 600) {
+             // CraftBukkit start
+             for (int i = 0; i < this.players.size(); ++i) {

@@ -1,0 +1,12 @@
+--- a/src/main/java/io/papermc/paper/world/PaperWorldLoader.java
++++ b/src/main/java/io/papermc/paper/world/PaperWorldLoader.java
+@@ -90,6 +_,9 @@
+         } else {
+             environment = World.Environment.CUSTOM;
+         }
++        if (stemKey != LevelStem.OVERWORLD && org.apismc.apis.hooks.ApisHooks.isDimensionDisabled(dimensionKey)) { // Apis - Cut disabled dimensions before allocation
++            enabled = false;
++        }
+ 
+         return new WorldLoadingInfo(environment, stemKey, dimensionKey, enabled);
+     }

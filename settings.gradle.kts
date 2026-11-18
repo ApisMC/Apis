@@ -12,11 +12,22 @@ plugins {
 }
 
 if (!file(".git").exists()) {
-    error("UltraCore directory must be a valid Git repository.")
+    error(
+        """
+        =====================[ ERROR ]=====================
+         The Apis directory is not a properly cloned Git repository.
+
+         Clone via Git rather than downloading a source ZIP:
+         https://github.com/kotop21/apis-mc
+
+         Documentation: https://kotop21.github.io/apismc/
+        ===================================================
+        """.trimIndent()
+    )
 }
 
-rootProject.name = "ultracore"
-for (name in listOf("ultracore-api", "ultracore-server", "ultracore-checkstyle")) {
+rootProject.name = "apis"
+for (name in listOf("apis-api", "apis-server", "apis-checkstyle")) {
     val projName = name.lowercase(Locale.ENGLISH)
     include(projName)
     findProject(":$projName")!!.projectDir = file(name)

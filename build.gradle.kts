@@ -15,34 +15,34 @@ paperweight {
 
         patchFile {
             path = "paper-server/build.gradle.kts"
-            outputFile = file("ultracore-server/build.gradle.kts")
-            patchFile = file("ultracore-server/build.gradle.kts.patch")
+            outputFile = file("apis-server/build.gradle.kts")
+            patchFile = file("apis-server/build.gradle.kts.patch")
         }
         patchFile {
             path = "paper-api/build.gradle.kts"
-            outputFile = file("ultracore-api/build.gradle.kts")
-            patchFile = file("ultracore-api/build.gradle.kts.patch")
+            outputFile = file("apis-api/build.gradle.kts")
+            patchFile = file("apis-api/build.gradle.kts.patch")
         }
         patchFile {
             path = "paper-checkstyle/build.gradle.kts"
-            outputFile = file("ultracore-checkstyle/build.gradle.kts")
-            patchFile = file("ultracore-checkstyle/build.gradle.kts.patch")
+            outputFile = file("apis-checkstyle/build.gradle.kts")
+            patchFile = file("apis-checkstyle/build.gradle.kts.patch")
         }
         patchDir("paperApi") {
             upstreamPath = "paper-api"
             excludes = setOf("build.gradle.kts")
-            patchesDir = file("ultracore-api/paper-patches")
+            patchesDir = file("apis-api/paper-patches")
             outputDir = file("paper-api")
         }
         patchDir("paperCheckstyle") {
             upstreamPath = "paper-checkstyle"
             excludes = setOf("build.gradle.kts")
-            patchesDir = file("ultracore-checkstyle/paper-patches")
+            patchesDir = file("apis-checkstyle/paper-patches")
             outputDir = file("paper-checkstyle")
         }
         patchDir("paperCheckstyleConfig") {
             upstreamPath = ".checkstyle"
-            patchesDir = file("ultracore-checkstyle/config-patches")
+            patchesDir = file("apis-checkstyle/config-patches")
             outputDir = file(".checkstyle")
         }
     }
@@ -62,7 +62,7 @@ subprojects {
     }
 
     dependencies {
-        "checkstyle"(project(":ultracore-checkstyle"))
+        "checkstyle"(project(":apis-checkstyle"))
     }
 
     val isRelease = providers.gradleProperty("release").map { it.toBoolean() }.getOrElse(false)
@@ -96,6 +96,15 @@ subprojects {
         mavenCentral()
         maven(paperMavenPublicUrl)
     }
+
+    /* extensions.configure<PublishingExtension> {
+        repositories {
+            maven("https://repo.apismc.org/snapshots") {
+                name = "apismc"
+                credentials(PasswordCredentials::class)
+            }
+        }
+    } */
 }
 
 tasks.register("printMinecraftVersion") {

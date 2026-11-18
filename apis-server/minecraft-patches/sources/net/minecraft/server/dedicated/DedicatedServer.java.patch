@@ -1,0 +1,67 @@
+--- a/net/minecraft/server/dedicated/DedicatedServer.java
++++ b/net/minecraft/server/dedicated/DedicatedServer.java
+@@ -237,8 +_,9 @@
+         // Paper start - initialize global and world-defaults configuration
+         this.paperConfigurations.initializeGlobalConfiguration(this.registryAccess());
+         this.paperConfigurations.initializeWorldDefaultsConfiguration(this.registryAccess());
++        org.apismc.apis.hooks.ApisHooks.resolveRegistries(this.registryAccess()); // Apis
+         // Paper end - initialize global and world-defaults configuration
+-        this.server.spark.enableEarlyIfRequested(); // Paper - spark
++        if (!org.apismc.apis.hooks.ApisHooks.isMetricsAndProfilerDisabled()) this.server.spark.enableEarlyIfRequested(); // Paper - spark // Apis
+         // Paper start - fix converting txt to json file; convert old users earlier after PlayerList creation but before file load/save
+         if (this.convertOldUsers()) {
+             this.services().nameToIdCache().save(false); // Paper
+@@ -248,8 +_,11 @@
+         org.spigotmc.WatchdogThread.doStart(org.spigotmc.SpigotConfig.timeoutTime, org.spigotmc.SpigotConfig.restartOnCrash); // Paper - start watchdog thread
+         consoleThread.start(); // Paper - Enhance console tab completions for brigadier commands; start console thread after MinecraftServer.console & PaperConfig are initialized
+         io.papermc.paper.command.PaperCommands.registerCommands(this); // Paper - setup /paper command
+-        this.server.spark.registerCommandBeforePlugins(this.server); // Paper - spark
+-        com.destroystokyo.paper.Metrics.PaperMetrics.startMetrics(); // Paper - start metrics
++        org.apismc.apis.command.ApisCommand.register(this); // Apis
++        if (!org.apismc.apis.hooks.ApisHooks.isMetricsAndProfilerDisabled()) { // Apis
++            this.server.spark.registerCommandBeforePlugins(this.server); // Paper - spark
++            com.destroystokyo.paper.Metrics.PaperMetrics.startMetrics(); // Paper - start metrics
++        } // Apis
+         com.destroystokyo.paper.VersionHistoryManager.INSTANCE.getClass(); // Paper - load version history now
+ 
+         // this.worldData.setGameType(properties.gameMode.get()); // CraftBukkit - moved to world loading
+@@ -280,7 +_,7 @@
+         }
+         // Paper end - Unix domain socket support
+ 
+-        this.initializeKeyPair();
++        if (org.apismc.apis.hooks.ApisHooks.isGenerateKeypairEnabled()) this.initializeKeyPair(); // Apis
+         LOGGER.info("Starting Minecraft server on {}:{}", this.getLocalIp().isEmpty() ? "*" : this.getLocalIp(), this.getPort());
+ 
+         try {
+@@ -298,25 +_,14 @@
+         this.server.enablePlugins(org.bukkit.plugin.PluginLoadOrder.STARTUP);
+         // CraftBukkit end
+ 
+-        // Paper start - Add Velocity IP Forwarding Support
+-        boolean usingProxy = org.spigotmc.SpigotConfig.bungee || io.papermc.paper.configuration.GlobalConfiguration.get().proxies.velocity.enabled;
+-        String proxyFlavor = (io.papermc.paper.configuration.GlobalConfiguration.get().proxies.velocity.enabled) ? "Velocity" : "BungeeCord";
+-        String proxyLink = (io.papermc.paper.configuration.GlobalConfiguration.get().proxies.velocity.enabled) ? "https://docs.papermc.io/velocity/security" : "http://www.spigotmc.org/wiki/firewall-guide/";
+-        // Paper end - Add Velocity IP Forwarding Support
+-        if (!this.usesAuthentication()) {
+-            LOGGER.warn("**** SERVER IS RUNNING IN OFFLINE/INSECURE MODE!");
+-            LOGGER.warn("The server will make no attempt to authenticate usernames. Beware.");
+-            // Spigot start
+-            // Paper start - Add Velocity IP Forwarding Support
++        if (!this.usesAuthentication()) { // Apis - Compact single-line offline-mode warning
++            final boolean usingProxy = org.spigotmc.SpigotConfig.bungee || io.papermc.paper.configuration.GlobalConfiguration.get().proxies.velocity.enabled;
+             if (usingProxy) {
+-                LOGGER.warn("Whilst this makes it possible to use {}, unless access to your server is properly restricted, it also opens up the ability for hackers to connect with any username they choose.", proxyFlavor);
+-                LOGGER.warn("Please see {} for further information.", proxyLink);
+-                // Paper end - Add Velocity IP Forwarding Support
++                final String proxyFlavor = io.papermc.paper.configuration.GlobalConfiguration.get().proxies.velocity.enabled ? "Velocity" : "BungeeCord";
++                LOGGER.warn("Server running in offline mode behind {} proxy (online-mode=false).", proxyFlavor);
+             } else {
+-                LOGGER.warn("While this makes the game possible to play without internet access, it also opens up the ability for hackers to connect with any username they choose.");
++                LOGGER.warn("Server running in offline/insecure mode without Mojang authentication (online-mode=false).");
+             }
+-            // Spigot end
+-            LOGGER.warn("To change this, set \"online-mode\" to \"true\" in the server.properties file.");
+         }
+ 
+         // CraftBukkit start

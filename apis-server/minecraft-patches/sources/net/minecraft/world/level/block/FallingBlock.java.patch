@@ -1,0 +1,10 @@
+--- a/net/minecraft/world/level/block/FallingBlock.java
++++ b/net/minecraft/world/level/block/FallingBlock.java
+@@ -43,6 +_,7 @@
+ 
+     @Override
+     protected void tick(final BlockState state, final ServerLevel level, final BlockPos pos, final RandomSource random) {
++        if (org.apismc.apis.hooks.ApisHooks.isBlockGravityDisabled()) return; // Apis
+         if (isFree(level.getBlockState(pos.below())) && pos.getY() >= level.getMinY()) {
+             FallingBlockEntity entity = FallingBlockEntity.fall(level, pos, state);
+             this.falling(entity);

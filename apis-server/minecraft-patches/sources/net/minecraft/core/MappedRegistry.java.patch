@@ -1,0 +1,53 @@
+--- a/net/minecraft/core/MappedRegistry.java
++++ b/net/minecraft/core/MappedRegistry.java
+@@ -40,6 +_,7 @@
+     private final Map<ResourceKey<T>, RegistrationInfo> registrationInfos = new IdentityHashMap<>(2048); // Paper - Perf: Use bigger expected size to reduce collisions
+     private Lifecycle registryLifecycle;
+     private final Map<TagKey<T>, HolderSet.Named<T>> frozenTags = new IdentityHashMap<>();
++    private final Map<TagKey<T>, HolderSet.Named<T>> prunedFallbackTags = new java.util.concurrent.ConcurrentHashMap<>(); // Apis
+     private MappedRegistry.TagSet<T> allTags = MappedRegistry.TagSet.unbound();
+     private @Nullable DataComponentLookup<T> componentLookup;
+     private boolean frozen;
+@@ -355,7 +_,28 @@
+ 
+     @Override
+     public Optional<HolderSet.Named<T>> get(final TagKey<T> id) {
+-        return this.allTags.get(id);
++        final Optional<HolderSet.Named<T>> tag = this.allTags.get(id);
++        if (tag.isEmpty() && this.frozen && org.apismc.apis.hooks.ApisHooks.shouldPruneRegistryAtLoad(this.key)) { // Apis
++            return Optional.of(this.getOrCreatePrunedEmptyTag(id));
++        } // Apis
++        return tag;
++    }
++
++    private HolderSet.Named<T> getOrCreatePrunedEmptyTag(final TagKey<T> id) { // Apis
++        return this.prunedFallbackTags.computeIfAbsent(id, tagKey -> {
++            final HolderSet.Named<T> emptyTag = new HolderSet.Named<>(this, tagKey);
++            emptyTag.bind(List.of());
++            return emptyTag;
++        });
++    }
++
++    public void bindUnboundHoldersToFallback(final T fallbackValue) { // Apis
++        this.validateWrite();
++        this.byKey.values().forEach(holder -> {
++            if (!holder.isBound()) {
++                holder.bindValue(fallbackValue);
++            }
++        });
+     }
+ 
+     private Holder.Reference<T> validateAndUnwrapTagElement(final TagKey<T> id, final Holder<T> value) {
+@@ -448,7 +_,11 @@
+ 
+             @Override
+             public Optional<HolderSet.Named<T>> get(final TagKey<T> id) {
+-                return Optional.ofNullable(pendingTags.get(id));
++                final Optional<HolderSet.Named<T>> tag = Optional.ofNullable(pendingTags.get(id));
++                if (tag.isEmpty() && org.apismc.apis.hooks.ApisHooks.shouldPruneRegistryAtLoad(MappedRegistry.this.key)) { // Apis
++                    return Optional.of(MappedRegistry.this.getOrCreatePrunedEmptyTag(id));
++                } // Apis
++                return tag;
+             }
+ 
+             @Override

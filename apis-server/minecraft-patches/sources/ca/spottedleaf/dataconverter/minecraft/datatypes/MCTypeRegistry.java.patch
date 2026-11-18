@@ -1,0 +1,39 @@
+--- a/ca/spottedleaf/dataconverter/minecraft/datatypes/MCTypeRegistry.java
++++ b/ca/spottedleaf/dataconverter/minecraft/datatypes/MCTypeRegistry.java
+@@ -62,20 +_,22 @@
+     public static final DynamicDataType DATACONVERTER_CUSTOM_TYPE_COMMAND = new DynamicDataType("DC_Custom/Command");
+ 
+     static {
+-        LOGGER.info("Initialising converters for DataConverter...");
+-
+-        final long start = System.nanoTime();
+-        try {
+-            registerAll();
+-        } catch (final Throwable thr) {
+-            LOGGER.error(LogUtils.FATAL_MARKER, "Failed to register data converters", thr);
+-            throw new RuntimeException(thr);
+-        }
+-        final long end = System.nanoTime();
+-
+-        final DecimalFormat oneDecimalFormat = new DecimalFormat("#,##0.0");
+-
+-        LOGGER.info("Finished initialising converters for DataConverter in " + oneDecimalFormat.format((double)(end - start) / 1.0E6) + "ms");
++        if (org.apismc.apis.hooks.ApisHooks.isDataFixersEnabled()) { // Apis
++            LOGGER.info("Initialising converters for DataConverter...");
++
++            final long start = System.nanoTime();
++            try {
++                registerAll();
++            } catch (final Throwable thr) {
++                LOGGER.error(LogUtils.FATAL_MARKER, "Failed to register data converters", thr);
++                throw new RuntimeException(thr);
++            }
++            final long end = System.nanoTime();
++
++            final DecimalFormat oneDecimalFormat = new DecimalFormat("#,##0.0");
++
++            LOGGER.info("Finished initialising converters for DataConverter in " + oneDecimalFormat.format((double)(end - start) / 1.0E6) + "ms");
++        } // Apis
+     }
+ 
+     public static void init() {}

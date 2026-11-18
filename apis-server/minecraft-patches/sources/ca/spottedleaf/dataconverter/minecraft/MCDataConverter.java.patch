@@ -1,0 +1,34 @@
+--- a/ca/spottedleaf/dataconverter/minecraft/MCDataConverter.java
++++ b/ca/spottedleaf/dataconverter/minecraft/MCDataConverter.java
+@@ -35,6 +_,7 @@
+     }
+ 
+     public static CompoundTag convertTag(final MCDataType type, final DataFixTypes vanillaType, final CompoundTag data, final int fromVersion, final int toVersion) {
++        if (!org.apismc.apis.hooks.ApisHooks.isDataFixersEnabled()) return data; // Apis
+         final int maxVersion = MCVersionRegistry.getMaxImplementedVersion();
+         if (toVersion > maxVersion) {
+             warnPassOn(toVersion);
+@@ -50,6 +_,7 @@
+     }
+ 
+     public static CompoundTag convertTag(final MCDataType type, final DSL.TypeReference vanillaType, final DataFixer fixer, final CompoundTag data, final int fromVersion, final int toVersion) {
++        if (!org.apismc.apis.hooks.ApisHooks.isDataFixersEnabled()) return data; // Apis
+         final int maxVersion = MCVersionRegistry.getMaxImplementedVersion();
+         if (toVersion > maxVersion) {
+             warnPassOn(toVersion);
+@@ -76,6 +_,7 @@
+     }
+ 
+     public static CompoundTag convertTag(final MCDataType type, final CompoundTag data, final int fromVersion, final int toVersion) {
++        if (!org.apismc.apis.hooks.ApisHooks.isDataFixersEnabled()) return data; // Apis
+         final NBTMapType wrapped = new NBTMapType(data);
+ 
+         final NBTMapType replaced = (NBTMapType)convert(type, wrapped, fromVersion, toVersion);
+@@ -84,6 +_,7 @@
+     }
+ 
+     public static JsonObject convertJson(final MCDataType type, final JsonObject data, final boolean compressed, final int fromVersion, final int toVersion) {
++        if (!org.apismc.apis.hooks.ApisHooks.isDataFixersEnabled()) return data; // Apis
+         final JsonMapType wrapped = new JsonMapType(data, compressed);
+ 
+         final JsonMapType replaced = (JsonMapType)convert(type, wrapped, fromVersion, toVersion);

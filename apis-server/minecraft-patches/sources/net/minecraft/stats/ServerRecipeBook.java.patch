@@ -1,0 +1,26 @@
+--- a/net/minecraft/stats/ServerRecipeBook.java
++++ b/net/minecraft/stats/ServerRecipeBook.java
+@@ -59,6 +_,7 @@
+     }
+ 
+     public int addRecipes(final Collection<RecipeHolder<?>> recipes, final ServerPlayer player) {
++        if (org.apismc.apis.hooks.ApisHooks.isRecipesDisabled()) return 0; // Apis
+         List<ClientboundRecipeBookAddPacket.Entry> recipesToAdd = new ArrayList<>();
+ 
+         for (RecipeHolder<?> recipe : recipes) {
+@@ -118,6 +_,7 @@
+     }
+ 
+     public void sendInitialRecipeBook(final ServerPlayer player) {
++        if (org.apismc.apis.hooks.ApisHooks.isRecipesDisabled()) return; // Apis
+         player.connection.send(new ClientboundRecipeBookSettingsPacket(this.getBookSettings().copy()));
+         List<ClientboundRecipeBookAddPacket.Entry> recipesToSend = new ArrayList<>(this.known.size());
+ 
+@@ -145,6 +_,7 @@
+     }
+ 
+     public void loadUntrusted(final ServerRecipeBook.Packed packed, final Predicate<ResourceKey<Recipe<?>>> validator) {
++        if (org.apismc.apis.hooks.ApisHooks.isRecipesDisabled()) return; // Apis
+         this.bookSettings.replaceFrom(packed.settings);
+         this.loadRecipes(packed.known, this.known::add, validator);
+         this.loadRecipes(packed.highlight, this.highlight::add, validator);
