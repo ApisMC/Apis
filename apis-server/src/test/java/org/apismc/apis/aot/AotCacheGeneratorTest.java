@@ -1,7 +1,6 @@
 package org.apismc.apis.aot;
 
 import java.nio.file.Path;
-import java.time.LocalTime;
 import java.util.List;
 import org.apismc.apis.hooks.ApisHooks;
 import org.bukkit.support.environment.Normal;
@@ -22,14 +21,14 @@ class AotCacheGeneratorTest {
     }
 
     @Test
-    void buildsExpectedRecordAndCreateCommands() {
+    void buildsExpectedRecordCreateAndBannerOutput() {
         final Path javaBin = Path.of("bin", "java");
         final Path jarPath = Path.of("apis-bundler-26.3-release.jar");
 
         final List<String> recordCmd = AotCacheGenerator.buildRecordCommand(
             javaBin,
             jarPath,
-            new String[] {"--generate-aot", "--port", "25565", "--nogui"}
+            new String[] {"--generate-aot", "--port", "25565", "--nogui", "--noconsole"}
         );
         assertEquals(
             List.of(
@@ -40,8 +39,7 @@ class AotCacheGeneratorTest {
                 "apis-bundler-26.3-release.jar",
                 "--port",
                 "25565",
-                "--nogui",
-                "--aot-internal-warmup"
+                "--nogui"
             ),
             recordCmd
         );
@@ -101,8 +99,7 @@ class AotCacheGeneratorTest {
                 "-jar",
                 "apis-bundler-26.3-release.jar",
                 "--configs-dir=configs",
-                "--nogui",
-                "--aot-internal-warmup"
+                "--nogui"
             ),
             recordWithInherited
         );
@@ -129,24 +126,37 @@ class AotCacheGeneratorTest {
             createWithInherited
         );
 
-        assertEquals(
-            "java -Xms2G -Xmx3G -XX:+UseParallelGC -Djdk.graal.CompilerConfiguration=community --add-modules=jdk.incubator.vector -XX:AOTCache=cache/apis.aot -jar apis-bundler-26.3-release.jar --nogui",
-            AotCacheGenerator.buildLaunchHint(filteredJvmArgs, jarPath)
+        final String expectedLaunchHint =
+            "java -Xms2G -Xmx3G -XX:+UseParallelGC -Djdk.graal.CompilerConfiguration=community "
+                + "--add-modules=jdk.incubator.vector -XX:AOTCache=cache/apis.aot "
+                + "-jar apis-bundler-26.3-release.jar --nogui";
+        assertEquals(expectedLaunchHint, AotCacheGenerator.buildLaunchHint(filteredJvmArgs, jarPath));
+
+        final String expectedBanner = String.join(
+            System.lineSeparator(),
+            "============================================================",
+            "AOT cache generated: cache/apis.aot",
+            "CRITICAL: You MUST use the exact same JVM flags for running",
+            "the server as used during generation (memory, GC, modules),",
+            "otherwise JVM will reject the cache.",
+            "",
+            "Run server using:",
+            expectedLaunchHint,
+            "============================================================"
         );
+        assertEquals(expectedBanner, AotCacheGenerator.buildSuccessBanner(filteredJvmArgs, jarPath));
     }
 
     @Test
-    void filtersAotJvmMessagesAndMutesServerNoise() {
-        assertTrue(AotCacheGenerator.isAotLogLine("[0.241s][warning][aot] Skipping foo: failed verification"));
-        assertTrue(AotCacheGenerator.isAotLogLine("[0.112s][info][aot] Number of classes 993"));
-        assertTrue(AotCacheGenerator.isAotLogLine("AOTConfiguration recorded: cache/apis.aotconf"));
-        assertTrue(AotCacheGenerator.isAotLogLine("Reading AOTConfiguration cache/apis.aotconf and writing AOTCache cache/apis.aot"));
-        assertTrue(AotCacheGenerator.isAotLogLine("AOTCache creation is complete: cache/apis.aot 10878976 bytes"));
+    void detectsReadyLogLineAndIgnoresAnsiAndOtherLines() {
+        final String esc = String.valueOf((char) 27);
+        assertTrue(AotCacheGenerator.isServerReadyLine("[00:03:52] INFO Done (3.152s)! For help, type \"help\""));
+        assertTrue(AotCacheGenerator.isServerReadyLine(esc + "[0m[00:03:52] INFO Done (1.234s)! For help, type \"help\"" + esc + "[0m"));
 
-        assertFalse(AotCacheGenerator.isAotLogLine(""));
-        assertFalse(AotCacheGenerator.isAotLogLine("[00:41:10] [ServerMain/INFO]: Preparing level \"world\""));
-        assertFalse(AotCacheGenerator.isAotLogLine("[00:41:12 INFO]: Done (1.234s)! For help, type \"help\""));
-        assertFalse(AotCacheGenerator.isAotLogLine("[MyPlugin] Loaded configuration"));
+        assertFalse(AotCacheGenerator.isServerReadyLine(null));
+        assertFalse(AotCacheGenerator.isServerReadyLine(""));
+        assertFalse(AotCacheGenerator.isServerReadyLine("[00:03:52] INFO Done preparing level \"hub\" (0.081s)"));
+        assertFalse(AotCacheGenerator.isServerReadyLine("[MyPlugin] Loaded configuration"));
     }
 
     @Test
@@ -161,59 +171,5 @@ class AotCacheGeneratorTest {
 
         ApisHooks.setAotInternalWarmup(true);
         assertTrue(ApisHooks.isAotInternalWarmup());
-    }
-
-    @Test
-    void reformatsJvmAotLinesToUnifiedServerLogFormat() {
-        final LocalTime ts = LocalTime.of(1, 2, 3);
-        final String esc = String.valueOf((char) 27);
-
-        // Plain / non-ANSI mode
-        assertEquals(
-            "[01:02:03] WARN [AOT] Preload Warning: Verification failed for org.mineskin.request.GenerateRequest",
-            AotCacheGenerator.formatAotLogLine(
-                "[8.451s][warning][aot] Preload Warning: Verification failed for org.mineskin.request.GenerateRequest",
-                ts,
-                false
-            )
-        );
-        assertEquals(
-            "[01:02:03] WARN [AOT] Skipping jdk/internal/event/Event: JFR event class",
-            AotCacheGenerator.formatAotLogLine(
-                "[8.711s][warning][aot] Skipping jdk/internal/event/Event: JFR event class",
-                ts,
-                false
-            )
-        );
-        assertEquals(
-            "[01:02:03] INFO [AOT] Number of classes 993",
-            AotCacheGenerator.formatAotLogLine("[0.112s][info][aot] Number of classes 993", ts, false)
-        );
-        assertEquals(
-            "[01:02:03] INFO [AOT] AOTConfiguration recorded: cache/apis.aotconf",
-            AotCacheGenerator.formatAotLogLine("AOTConfiguration recorded: cache/apis.aotconf", ts, false)
-        );
-        assertEquals(
-            "[01:02:03] ERROR [AOT] Unrecognized VM option 'BadOption'",
-            AotCacheGenerator.formatAotLogLine("Unrecognized VM option 'BadOption'", ts, false)
-        );
-
-        // ANSI mode matches ApisLevelBadgeConverter + %highlightError
-        assertEquals(
-            "[01:02:03] INFO Recording AOT profile with loaded plugins...",
-            AotCacheGenerator.formatServerStyleLine("INFO", false, "Recording AOT profile with loaded plugins...", ts, true)
-        );
-        assertEquals(
-            "[01:02:03] INFO [AOT] Number of classes 993",
-            AotCacheGenerator.formatAotLogLine("[0.112s][info][aot] Number of classes 993", ts, true)
-        );
-        assertEquals(
-            esc + "[0;33;1m[01:02:03] " + esc + "[0;1;30;103m WARN " + esc + "[0;33;1m [AOT] Preload Warning: x" + esc + "[0m",
-            AotCacheGenerator.formatAotLogLine("[8.451s][warning][aot] Preload Warning: x", ts, true)
-        );
-        assertEquals(
-            esc + "[0;31;1m[01:02:03] " + esc + "[0;1;30;101m ERROR " + esc + "[0;31;1m Failed" + esc + "[0m",
-            AotCacheGenerator.formatServerStyleLine("ERROR", false, "Failed", ts, true)
-        );
     }
 }

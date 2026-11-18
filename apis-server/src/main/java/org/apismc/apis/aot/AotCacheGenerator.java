@@ -1,9 +1,11 @@
 package org.apismc.apis.aot;
 
 import java.io.BufferedReader;
+import java.io.BufferedWriter;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStreamReader;
+import java.io.OutputStreamWriter;
 import java.lang.management.ManagementFactory;
 import java.net.URISyntaxException;
 import java.net.URL;
@@ -11,21 +13,16 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.security.CodeSource;
-import java.time.LocalTime;
-import java.time.format.DateTimeFormatter;
-import java.util.ArrayDeque;
 import java.util.ArrayList;
-import java.util.Deque;
 import java.util.List;
 import java.util.Locale;
 import java.util.Optional;
-import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import net.minecraft.server.MinecraftServer;
 import org.jspecify.annotations.Nullable;
 
 /**
- * Orchestrates two-phase Java 25 AOT cache generation via {@code --generate-aot}.
+ * Transparent two-phase Java 25 AOT cache runner invoked via {@code --generate-aot}.
  */
 public final class AotCacheGenerator {
 
@@ -36,19 +33,8 @@ public final class AotCacheGenerator {
     private static final String AOT_CONF_PATH = "cache/apis.aotconf";
     private static final String AOT_CACHE_PATH = "cache/apis.aot";
     private static final long WARMUP_DELAY_MS = 2_000L;
-    private static final int TAIL_BUFFER_LIMIT = 30;
-    private static final DateTimeFormatter TIME_FORMATTER = DateTimeFormatter.ofPattern("HH:mm:ss");
-    private static final char ESC = 27;
-    private static final String ANSI_RESET = ESC + "[0m";
-    private static final String WARN_LINE_COLOR = ESC + "[0;33;1m";
-    private static final String WARN_BADGE = ESC + "[0;1;30;103m WARN " + WARN_LINE_COLOR;
-    private static final String ERROR_LINE_COLOR = ESC + "[0;31;1m";
-    private static final String ERROR_BADGE = ESC + "[0;1;30;101m ERROR " + ERROR_LINE_COLOR;
-    private static final boolean ANSI_SUPPORTED = detectAnsiSupport();
-    private static final Pattern JVM_AOT_PREFIX = Pattern.compile(
-        "^(?:\\[[^\\]]+\\]\\s*)?\\[(warning|info|error|debug)\\]\\[aot[^\\]]*\\]\\s*(.*)$",
-        Pattern.CASE_INSENSITIVE
-    );
+    private static final String BANNER_DIVIDER = "============================================================";
+    private static final Pattern ANSI_ESCAPE_PATTERN = Pattern.compile("\\u001B\\[[;\\d]*[A-Za-z]");
 
     private AotCacheGenerator() {
     }
@@ -100,7 +86,7 @@ public final class AotCacheGenerator {
     }
 
     /**
-     * Runs the two-phase AOT record &amp; create pipeline and returns the suggested process exit code.
+     * Runs the transparent two-phase AOT record &amp; create pipeline and returns the exit code.
      *
      * @param originalArgs CLI arguments passed to the entry point
      * @param entryClass   bootstrap entry class for fallback JAR lookup
@@ -117,7 +103,7 @@ public final class AotCacheGenerator {
             javaBin = resolveJavaExecutable();
             jarPath = resolveCurrentJarPath(entryClass);
         } catch (final IllegalStateException ex) {
-            logError(ex.getMessage());
+            System.err.println(ex.getMessage());
             return 1;
         }
 
@@ -125,46 +111,40 @@ public final class AotCacheGenerator {
             Files.createDirectories(cacheDir);
             Files.deleteIfExists(aotConf);
         } catch (final IOException ex) {
-            logError("Failed to prepare AOT cache directory '" + cacheDir + "': " + ex.getMessage());
+            System.err.println("Failed to prepare AOT cache directory '" + cacheDir + "': " + ex.getMessage());
             return 1;
         }
 
         final List<String> inheritedJvmArgs = resolveInheritedJvmArgs();
 
         try {
-            logInfo("Recording AOT profile with loaded plugins...");
             final List<String> recordCmd = buildRecordCommand(javaBin, inheritedJvmArgs, jarPath, originalArgs);
-            final PhaseResult recordResult = runPhase(recordCmd, true);
+            final RecordResult recordResult = runRecordPhase(recordCmd);
             if (recordResult.eulaMissing) {
-                logError("Cannot record AOT profile: please accept eula.txt first.");
+                System.err.println("Cannot record AOT profile: please accept eula.txt first.");
                 return 1;
             }
             if (recordResult.exitCode != 0 || !Files.isRegularFile(aotConf) || fileSizeSafe(aotConf) <= 0L) {
-                logError("AOT profile recording failed (exit code " + recordResult.exitCode + ").");
-                dumpFailureTail(recordResult.tail);
+                System.err.println("AOT profile recording failed (exit code " + recordResult.exitCode + ").");
                 return 1;
             }
 
-            logInfo("Compiling AOT cache to " + AOT_CACHE_PATH + "...");
             final List<String> createCmd = buildCreateCommand(javaBin, inheritedJvmArgs, jarPath);
-            final PhaseResult createResult = runPhase(createCmd, false);
-            if (createResult.exitCode != 0 || !Files.isRegularFile(aotCache) || fileSizeSafe(aotCache) <= 0L) {
-                logError("AOT cache compilation failed (exit code " + createResult.exitCode + ").");
-                dumpFailureTail(createResult.tail);
+            final int createExitCode = runCreatePhase(createCmd);
+            if (createExitCode != 0 || !Files.isRegularFile(aotCache) || fileSizeSafe(aotCache) <= 0L) {
+                System.err.println("AOT cache compilation failed (exit code " + createExitCode + ").");
                 return 1;
             }
 
-            final double sizeMb = Files.size(aotCache) / (1024.0d * 1024.0d);
-            logInfo(String.format(Locale.ROOT, "AOT cache generated successfully (%.1f MB).", sizeMb));
-            logInfo("Run server using:");
-            System.out.println(buildLaunchHint(inheritedJvmArgs, jarPath));
+            System.out.println();
+            System.out.println(buildSuccessBanner(inheritedJvmArgs, jarPath));
             return 0;
         } catch (final IOException ex) {
-            logError("I/O error during AOT generation: " + ex.getMessage());
+            System.err.println("I/O error during AOT generation: " + ex.getMessage());
             return 1;
         } catch (InterruptedException _) {
             Thread.currentThread().interrupt();
-            logError("AOT generation interrupted.");
+            System.err.println("AOT generation interrupted.");
             return 1;
         } finally {
             deleteQuietly(aotConf);
@@ -221,19 +201,18 @@ public final class AotCacheGenerator {
         final Path jarPath,
         final String[] originalArgs
     ) {
-        final List<String> cmd = new ArrayList<>();
+        final List<String> cmd = new ArrayList<>(inheritedJvmArgs.size() + 8);
         cmd.add(javaBin.toString());
         cmd.addAll(inheritedJvmArgs);
         cmd.add("-XX:AOTMode=record");
         cmd.add("-XX:AOTConfiguration=" + AOT_CONF_PATH);
         cmd.add("-jar");
         cmd.add(jarPath.toString());
-        for (final String arg : stripFlags(originalArgs, FLAG_GENERATE_AOT, FLAG_INTERNAL_WARMUP, "--nogui")) {
+        for (final String arg : stripFlags(originalArgs, FLAG_GENERATE_AOT, FLAG_INTERNAL_WARMUP, "--nogui", "--noconsole")) {
             cmd.add(arg);
         }
         cmd.add("--nogui");
-        cmd.add(FLAG_INTERNAL_WARMUP);
-        return cmd;
+        return List.copyOf(cmd);
     }
 
     static List<String> buildCreateCommand(final Path javaBin, final Path jarPath) {
@@ -269,6 +248,29 @@ public final class AotCacheGenerator {
         return String.join(" ", parts);
     }
 
+    static String buildSuccessBanner(final List<String> inheritedJvmArgs, final Path jarPath) {
+        return String.join(
+            System.lineSeparator(),
+            BANNER_DIVIDER,
+            "AOT cache generated: " + AOT_CACHE_PATH,
+            "CRITICAL: You MUST use the exact same JVM flags for running",
+            "the server as used during generation (memory, GC, modules),",
+            "otherwise JVM will reject the cache.",
+            "",
+            "Run server using:",
+            buildLaunchHint(inheritedJvmArgs, jarPath),
+            BANNER_DIVIDER
+        );
+    }
+
+    static boolean isServerReadyLine(final @Nullable String rawLine) {
+        if (rawLine == null || rawLine.isEmpty()) {
+            return false;
+        }
+        final String clean = ANSI_ESCAPE_PATTERN.matcher(rawLine).replaceAll("");
+        return clean.contains("Done (") && clean.contains(")!");
+    }
+
     private static boolean isAotSpecificFlag(final String arg) {
         return "-XX:AOTMode".equals(arg) || arg.startsWith("-XX:AOTMode=")
             || "-XX:AOTConfiguration".equals(arg) || arg.startsWith("-XX:AOTConfiguration=")
@@ -280,78 +282,6 @@ public final class AotCacheGenerator {
             return '"' + token.replace("\"", "\\\"") + '"';
         }
         return token;
-    }
-
-    static boolean isAotLogLine(final @Nullable String rawLine) {
-        if (rawLine == null) {
-            return false;
-        }
-        final String trimmed = rawLine.trim();
-        if (trimmed.isEmpty()) {
-            return false;
-        }
-        final String lower = trimmed.toLowerCase(Locale.ROOT);
-        if (lower.contains("[warning][aot")
-            || lower.contains("[info][aot")
-            || lower.contains("[error][aot")
-            || lower.contains("[debug][aot")
-            || lower.contains("[aot]")) {
-            return true;
-        }
-        return trimmed.startsWith("AOTConfiguration ")
-            || trimmed.startsWith("Reading AOTConfiguration ")
-            || trimmed.startsWith("AOTCache ")
-            || trimmed.startsWith("An error has occurred")
-            || trimmed.startsWith("Error: ")
-            || trimmed.startsWith("Unrecognized VM option");
-    }
-
-    static String formatAotLogLine(final String trimmedLine, final LocalTime timestamp) {
-        return formatAotLogLine(trimmedLine, timestamp, ANSI_SUPPORTED);
-    }
-
-    static String formatAotLogLine(final String trimmedLine, final LocalTime timestamp, final boolean ansiSupported) {
-        final Matcher matcher = JVM_AOT_PREFIX.matcher(trimmedLine);
-        if (matcher.matches()) {
-            final String rawLevel = matcher.group(1).toLowerCase(Locale.ROOT);
-            final String level = switch (rawLevel) {
-                case "warning" -> "WARN";
-                case "error" -> "ERROR";
-                default -> "INFO";
-            };
-            final String body = matcher.group(2).stripLeading();
-            return formatServerStyleLine(level, true, body, timestamp, ansiSupported);
-        }
-        if (trimmedLine.startsWith("An error has occurred")
-            || trimmedLine.startsWith("Error: ")
-            || trimmedLine.startsWith("Unrecognized VM option")) {
-            return formatServerStyleLine("ERROR", true, trimmedLine, timestamp, ansiSupported);
-        }
-        return formatServerStyleLine("INFO", true, trimmedLine, timestamp, ansiSupported);
-    }
-
-    static String formatServerStyleLine(
-        final String level,
-        final boolean withAotTag,
-        final String message,
-        final LocalTime timestamp,
-        final boolean ansiSupported
-    ) {
-        final String time = TIME_FORMATTER.format(timestamp);
-        final String prefix = withAotTag ? "[AOT] " : "";
-        if ("WARN".equals(level)) {
-            if (!ansiSupported) {
-                return "[" + time + "] WARN " + prefix + message;
-            }
-            return WARN_LINE_COLOR + "[" + time + "] " + WARN_BADGE + " " + prefix + message + ANSI_RESET;
-        }
-        if ("ERROR".equals(level)) {
-            if (!ansiSupported) {
-                return "[" + time + "] ERROR " + prefix + message;
-            }
-            return ERROR_LINE_COLOR + "[" + time + "] " + ERROR_BADGE + " " + prefix + message + ANSI_RESET;
-        }
-        return "[" + time + "] " + level + " " + prefix + message;
     }
 
     static Path resolveJavaExecutable() {
@@ -429,36 +359,46 @@ public final class AotCacheGenerator {
         return null;
     }
 
-    private static PhaseResult runPhase(final List<String> command, final boolean filterServerNoise)
+    private static RecordResult runRecordPhase(final List<String> command)
         throws IOException, InterruptedException {
         final ProcessBuilder pb = new ProcessBuilder(command);
         pb.redirectErrorStream(true);
         final Process process = pb.start();
-        process.getOutputStream().close();
 
-        final Deque<String> tail = new ArrayDeque<>(TAIL_BUFFER_LIMIT);
         boolean eulaMissing = false;
-        try (BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream(), StandardCharsets.UTF_8))) {
+        boolean stopSent = false;
+        try (
+            BufferedWriter childInput = new BufferedWriter(new OutputStreamWriter(process.getOutputStream(), StandardCharsets.UTF_8));
+            BufferedReader childOutput = new BufferedReader(new InputStreamReader(process.getInputStream(), StandardCharsets.UTF_8))
+        ) {
             String line;
-            while ((line = reader.readLine()) != null) {
-                final String trimmed = line.trim();
-                if (!trimmed.isEmpty()) {
-                    if (tail.size() >= TAIL_BUFFER_LIMIT) {
-                        tail.removeFirst();
-                    }
-                    tail.addLast(trimmed);
-                    if (trimmed.contains("You need to agree to the EULA")) {
-                        eulaMissing = true;
-                    }
-                    if (!filterServerNoise || isAotLogLine(trimmed)) {
-                        System.out.println(formatAotLogLine(trimmed, LocalTime.now()));
+            while ((line = childOutput.readLine()) != null) {
+                System.out.println(line);
+                if (line.contains("You need to agree to the EULA")) {
+                    eulaMissing = true;
+                }
+                if (!stopSent && isServerReadyLine(line)) {
+                    stopSent = true;
+                    try {
+                        childInput.write("stop");
+                        childInput.newLine();
+                        childInput.flush();
+                    } catch (IOException _) {
+                        // Child may already be shutting down
                     }
                 }
             }
         }
 
         final int exitCode = process.waitFor();
-        return new PhaseResult(exitCode, tail, eulaMissing);
+        return new RecordResult(exitCode, eulaMissing);
+    }
+
+    private static int runCreatePhase(final List<String> command) throws IOException, InterruptedException {
+        final ProcessBuilder pb = new ProcessBuilder(command);
+        pb.inheritIO();
+        final Process process = pb.start();
+        return process.waitFor();
     }
 
     private static long fileSizeSafe(final Path path) {
@@ -471,51 +411,12 @@ public final class AotCacheGenerator {
 
     private static void deleteQuietly(final Path path) {
         try {
-            if (Files.deleteIfExists(path)) {
-                return;
-            }
+            Files.deleteIfExists(path);
         } catch (final IOException ex) {
-            logWarn("Could not delete temporary AOT file '" + path + "': " + ex.getMessage());
+            System.err.println("Could not delete temporary AOT file '" + path + "': " + ex.getMessage());
         }
     }
 
-    private static void dumpFailureTail(final Deque<String> tail) {
-        if (tail.isEmpty()) {
-            return;
-        }
-        logError("Last child process output lines:");
-        for (final String line : tail) {
-            System.err.println("  " + line);
-        }
-    }
-
-    private static boolean detectAnsiSupport() {
-        if (System.getenv("NO_COLOR") != null) {
-            return false;
-        }
-        final @Nullable String term = System.getenv("TERM");
-        if ("dumb".equalsIgnoreCase(term)) {
-            return false;
-        }
-        final @Nullable String override = System.getProperty("terminal.ansi");
-        if (override != null) {
-            return Boolean.parseBoolean(override);
-        }
-        return System.console() != null;
-    }
-
-    private static void logInfo(final String message) {
-        System.out.println(formatServerStyleLine("INFO", false, message, LocalTime.now(), ANSI_SUPPORTED));
-    }
-
-    private static void logWarn(final String message) {
-        System.out.println(formatServerStyleLine("WARN", false, message, LocalTime.now(), ANSI_SUPPORTED));
-    }
-
-    private static void logError(final String message) {
-        System.err.println(formatServerStyleLine("ERROR", false, message, LocalTime.now(), ANSI_SUPPORTED));
-    }
-
-    private record PhaseResult(int exitCode, Deque<String> tail, boolean eulaMissing) {
+    private record RecordResult(int exitCode, boolean eulaMissing) {
     }
 }
