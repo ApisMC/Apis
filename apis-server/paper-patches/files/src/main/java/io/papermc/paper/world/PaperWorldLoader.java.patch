@@ -4,9 +4,20 @@
          } else {
              environment = World.Environment.CUSTOM;
          }
-+        if (stemKey != LevelStem.OVERWORLD && org.apismc.apis.hooks.ApisHooks.isDimensionDisabled(dimensionKey)) { // Apis - Cut disabled dimensions before allocation
++        if (stemKey != LevelStem.OVERWORLD && (org.apismc.apis.hooks.ApisHooks.isStandaloneWorldsMode() || org.apismc.apis.hooks.ApisHooks.isDimensionDisabled(dimensionKey))) { // Apis - Cut disabled or unused vanilla nether/end stems in standalone mode
 +            enabled = false;
 +        }
  
          return new WorldLoadingInfo(environment, stemKey, dimensionKey, enabled);
      }
+@@ -136,6 +_,10 @@
+         for (ServerLevel serverLevel : this.server.getAllLevels()) {
+             this.server.prepareLevel(serverLevel);
+         }
++        if (org.apismc.apis.hooks.ApisHooks.isStandaloneWorldsMode()) { // Apis - Initialize standalone fallback world & auto-load worlds/*
++            org.apismc.apis.hooks.ApisHooks.onPrimaryWorldPrepared(this.server.overworld());
++            org.apismc.apis.hooks.ApisHooks.loadStandaloneExtraWorlds(this.server);
++        } // Apis
+     }
+ 
+     private void loadInitialWorld(final LevelStem stem, final boolean hasWorldData) {

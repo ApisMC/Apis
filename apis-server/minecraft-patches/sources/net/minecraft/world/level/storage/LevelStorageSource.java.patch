@@ -1,5 +1,18 @@
 --- a/net/minecraft/world/level/storage/LevelStorageSource.java
 +++ b/net/minecraft/world/level/storage/LevelStorageSource.java
+@@ -545,7 +_,11 @@
+         }
+ 
+         public Path getDimensionPath(final ResourceKey<Level> name) {
+-            return DimensionType.getStorageFolder(name, this.levelDirectory.path());
++            return org.apismc.apis.hooks.ApisHooks.resolveDimensionPath(
++                name,
++                this.levelDirectory.path(),
++                DimensionType.getStorageFolder(name, this.levelDirectory.path())
++            ); // Apis
+         }
+ 
+         private void checkLock() {
 @@ -609,6 +_,7 @@
          }
  

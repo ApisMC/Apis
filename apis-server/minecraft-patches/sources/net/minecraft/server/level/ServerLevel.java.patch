@@ -1,5 +1,14 @@
 --- a/net/minecraft/server/level/ServerLevel.java
 +++ b/net/minecraft/server/level/ServerLevel.java
+@@ -650,7 +_,7 @@
+         this.server = server;
+         this.customSpawners = customSpawners;
+         this.serverLevelData = levelData;
+-        ChunkGenerator generator = levelStem.generator();
++        ChunkGenerator generator = org.apismc.apis.hooks.ApisHooks.resolveVoidLevelStemGenerator(server.registryAccess(), levelStem.generator()); // Apis
+         // CraftBukkit start
+         // Paper start - per-world time
+         if (!io.papermc.paper.configuration.GlobalConfiguration.get().time.affectsAllWorlds) {
 @@ -810,13 +_,15 @@
          if (runs) {
              profiler.push("world border");

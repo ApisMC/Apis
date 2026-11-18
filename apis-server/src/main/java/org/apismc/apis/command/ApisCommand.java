@@ -8,8 +8,14 @@ import net.minecraft.server.MinecraftServer;
 import org.apismc.apis.config.ApisConfig;
 import org.apismc.apis.config.ApisConfigSync;
 import org.apismc.apis.feature.FeatureRegistry;
+import org.apismc.apis.hooks.ApisHooks;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandSender;
+import org.bukkit.command.SimpleCommandMap;
+import org.bukkit.permissions.Permission;
+import org.bukkit.permissions.PermissionDefault;
+import org.bukkit.plugin.PluginManager;
+import org.jspecify.annotations.Nullable;
 import org.slf4j.LoggerFactory;
 
 /**
@@ -32,7 +38,30 @@ public final class ApisCommand extends Command {
      * @param server active MinecraftServer instance
      */
     public static void register(final MinecraftServer server) {
-        server.server.getCommandMap().register("apis", "Apis", new ApisCommand(server));
+        final PluginManager pluginManager = server.server.getPluginManager();
+        registerOpPermission(
+            pluginManager,
+            SetWorldSpawnOverrideCommand.PERMISSION,
+            "Allows setting standalone world spawn in world.yml"
+        );
+        registerOpPermission(pluginManager, TpWorldCommand.PERMISSION, "Allows teleporting between standalone worlds");
+
+        final SimpleCommandMap commandMap = server.server.getCommandMap();
+        commandMap.register("apis", new ApisCommand(server));
+        commandMap.register("apis", new TpWorldCommand(server));
+        if (ApisHooks.isStandaloneWorldsMode()) {
+            final @Nullable Command vanillaSetSpawn = commandMap.getCommand("setworldspawn");
+            if (vanillaSetSpawn != null && commandMap.getCommand("minecraft:setworldspawn") == null) {
+                commandMap.getKnownCommands().put("minecraft:setworldspawn", vanillaSetSpawn);
+            }
+            commandMap.register("apis", new SetWorldSpawnOverrideCommand());
+        }
+    }
+
+    private static void registerOpPermission(final PluginManager pm, final String name, final String description) {
+        if (pm.getPermission(name) == null) {
+            pm.addPermission(new Permission(name, description, PermissionDefault.OP));
+        }
     }
 
     @Override

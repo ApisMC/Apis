@@ -63,3 +63,14 @@
              }
  
              for (int i = 0; i < this.getInventory().getContainerSize(); i++) {
+@@ -1371,7 +_,9 @@
+             }
+         } else {
+             // CraftBukkit start
+-            teleportTransition = TeleportTransition.createDefault(this, postTeleportTransition);
++            teleportTransition = org.apismc.apis.hooks.ApisHooks.isStandaloneWorldsMode()
++                ? org.apismc.apis.hooks.ApisHooks.resolveStandaloneRespawnDefault(this.server, postTeleportTransition)
++                : TeleportTransition.createDefault(this, postTeleportTransition); // Apis
+         }
+ 
+         org.bukkit.entity.Player respawnPlayer = this.getBukkitEntity();

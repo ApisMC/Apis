@@ -1,0 +1,16 @@
+--- a/net/minecraft/server/network/config/PrepareSpawnTask.java
++++ b/net/minecraft/server/network/config/PrepareSpawnTask.java
+@@ -110,6 +_,13 @@
+                 .orElseGet(() -> PlayerSpawnFinder.findSpawn(finalSpawnLevel, respawnData.pos()));
+             // Paper end - move logic in Entity to here, to use bukkit supplied world UUID & reset to main world spawn if no valid world is found
+             Vec2 spawnAngle = loadedPosition.rotation().orElse(new Vec2(respawnData.yaw(), respawnData.pitch()));
++            final org.apismc.apis.world.StandaloneWorldManager.ResolvedSpawn apisSpawn =
++                org.apismc.apis.hooks.ApisHooks.resolveStandaloneJoinSpawn(this.server, this.newPlayer, spawnLevel, loadedPosition.position().isPresent()); // Apis
++            if (apisSpawn != null) {
++                spawnLevel = apisSpawn.level();
++                spawnPosition = CompletableFuture.completedFuture(apisSpawn.position());
++                spawnAngle = apisSpawn.angle();
++            } // Apis
+             this.state = new PrepareSpawnTask.Preparing(spawnLevel, spawnPosition, spawnAngle);
+         }
+     }

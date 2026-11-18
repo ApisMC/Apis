@@ -11,6 +11,7 @@ import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Deque;
 import java.util.List;
+import java.util.Locale;
 import org.apismc.apis.feature.FeatureRegistry;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
@@ -31,6 +32,9 @@ import org.spongepowered.configurate.yaml.YamlConfigurationLoader;
 public final class ApisConfig {
 
     public static final String DEFAULT_FILE_NAME = "apis.yml";
+    public static final String MODE_STANDALONE = "standalone";
+    public static final String MODE_VANILLA = "vanilla";
+    public static final String DEFAULT_FALLBACK_WORLD = "hub";
     public static final List<String> DEFAULT_ENABLED_DIMENSIONS = List.of(
         "minecraft:overworld",
         "minecraft:the_nether",
@@ -107,6 +111,10 @@ public final class ApisConfig {
     @Setting("compatibility")
     @Comment("Legacy Bukkit/Mojang compatibility subsystems | Застарілі механізми сумісності зі старими плагінами/даними")
     public CompatibilitySection compatibility = new CompatibilitySection();
+
+    @Setting("messages")
+    @Comment("MiniMessage localization templates for built-in core commands (set '' to mute) | Шаблони MiniMessage для команд ядра ('' вимикає вивід)")
+    public MessagesSection messages = new MessagesSection();
 
     public static ApisConfig get() {
         return instance;
@@ -308,6 +316,25 @@ public final class ApisConfig {
         if (this.system.lifecycle == null) this.system.lifecycle = new SystemLifecycleSection();
         if (this.compatibility == null) this.compatibility = new CompatibilitySection();
         if (this.compatibility.legacy == null) this.compatibility.legacy = new LegacySection();
+        if (this.messages == null) this.messages = new MessagesSection();
+        if (this.messages.commands == null) this.messages.commands = new CommandMessagesSection();
+        this.messages.commands.fillMissingDefaults();
+
+        final String rawMode = this.dimensions.mode == null ? MODE_STANDALONE : this.dimensions.mode.trim().toLowerCase(Locale.ROOT);
+        if (!MODE_STANDALONE.equals(rawMode) && !MODE_VANILLA.equals(rawMode)) {
+            logger.warn("Invalid dimensions.mode '{}'; defaulting to '{}'.", this.dimensions.mode, MODE_STANDALONE);
+            this.dimensions.mode = MODE_STANDALONE;
+        } else {
+            this.dimensions.mode = rawMode;
+        }
+
+        final String rawFallback = this.dimensions.fallbackWorld == null ? "" : this.dimensions.fallbackWorld.trim();
+        if (rawFallback.isEmpty() || rawFallback.contains("/") || rawFallback.contains("\\") || rawFallback.contains("..")) {
+            logger.warn("Invalid dimensions.fallback-world '{}'; defaulting to '{}'.", this.dimensions.fallbackWorld, DEFAULT_FALLBACK_WORLD);
+            this.dimensions.fallbackWorld = DEFAULT_FALLBACK_WORLD;
+        } else {
+            this.dimensions.fallbackWorld = rawFallback;
+        }
 
         this.network.packetRangeClamping.projectileTrackingRange = clampInt(
             this.network.packetRangeClamping.projectileTrackingRange,
@@ -399,6 +426,14 @@ public final class ApisConfig {
 
     @ConfigSerializable
     public static final class DimensionsSection {
+        @Setting("mode")
+        @Comment("World architecture mode: 'standalone' (isolated worlds/ folder, Void generator, world.yml spawns) or 'vanilla' (standard Paper root worlds & terrain) | Режим світів: 'standalone' (ізольована тека worlds/, чистий Void, world.yml) або 'vanilla' (стандартний Paper)")
+        public String mode = MODE_STANDALONE;
+
+        @Setting("fallback-world")
+        @Comment("Primary world name inside worlds/ used when worlds/ is empty or as default join world in standalone mode | Ім'я базового світу в теці worlds/ при порожній теці або стандартному вході")
+        public String fallbackWorld = DEFAULT_FALLBACK_WORLD;
+
         @Setting("enabled")
         @Comment("Positive whitelist of dimensions allowed to load (minecraft:overworld is always protected and loaded; remove the_nether/the_end to skip allocation) | Позитивний білий список вимірів, дозволених до завантаження (minecraft:overworld завжди захищений і завантажується)")
         public List<String> enabled = new ArrayList<>(DEFAULT_ENABLED_DIMENSIONS);
@@ -764,5 +799,85 @@ public final class ApisConfig {
         @Setting("validate-entity-attributes")
         @Comment("Eagerly load all mob classes & validate DefaultAttributes in Bootstrap; false = resolve entity attributes lazily per type | Завантажувати класи всіх мобів і валідувати DefaultAttributes на старті; false = лінива ініціалізація")
         public boolean validateEntityAttributes = true;
+    }
+
+    @ConfigSerializable
+    public static final class MessagesSection {
+        @Setting("commands")
+        @Comment("MiniMessage output templates for /setworldspawn and /tpworld | Шаблони відповідей MiniMessage для /setworldspawn та /tpworld")
+        public CommandMessagesSection commands = new CommandMessagesSection();
+    }
+
+    @ConfigSerializable
+    public static final class CommandMessagesSection {
+        public static final String DEFAULT_NO_PERMISSION = "<red>You do not have permission to execute this command.";
+        public static final String DEFAULT_PLAYER_ONLY = "<red>Only players can run this command without explicit world/coordinates.";
+        public static final String DEFAULT_INVALID_SYNTAX_SETWORLDSPAWN = "<red>Usage: /setworldspawn [<x> <y> <z>] [<yaw> <pitch>]";
+        public static final String DEFAULT_INVALID_SYNTAX_TPWORLD = "<red>Usage: /tpworld <world> [<player>] [<x> <y> <z>] [<yaw> <pitch>]";
+        public static final String DEFAULT_INVALID_NUMBER = "<red>Invalid numeric argument '<input>'.";
+        public static final String DEFAULT_WORLD_NOT_FOUND = "<red>World '<world>' is not loaded or does not exist.";
+        public static final String DEFAULT_PLAYER_NOT_FOUND = "<red>Player '<player>' is not online.";
+        public static final String DEFAULT_SETWORLDSPAWN_SUCCESS = "<green>Spawn of world <white><world></white> updated to <gray>(<x>, <y>, <z> | yaw <yaw>, pitch <pitch>)</gray>.";
+        public static final String DEFAULT_TPWORLD_SUCCESS_SELF = "<green>Teleported to <white><world></white> at <gray>(<x>, <y>, <z>)</gray>.";
+        public static final String DEFAULT_TPWORLD_SUCCESS_OTHER = "<green>Teleported <white><player></white> to <white><world></white> at <gray>(<x>, <y>, <z>)</gray>.";
+        public static final String DEFAULT_TPWORLD_FAILED = "<red>Failed to teleport to world '<world>'.";
+
+        @Setting("no-permission")
+        @Comment("Sent when sender lacks permission ('' mutes) | Немає прав ('' вимикає повідомлення)")
+        public @Nullable String noPermission = DEFAULT_NO_PERMISSION;
+
+        @Setting("player-only")
+        @Comment("Sent when console omits required player context | Лише для гравців без явних аргументів")
+        public @Nullable String playerOnly = DEFAULT_PLAYER_ONLY;
+
+        @Setting("invalid-syntax-setworldspawn")
+        @Comment("Sent when /setworldspawn argument count is invalid | Помилка синтаксису /setworldspawn")
+        public @Nullable String invalidSyntaxSetWorldSpawn = DEFAULT_INVALID_SYNTAX_SETWORLDSPAWN;
+
+        @Setting("invalid-syntax-tpworld")
+        @Comment("Sent when /tpworld argument count is invalid | Помилка синтаксису /tpworld")
+        public @Nullable String invalidSyntaxTpWorld = DEFAULT_INVALID_SYNTAX_TPWORLD;
+
+        @Setting("invalid-number")
+        @Comment("Sent when coordinate or rotation is not a valid finite number (placeholders: <input>) | Некоректне число (<input>)")
+        public @Nullable String invalidNumber = DEFAULT_INVALID_NUMBER;
+
+        @Setting("world-not-found")
+        @Comment("Sent when target world is missing or unloaded (placeholders: <world>) | Світ не знайдено (<world>)")
+        public @Nullable String worldNotFound = DEFAULT_WORLD_NOT_FOUND;
+
+        @Setting("player-not-found")
+        @Comment("Sent when target player is offline or unknown (placeholders: <player>) | Гравця не знайдено (<player>)")
+        public @Nullable String playerNotFound = DEFAULT_PLAYER_NOT_FOUND;
+
+        @Setting("setworldspawn-success")
+        @Comment("Sent after /setworldspawn succeeds (<world>, <x>, <y>, <z>, <yaw>, <pitch>) | Успішне оновлення спавна світу")
+        public @Nullable String setWorldSpawnSuccess = DEFAULT_SETWORLDSPAWN_SUCCESS;
+
+        @Setting("tpworld-success-self")
+        @Comment("Sent after self-teleport via /tpworld (<world>, <x>, <y>, <z>, <yaw>, <pitch>) | Успішна телепортація гравця")
+        public @Nullable String tpWorldSuccessSelf = DEFAULT_TPWORLD_SUCCESS_SELF;
+
+        @Setting("tpworld-success-other")
+        @Comment("Sent after teleporting another player (<player>, <world>, <x>, <y>, <z>, <yaw>, <pitch>) | Успішна телепортація іншого гравця")
+        public @Nullable String tpWorldSuccessOther = DEFAULT_TPWORLD_SUCCESS_OTHER;
+
+        @Setting("tpworld-failed")
+        @Comment("Sent if async teleport fails (<world>, <player>) | Помилка телепортації")
+        public @Nullable String tpWorldFailed = DEFAULT_TPWORLD_FAILED;
+
+        void fillMissingDefaults() {
+            if (this.noPermission == null) this.noPermission = DEFAULT_NO_PERMISSION;
+            if (this.playerOnly == null) this.playerOnly = DEFAULT_PLAYER_ONLY;
+            if (this.invalidSyntaxSetWorldSpawn == null) this.invalidSyntaxSetWorldSpawn = DEFAULT_INVALID_SYNTAX_SETWORLDSPAWN;
+            if (this.invalidSyntaxTpWorld == null) this.invalidSyntaxTpWorld = DEFAULT_INVALID_SYNTAX_TPWORLD;
+            if (this.invalidNumber == null) this.invalidNumber = DEFAULT_INVALID_NUMBER;
+            if (this.worldNotFound == null) this.worldNotFound = DEFAULT_WORLD_NOT_FOUND;
+            if (this.playerNotFound == null) this.playerNotFound = DEFAULT_PLAYER_NOT_FOUND;
+            if (this.setWorldSpawnSuccess == null) this.setWorldSpawnSuccess = DEFAULT_SETWORLDSPAWN_SUCCESS;
+            if (this.tpWorldSuccessSelf == null) this.tpWorldSuccessSelf = DEFAULT_TPWORLD_SUCCESS_SELF;
+            if (this.tpWorldSuccessOther == null) this.tpWorldSuccessOther = DEFAULT_TPWORLD_SUCCESS_OTHER;
+            if (this.tpWorldFailed == null) this.tpWorldFailed = DEFAULT_TPWORLD_FAILED;
+        }
     }
 }

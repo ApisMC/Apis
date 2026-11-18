@@ -38,6 +38,8 @@ class ApisConfigTest {
         assertTrue(initial.storage.worldSaving);
         assertTrue(initial.system.lifecycle.gracefulShutdown);
         assertTrue(initial.blockEntities.ticking.enabled);
+        assertEquals(ApisConfig.MODE_STANDALONE, initial.dimensions.mode);
+        assertEquals(ApisConfig.DEFAULT_FALLBACK_WORLD, initial.dimensions.fallbackWorld);
         assertTrue(Files.exists(cfgFile));
 
         final String yamlText = Files.readString(cfgFile);
@@ -70,6 +72,10 @@ class ApisConfigTest {
         assertTrue(yamlText.contains("bstats: true"));
         assertTrue(yamlText.contains("spark: true"));
         assertTrue(yamlText.contains("tick-monitor: true"));
+        assertTrue(yamlText.contains("mode: standalone"));
+        assertTrue(yamlText.contains("fallback-world: hub"));
+        assertTrue(yamlText.contains("messages:"));
+        assertTrue(yamlText.contains("setworldspawn-success:"));
         assertFalse(yamlText.contains("disable-portals"), "Legacy disable-* keys must not exist");
         assertFalse(yamlText.contains("disabled-dimensions"), "Legacy disabled-dimensions key must not exist");
         assertFalse(yamlText.contains("disabled-types"), "Legacy disabled-types key must not exist");
@@ -116,5 +122,30 @@ class ApisConfigTest {
         assertTrue(fallback.dimensions.portals);
         assertTrue(Files.exists(tempDir.resolve("apis.yml.broken")));
         assertTrue(Files.exists(cfgFile));
+    }
+
+    @Test
+    void sanitizesInvalidModeAndFallbackWorldWhilePreservingEmptyMuteStrings(final @TempDir Path tempDir) throws IOException {
+        final Path cfgFile = tempDir.resolve("apis.yml");
+        Files.writeString(
+            cfgFile,
+            """
+            dimensions:
+              mode: invalid_mode
+              fallback-world: ../escape
+            messages:
+              commands:
+                world-not-found: ''
+            """
+        );
+
+        final ApisConfig loaded = ApisConfig.loadEarly(cfgFile);
+        assertEquals(ApisConfig.MODE_STANDALONE, loaded.dimensions.mode);
+        assertEquals(ApisConfig.DEFAULT_FALLBACK_WORLD, loaded.dimensions.fallbackWorld);
+        assertEquals("", loaded.messages.commands.worldNotFound);
+        assertEquals(
+            ApisConfig.CommandMessagesSection.DEFAULT_PLAYER_NOT_FOUND,
+            loaded.messages.commands.playerNotFound
+        );
     }
 }

@@ -8,12 +8,14 @@ import com.mojang.datafixers.types.Type;
 import com.mojang.datafixers.types.templates.TypeTemplate;
 import com.mojang.serialization.Decoder;
 import io.papermc.paper.adventure.PaperAdventure;
+import java.io.File;
 import java.nio.file.Path;
 import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Supplier;
 import net.kyori.adventure.key.Key;
+import net.minecraft.core.HolderLookup;
 import net.minecraft.core.MappedRegistry;
 import net.minecraft.core.Registry;
 import net.minecraft.core.RegistryAccess;
@@ -21,6 +23,7 @@ import net.minecraft.core.registries.Registries;
 import net.minecraft.resources.Identifier;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.server.MinecraftServer;
+import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntityType;
@@ -29,14 +32,20 @@ import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.entity.projectile.Projectile;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.biome.Biome;
+import net.minecraft.world.level.chunk.ChunkGenerator;
+import net.minecraft.world.level.levelgen.WorldDimensions;
+import net.minecraft.world.level.portal.TeleportTransition;
 import net.minecraft.world.level.storage.loot.LootTable;
 import org.apismc.apis.config.ApisConfig;
 import org.apismc.apis.config.ApisPaths;
 import org.apismc.apis.feature.Feature;
 import org.apismc.apis.feature.FeatureRegistry;
+import org.apismc.apis.world.ApisVoidChunkGenerator;
+import org.apismc.apis.world.StandaloneWorldManager;
 import org.bukkit.NamespacedKey;
 import org.bukkit.WorldCreator;
 import org.bukkit.craftbukkit.util.CraftNamespacedKey;
+import org.bukkit.generator.BiomeProvider;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -266,6 +275,9 @@ public final class ApisHooks {
     }
 
     public static boolean isWorldCreationBlocked(final WorldCreator creator) {
+        if (StandaloneWorldManager.isInternalDiscovery()) {
+            return false;
+        }
         if (FeatureRegistry.isDisabled(Feature.DIMENSIONS_CUSTOM_WORLDS)) {
             ApisDiagnostics.warnBlocked(
                 Feature.DIMENSIONS_CUSTOM_WORLDS.configKey(),
@@ -597,5 +609,90 @@ public final class ApisHooks {
 
     public static boolean isFireSpreadDisabled() {
         return FeatureRegistry.isDisabled(Feature.PHYSICS_FIRE_SPREAD);
+    }
+
+    // 10. Standalone Worlds Architecture
+    public static boolean isStandaloneWorldsMode() {
+        return StandaloneWorldManager.isStandaloneMode();
+    }
+
+    public static File resolveUniversePath(final File vanillaUniverse) {
+        return StandaloneWorldManager.resolveUniversePath(vanillaUniverse);
+    }
+
+    public static String resolveStartupLevelName(final String vanillaLevelName) {
+        return StandaloneWorldManager.isStandaloneMode()
+            ? StandaloneWorldManager.fallbackWorldName()
+            : vanillaLevelName;
+    }
+
+    public static void markFallbackWorldNewBeforeAccess(final Path universeDir, final String levelName) {
+        StandaloneWorldManager.markFallbackWorldNewBeforeAccess(universeDir, levelName);
+    }
+
+    public static Path resolveDimensionPath(
+        final ResourceKey<Level> dimensionKey,
+        final Path overworldDir,
+        final Path vanillaPath
+    ) {
+        return StandaloneWorldManager.resolveDimensionPath(dimensionKey, overworldDir, vanillaPath);
+    }
+
+    public static void registerStandaloneWorldFolder(final ResourceKey<Level> dimensionKey, final String folderName) {
+        StandaloneWorldManager.registerDimensionFolder(dimensionKey, folderName);
+    }
+
+    public static WorldDimensions resolveInitialStandaloneDimensions(
+        final HolderLookup.Provider registries,
+        final WorldDimensions original
+    ) {
+        return StandaloneWorldManager.resolveInitialDimensions(registries, original);
+    }
+
+    public static ChunkGenerator resolveVoidLevelStemGenerator(
+        final HolderLookup.Provider registries,
+        final ChunkGenerator original
+    ) {
+        return StandaloneWorldManager.isStandaloneMode()
+            ? StandaloneWorldManager.createVoidFlatLevelSource(registries)
+            : original;
+    }
+
+    public static org.bukkit.generator.@Nullable ChunkGenerator resolveVoidBukkitGenerator(
+        final org.bukkit.generator.@Nullable ChunkGenerator original
+    ) {
+        return StandaloneWorldManager.isStandaloneMode() ? ApisVoidChunkGenerator.INSTANCE : original;
+    }
+
+    public static @Nullable BiomeProvider resolveVoidBiomeProvider(final @Nullable BiomeProvider original) {
+        return StandaloneWorldManager.isStandaloneMode() ? ApisVoidChunkGenerator.VOID_BIOME_PROVIDER : original;
+    }
+
+    public static void onPrimaryWorldPrepared(final ServerLevel overworld) {
+        StandaloneWorldManager.initializePrimaryFallbackWorld(overworld);
+    }
+
+    public static void loadStandaloneExtraWorlds(final MinecraftServer server) {
+        StandaloneWorldManager.discoverAndLoadExtraWorlds(server);
+    }
+
+    public static void ensureStandaloneWorldConfig(final ServerLevel level) {
+        StandaloneWorldManager.ensureWorldConfigLoaded(level);
+    }
+
+    public static StandaloneWorldManager.@Nullable ResolvedSpawn resolveStandaloneJoinSpawn(
+        final MinecraftServer server,
+        final boolean newPlayer,
+        final @Nullable ServerLevel savedLevel,
+        final boolean hasSavedPos
+    ) {
+        return StandaloneWorldManager.resolveJoinSpawn(server, newPlayer, savedLevel, hasSavedPos);
+    }
+
+    public static TeleportTransition resolveStandaloneRespawnDefault(
+        final MinecraftServer server,
+        final TeleportTransition.PostTeleportTransition post
+    ) {
+        return StandaloneWorldManager.resolveRespawnDefault(server, post);
     }
 }

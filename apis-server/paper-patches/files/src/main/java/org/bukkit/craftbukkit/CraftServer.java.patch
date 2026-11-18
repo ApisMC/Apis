@@ -53,6 +53,35 @@
  
          String name = creator.name();
          ChunkGenerator chunkGenerator = creator.generator();
+@@ -1167,10 +_,12 @@
+         if (chunkGenerator == null) {
+             chunkGenerator = this.getGenerator(name);
+         }
++        chunkGenerator = org.apismc.apis.hooks.ApisHooks.resolveVoidBukkitGenerator(chunkGenerator); // Apis
+ 
+         if (biomeProvider == null) {
+             biomeProvider = this.getBiomeProvider(name);
+         }
++        biomeProvider = org.apismc.apis.hooks.ApisHooks.resolveVoidBiomeProvider(biomeProvider); // Apis
+ 
+         ResourceKey<LevelStem> actualDimension = switch (creator.environment()) {
+             case NORMAL -> LevelStem.OVERWORLD;
+@@ -1181,6 +_,7 @@
+ 
+         RegistryAccess registryAccess = this.console.registryAccess();
+         final ResourceKey<net.minecraft.world.level.Level> dimensionKey = CraftNamespacedKey.toResourceKey(Registries.DIMENSION, creator.key());
++        org.apismc.apis.hooks.ApisHooks.registerStandaloneWorldFolder(dimensionKey, name); // Apis - Keep standalone world folders in worlds/<name>/
+         net.minecraft.core.Registry<LevelStem> levelStemRegistry = registryAccess.lookupOrThrow(Registries.LEVEL_STEM);
+         final LevelStem configuredStem = levelStemRegistry.getValue(actualDimension);
+         if (configuredStem == null) {
+@@ -1293,6 +_,7 @@
+         serverLevel.setSpawnSettings(true);
+ 
+         this.getServer().prepareLevel(serverLevel);
++        org.apismc.apis.hooks.ApisHooks.ensureStandaloneWorldConfig(serverLevel); // Apis
+ 
+         return serverLevel.getWorld();
+     }
 @@ -1365,7 +_,9 @@
      public World getWorld(String name) {
          Preconditions.checkArgument(name != null, "name cannot be null");
