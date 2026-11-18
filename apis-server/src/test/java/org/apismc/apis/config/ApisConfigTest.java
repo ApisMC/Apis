@@ -28,34 +28,53 @@ class ApisConfigTest {
         final Path cfgFile = tempDir.resolve("apis.yml");
         final ApisConfig initial = ApisConfig.loadEarly(cfgFile);
         assertTrue(initial.startup.datafixers);
-        assertTrue(initial.startup.eagerBlockstateCache);
-        assertTrue(initial.startup.eagerCraftblockdataCache);
+        assertTrue(initial.caches.eagerBlockstateCache);
+        assertTrue(initial.caches.eagerCraftblockdataCache);
+        assertTrue(initial.caches.eagerMapColorCache);
         assertTrue(initial.gameplay.lootTables);
         assertTrue(initial.compatibility.legacy.pluginBytecodeRerouting);
         assertTrue(initial.compatibility.legacy.bootstrapDataTables);
-        assertTrue(initial.compatibility.legacy.eagerMapColorCache);
         assertTrue(initial.compatibility.legacy.validateEntityAttributes);
-        assertTrue(initial.storage.ephemeral.worldSaving);
-        assertTrue(initial.world.physics.blockEntityTicking);
+        assertTrue(initial.storage.worldSaving);
+        assertTrue(initial.system.lifecycle.gracefulShutdown);
+        assertTrue(initial.blockEntities.ticking.enabled);
         assertTrue(Files.exists(cfgFile));
 
         final String yamlText = Files.readString(cfgFile);
-        assertTrue(yamlText.contains("# Bootstrap & cold-start") && yamlText.contains(" | "),
-            "Generated config must contain ENG | UA bilingual comments");
-        assertTrue(yamlText.contains("true = standard Vanilla/Paper behavior enabled"),
-            "Generated header must explain positive true/false semantics");
+        assertTrue(
+            yamlText.contains("# Bootstrap, discovery & validation") && yamlText.contains(" | "),
+            "Generated config must contain ENG | UA bilingual comments"
+        );
+        assertTrue(
+            yamlText.contains("[MASTER SWITCH]") && yamlText.contains("[ГОЛОВНИЙ РУБИЛЬНИК]"),
+            "Master switches must carry explicit ENG | UA master-switch warnings"
+        );
+        assertTrue(
+            yamlText.contains("true = standard Vanilla/Paper behavior enabled"),
+            "Generated header must explain positive true/false semantics"
+        );
         assertTrue(yamlText.contains("datafixers: true"));
         assertTrue(yamlText.contains("eager-blockstate-cache: true"));
         assertTrue(yamlText.contains("eager-craftblockdata-cache: true"));
+        assertTrue(yamlText.contains("eager-map-color-cache: true"));
+        assertTrue(yamlText.contains("type-filter: []"));
+        assertTrue(yamlText.contains("sub-features:"));
         assertTrue(yamlText.contains("loot-tables: true"));
         assertTrue(yamlText.contains("plugin-bytecode-rerouting: true"));
         assertTrue(yamlText.contains("bootstrap-data-tables: true"));
-        assertTrue(yamlText.contains("eager-map-color-cache: true"));
         assertTrue(yamlText.contains("validate-entity-attributes: true"));
         assertTrue(yamlText.contains("world-saving: true"));
-        assertTrue(yamlText.contains("player-collisions: true"));
-        assertTrue(yamlText.contains("block-entity-ticking: true"));
+        assertTrue(yamlText.contains("warden-tracker: true"));
+        assertTrue(yamlText.contains("sleep-cycle: true"));
+        assertTrue(yamlText.contains("end-dragon-fight: true"));
+        assertTrue(yamlText.contains("bstats: true"));
+        assertTrue(yamlText.contains("spark: true"));
+        assertTrue(yamlText.contains("tick-monitor: true"));
         assertFalse(yamlText.contains("disable-portals"), "Legacy disable-* keys must not exist");
+        assertFalse(yamlText.contains("disabled-dimensions"), "Legacy disabled-dimensions key must not exist");
+        assertFalse(yamlText.contains("disabled-types"), "Legacy disabled-types key must not exist");
+        assertFalse(yamlText.contains("warden-and-sleep"), "Legacy combo key warden-and-sleep must not exist");
+        assertFalse(yamlText.contains("metrics-and-profiler"), "Legacy combo key metrics-and-profiler must not exist");
 
         final String updated = yamlText
             .replace("datafixers: true", "datafixers: false")
@@ -63,32 +82,38 @@ class ApisConfigTest {
             .replace("plugin-bytecode-rerouting: true", "plugin-bytecode-rerouting: false")
             .replace("world-saving: true", "world-saving: false")
             .replace("graceful-shutdown: true", "graceful-shutdown: false")
-            .replace("player-collisions: true", "player-collisions: false")
+            .replace("players: true", "players: false")
             .replace("projectile-tracking-range: 32", "projectile-tracking-range: 9999");
         Files.writeString(cfgFile, updated);
 
         final ApisConfig reloaded = ApisConfig.loadEarly(cfgFile);
         assertFalse(reloaded.startup.datafixers);
-        assertFalse(reloaded.startup.eagerBlockstateCache);
+        assertFalse(reloaded.caches.eagerBlockstateCache);
         assertFalse(reloaded.compatibility.legacy.pluginBytecodeRerouting);
-        assertFalse(reloaded.storage.ephemeral.worldSaving);
-        assertFalse(reloaded.storage.ephemeral.gracefulShutdown);
-        assertFalse(reloaded.network.tracking.playerCollisions);
-        assertEquals(256, reloaded.network.tracking.projectileTrackingRange, "Out-of-bounds tracking range must be clamped");
+        assertFalse(reloaded.storage.worldSaving);
+        assertFalse(reloaded.system.lifecycle.gracefulShutdown);
+        assertFalse(reloaded.entities.collisions.players);
+        assertEquals(
+            256,
+            reloaded.network.packetRangeClamping.projectileTrackingRange,
+            "Out-of-bounds tracking range must be clamped"
+        );
         assertTrue(FeatureRegistry.isDisabled(Feature.STARTUP_DATAFIXERS));
-        assertTrue(FeatureRegistry.isDisabled(Feature.STARTUP_EAGER_BLOCKSTATE_CACHE));
+        assertTrue(FeatureRegistry.isDisabled(Feature.CACHES_EAGER_BLOCKSTATE));
         assertTrue(FeatureRegistry.isDisabled(Feature.LEGACY_PLUGIN_BYTECODE_REROUTING));
         assertTrue(FeatureRegistry.isDisabled(Feature.STORAGE_WORLD_SAVING));
+        assertTrue(FeatureRegistry.isDisabled(Feature.SYSTEM_GRACEFUL_SHUTDOWN));
+        assertTrue(FeatureRegistry.isDisabled(Feature.ENTITIES_PLAYER_COLLISIONS));
         assertEquals(6, FeatureRegistry.activeKillSwitches().size());
     }
 
     @Test
     void malformedYamlBacksUpFileAndFallsBackToDefaults(final @TempDir Path tempDir) throws IOException {
         final Path cfgFile = tempDir.resolve("apis.yml");
-        Files.writeString(cfgFile, "worlds:\n  portals: [unclosed\n");
+        Files.writeString(cfgFile, "dimensions:\n  portals: [unclosed\n");
 
         final ApisConfig fallback = ApisConfig.loadOrCreate(cfgFile, LoggerFactory.getLogger("ApisTest"));
-        assertTrue(fallback.worlds.portals);
+        assertTrue(fallback.dimensions.portals);
         assertTrue(Files.exists(tempDir.resolve("apis.yml.broken")));
         assertTrue(Files.exists(cfgFile));
     }

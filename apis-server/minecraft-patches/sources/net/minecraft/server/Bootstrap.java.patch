@@ -6,7 +6,7 @@
              BuiltInRegistries.bootStrap(io.papermc.paper.world.worldgen.OptionallyFlatBedrockCondition::bootstrap); // Paper - Flat bedrock generator settings
 -            CreativeModeTabs.validate();
 -            LootContextParamSets.validate();
-+            if (org.apismc.apis.hooks.ApisHooks.isValidateRegistriesEnabled()) { // Apis
++            if (org.apismc.apis.hooks.ApisHooks.isValidateCreativeTabsEnabled()) { // Apis
 +                CreativeModeTabs.validate();
 +                LootContextParamSets.validate();
 +            } // Apis

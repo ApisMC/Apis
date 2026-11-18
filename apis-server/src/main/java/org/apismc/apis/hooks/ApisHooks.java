@@ -98,8 +98,12 @@ public final class ApisHooks {
         return FeatureRegistry.isEnabled(Feature.STARTUP_INITIAL_CHUNK_LOAD);
     }
 
-    public static boolean isValidateRegistriesEnabled() {
-        return FeatureRegistry.isEnabled(Feature.STARTUP_VALIDATE_REGISTRIES);
+    public static boolean isValidateCreativeTabsEnabled() {
+        return FeatureRegistry.isEnabled(Feature.STARTUP_VALIDATE_CREATIVE_TABS);
+    }
+
+    public static boolean isValidateLootEnabled() {
+        return FeatureRegistry.isEnabled(Feature.STARTUP_VALIDATE_LOOT);
     }
 
     public static boolean isMojangServiceDiscoveryEnabled() {
@@ -111,11 +115,11 @@ public final class ApisHooks {
     }
 
     public static boolean isEagerBlockStateCacheEnabled() {
-        return FeatureRegistry.isEnabled(Feature.STARTUP_EAGER_BLOCKSTATE_CACHE);
+        return FeatureRegistry.isEnabled(Feature.CACHES_EAGER_BLOCKSTATE);
     }
 
     public static boolean isEagerCraftBlockDataCacheEnabled() {
-        return FeatureRegistry.isEnabled(Feature.STARTUP_EAGER_CRAFTBLOCKDATA_CACHE);
+        return FeatureRegistry.isEnabled(Feature.CACHES_EAGER_CRAFTBLOCKDATA);
     }
 
     /**
@@ -146,7 +150,7 @@ public final class ApisHooks {
             return FeatureRegistry.isDisabled(Feature.CHUNKS_STRUCTURES);
         }
         if (Registries.TEST_ENVIRONMENT.equals(registryKey) || Registries.TEST_INSTANCE.equals(registryKey)) {
-            return FeatureRegistry.isDisabled(Feature.STARTUP_VALIDATE_REGISTRIES);
+            return FeatureRegistry.isDisabled(Feature.STARTUP_TEST_REGISTRIES);
         }
         return false;
     }
@@ -193,7 +197,7 @@ public final class ApisHooks {
     }
 
     public static boolean isEagerMapColorCacheEnabled() {
-        return FeatureRegistry.isEnabled(Feature.LEGACY_EAGER_MAP_COLOR_CACHE);
+        return FeatureRegistry.isEnabled(Feature.CACHES_EAGER_MAP_COLOR);
     }
 
     public static boolean isValidateEntityAttributesEnabled() {
@@ -256,15 +260,15 @@ public final class ApisHooks {
         };
     }
 
-    // 2. Worlds & Dimensions
+    // 2. Dimensions
     public static boolean isDimensionDisabled(final ResourceKey<Level> dimensionKey) {
         return FeatureRegistry.isDimensionDisabled(dimensionKey);
     }
 
     public static boolean isWorldCreationBlocked(final WorldCreator creator) {
-        if (FeatureRegistry.isDisabled(Feature.WORLDS_CUSTOM_WORLDS)) {
+        if (FeatureRegistry.isDisabled(Feature.DIMENSIONS_CUSTOM_WORLDS)) {
             ApisDiagnostics.warnBlocked(
-                Feature.WORLDS_CUSTOM_WORLDS.configKey(),
+                Feature.DIMENSIONS_CUSTOM_WORLDS.configKey(),
                 "CraftServer.createWorld",
                 creator.name()
             );
@@ -272,9 +276,10 @@ public final class ApisHooks {
         }
         final NamespacedKey key = creator.key();
         final ResourceKey<Level> dimensionKey = CraftNamespacedKey.toResourceKey(Registries.DIMENSION, key);
-        if (FeatureRegistry.isDimensionDisabled(dimensionKey)) {
+        if ((dimensionKey.equals(Level.NETHER) || dimensionKey.equals(Level.END))
+            && FeatureRegistry.isDimensionDisabled(dimensionKey)) {
             ApisDiagnostics.warnBlocked(
-                "worlds.disabled-dimensions",
+                "dimensions.enabled",
                 "CraftServer.createWorld",
                 key.asString()
             );
@@ -290,12 +295,12 @@ public final class ApisHooks {
             : "world";
         if ((lower.equals(baseLevel + "_nether") || lower.equals("minecraft:the_nether") || lower.equals("the_nether"))
             && FeatureRegistry.isDimensionDisabled(Level.NETHER)) {
-            ApisDiagnostics.warnBlocked("worlds.disabled-dimensions", "Bukkit.getWorld", worldName);
+            ApisDiagnostics.warnBlocked("dimensions.enabled", "Bukkit.getWorld", worldName);
             return;
         }
         if ((lower.equals(baseLevel + "_the_end") || lower.equals("minecraft:the_end") || lower.equals("the_end"))
             && FeatureRegistry.isDimensionDisabled(Level.END)) {
-            ApisDiagnostics.warnBlocked("worlds.disabled-dimensions", "Bukkit.getWorld", worldName);
+            ApisDiagnostics.warnBlocked("dimensions.enabled", "Bukkit.getWorld", worldName);
             return;
         }
         final @Nullable Identifier parsedId = Identifier.tryParse(lower.contains(":") ? lower : "minecraft:" + lower);
@@ -303,15 +308,24 @@ public final class ApisHooks {
             Registries.DIMENSION,
             parsedId != null ? parsedId : Level.OVERWORLD.identifier()
         );
-        if (!guessed.equals(Level.OVERWORLD) && FeatureRegistry.isDimensionDisabled(guessed)) {
-            ApisDiagnostics.warnBlocked("worlds.disabled-dimensions", "Bukkit.getWorld", worldName);
+        if (!guessed.equals(Level.OVERWORLD) && FeatureRegistry.isDisabled(Feature.DIMENSIONS_CUSTOM_WORLDS)) {
+            ApisDiagnostics.warnBlocked(Feature.DIMENSIONS_CUSTOM_WORLDS.configKey(), "Bukkit.getWorld", worldName);
         }
     }
 
     public static void warnIfDisabledWorldKeyLookup(final Key worldKey) {
         final ResourceKey<Level> dimensionKey = ResourceKey.create(Registries.DIMENSION, PaperAdventure.asVanilla(worldKey));
-        if (FeatureRegistry.isDimensionDisabled(dimensionKey)) {
-            ApisDiagnostics.warnBlocked("worlds.disabled-dimensions", "Bukkit.getWorld", worldKey.asString());
+        if ((dimensionKey.equals(Level.NETHER) || dimensionKey.equals(Level.END))
+            && FeatureRegistry.isDimensionDisabled(dimensionKey)) {
+            ApisDiagnostics.warnBlocked("dimensions.enabled", "Bukkit.getWorld", worldKey.asString());
+            return;
+        }
+        if (!dimensionKey.equals(Level.OVERWORLD) && FeatureRegistry.isDisabled(Feature.DIMENSIONS_CUSTOM_WORLDS)) {
+            ApisDiagnostics.warnBlocked(
+                Feature.DIMENSIONS_CUSTOM_WORLDS.configKey(),
+                "Bukkit.getWorld",
+                worldKey.asString()
+            );
         }
     }
 
@@ -324,7 +338,7 @@ public final class ApisHooks {
     }
 
     public static boolean isPortalsDisabled() {
-        return FeatureRegistry.isDisabled(Feature.WORLDS_PORTALS);
+        return FeatureRegistry.isDisabled(Feature.DIMENSIONS_PORTALS);
     }
 
     public static boolean isWorldTickDisabled(final Level level) {
@@ -341,30 +355,30 @@ public final class ApisHooks {
     }
 
     public static boolean isGoalSelectorDisabled() {
-        return FeatureRegistry.isDisabled(Feature.AI_ENABLED)
-            || FeatureRegistry.isDisabled(Feature.AI_GOAL_SELECTOR);
+        return FeatureRegistry.isDisabled(Feature.ENTITIES_AI_ENABLED)
+            || FeatureRegistry.isDisabled(Feature.ENTITIES_AI_GOAL_SELECTOR);
     }
 
     public static boolean isBrainDisabled() {
-        return FeatureRegistry.isDisabled(Feature.AI_ENABLED)
-            || FeatureRegistry.isDisabled(Feature.AI_BRAIN);
+        return FeatureRegistry.isDisabled(Feature.ENTITIES_AI_ENABLED)
+            || FeatureRegistry.isDisabled(Feature.ENTITIES_AI_BRAIN);
     }
 
     public static boolean isPathfindingDisabled() {
-        return FeatureRegistry.isDisabled(Feature.AI_ENABLED)
-            || FeatureRegistry.isDisabled(Feature.AI_PATHFINDING);
+        return FeatureRegistry.isDisabled(Feature.ENTITIES_AI_ENABLED)
+            || FeatureRegistry.isDisabled(Feature.ENTITIES_AI_PATHFINDING);
     }
 
     public static boolean isSensorsDisabled() {
-        return FeatureRegistry.isDisabled(Feature.AI_ENABLED)
-            || FeatureRegistry.isDisabled(Feature.AI_SENSORS);
+        return FeatureRegistry.isDisabled(Feature.ENTITIES_AI_ENABLED)
+            || FeatureRegistry.isDisabled(Feature.ENTITIES_AI_SENSORS);
     }
 
     public static boolean isEntityCollisionDisabled(final Entity a, final Entity b) {
         if (FeatureRegistry.isDisabled(Feature.ENTITIES_COLLISIONS)) {
             return true;
         }
-        return FeatureRegistry.isDisabled(Feature.NETWORK_PLAYER_COLLISIONS)
+        return FeatureRegistry.isDisabled(Feature.ENTITIES_PLAYER_COLLISIONS)
             && a instanceof Player
             && b instanceof Player;
     }
@@ -373,12 +387,12 @@ public final class ApisHooks {
         if (FeatureRegistry.isDisabled(Feature.ENTITIES_COLLISIONS)) {
             return true;
         }
-        return FeatureRegistry.isDisabled(Feature.NETWORK_PLAYER_COLLISIONS)
+        return FeatureRegistry.isDisabled(Feature.ENTITIES_PLAYER_COLLISIONS)
             && entity instanceof Player;
     }
 
     public static boolean isPlayerCollisionDisabled() {
-        return FeatureRegistry.isDisabled(Feature.NETWORK_PLAYER_COLLISIONS)
+        return FeatureRegistry.isDisabled(Feature.ENTITIES_PLAYER_COLLISIONS)
             || FeatureRegistry.isDisabled(Feature.ENTITIES_COLLISIONS);
     }
 
@@ -396,51 +410,57 @@ public final class ApisHooks {
     }
 
     public static boolean isRandomTicksDisabled() {
-        return FeatureRegistry.isDisabled(Feature.CHUNKS_RANDOM_TICKS);
+        return FeatureRegistry.isDisabled(Feature.CHUNKS_TICKING)
+            || FeatureRegistry.isDisabled(Feature.CHUNKS_RANDOM_TICKS);
     }
 
     public static boolean isBlockTicksDisabled() {
-        return FeatureRegistry.isDisabled(Feature.CHUNKS_BLOCK_TICKS);
+        return FeatureRegistry.isDisabled(Feature.CHUNKS_TICKING)
+            || FeatureRegistry.isDisabled(Feature.CHUNKS_BLOCK_TICKS);
     }
 
     public static boolean isFluidTicksDisabled() {
-        return FeatureRegistry.isDisabled(Feature.CHUNKS_FLUID_TICKS);
+        return FeatureRegistry.isDisabled(Feature.CHUNKS_TICKING)
+            || FeatureRegistry.isDisabled(Feature.CHUNKS_FLUID_TICKS);
     }
 
-    // 5. Gameplay & Environment
+    // 5. World Environment, Spawning, Physics & Gameplay
     public static boolean isWeatherDisabled() {
-        return FeatureRegistry.isDisabled(Feature.GAMEPLAY_WEATHER);
+        return FeatureRegistry.isDisabled(Feature.ENV_WEATHER);
     }
 
     public static boolean isRaidsDisabled() {
-        return FeatureRegistry.isDisabled(Feature.GAMEPLAY_RAIDS);
+        return FeatureRegistry.isDisabled(Feature.ENV_RAIDS);
     }
 
     public static boolean isRedstoneDisabled() {
-        return FeatureRegistry.isDisabled(Feature.GAMEPLAY_REDSTONE);
+        return FeatureRegistry.isDisabled(Feature.PHYSICS_REDSTONE);
     }
 
     public static boolean isNaturalSpawningDisabled() {
-        return FeatureRegistry.isDisabled(Feature.GAMEPLAY_NATURAL_SPAWNING);
+        return FeatureRegistry.isDisabled(Feature.SPAWNING_NATURAL);
     }
 
     public static boolean isCustomSpawnersDisabled() {
-        return FeatureRegistry.isDisabled(Feature.GAMEPLAY_CUSTOM_SPAWNERS);
+        return FeatureRegistry.isDisabled(Feature.SPAWNING_NATURAL)
+            || FeatureRegistry.isDisabled(Feature.SPAWNING_CUSTOM_SPAWNERS);
     }
 
     public static boolean isMonstersDisabled() {
-        return FeatureRegistry.isDisabled(Feature.GAMEPLAY_MONSTERS);
+        return FeatureRegistry.isDisabled(Feature.SPAWNING_NATURAL)
+            || FeatureRegistry.isDisabled(Feature.SPAWNING_MONSTERS);
     }
 
     public static boolean isAnimalsDisabled() {
-        return FeatureRegistry.isDisabled(Feature.GAMEPLAY_ANIMALS);
+        return FeatureRegistry.isDisabled(Feature.SPAWNING_NATURAL)
+            || FeatureRegistry.isDisabled(Feature.SPAWNING_ANIMALS);
     }
 
     public static boolean isMobCategoryDisabled(final MobCategory category) {
         if (category == MobCategory.MONSTER) {
-            return FeatureRegistry.isDisabled(Feature.GAMEPLAY_MONSTERS);
+            return isMonstersDisabled();
         }
-        return category != MobCategory.MISC && FeatureRegistry.isDisabled(Feature.GAMEPLAY_ANIMALS);
+        return category != MobCategory.MISC && isAnimalsDisabled();
     }
 
     public static boolean isAdvancementsDisabled() {
@@ -451,8 +471,16 @@ public final class ApisHooks {
         return FeatureRegistry.isDisabled(Feature.GAMEPLAY_RECIPES);
     }
 
-    public static boolean isWardenAndSleepEnabled() {
-        return FeatureRegistry.isEnabled(Feature.GAMEPLAY_WARDEN_AND_SLEEP);
+    public static boolean isWardenTrackerEnabled() {
+        return FeatureRegistry.isEnabled(Feature.PLAYERS_WARDEN_TRACKER);
+    }
+
+    public static boolean isSleepCycleEnabled() {
+        return FeatureRegistry.isEnabled(Feature.ENV_SLEEP_CYCLE);
+    }
+
+    public static boolean isEndDragonFightEnabled() {
+        return FeatureRegistry.isEnabled(Feature.ENV_END_DRAGON_FIGHT);
     }
 
     public static boolean isCommandFunctionsEnabled() {
@@ -464,8 +492,16 @@ public final class ApisHooks {
         return FeatureRegistry.isEnabled(Feature.NETWORK_GENERATE_KEYPAIR);
     }
 
-    public static boolean isMetricsAndProfilerDisabled() {
-        return FeatureRegistry.isDisabled(Feature.ANALYTICS_METRICS_AND_PROFILER);
+    public static boolean isBstatsDisabled() {
+        return FeatureRegistry.isDisabled(Feature.ANALYTICS_BSTATS);
+    }
+
+    public static boolean isSparkDisabled() {
+        return FeatureRegistry.isDisabled(Feature.ANALYTICS_SPARK);
+    }
+
+    public static boolean isTickMonitorDisabled() {
+        return FeatureRegistry.isDisabled(Feature.ANALYTICS_TICK_MONITOR);
     }
 
     public static boolean isDebugSynchronizersDisabled() {
@@ -499,12 +535,6 @@ public final class ApisHooks {
             && distSq > FeatureRegistry.particleBroadcastRangeSq();
     }
 
-    public static int equipmentTrackingRange(final int defaultRange) {
-        return FeatureRegistry.isDisabled(Feature.NETWORK_FULL_PACKET_BROADCAST)
-            ? Math.min(defaultRange, FeatureRegistry.armorEquipmentRange())
-            : defaultRange;
-    }
-
     public static boolean shouldFilterEquipmentPacket(final Entity entity, final ServerPlayer viewer) {
         if (FeatureRegistry.isEnabled(Feature.NETWORK_FULL_PACKET_BROADCAST)) {
             return false;
@@ -516,13 +546,13 @@ public final class ApisHooks {
         return entity.distanceToSqr(viewer) > (double) range * (double) range;
     }
 
-    // 7. Ephemeral Storage & Shutdown
+    // 7. Storage & Lifecycle
     public static boolean isMemoryOnlyWorld() {
         return FeatureRegistry.isDisabled(Feature.STORAGE_WORLD_SAVING);
     }
 
     public static boolean isFastShutdown() {
-        return FeatureRegistry.isDisabled(Feature.STORAGE_GRACEFUL_SHUTDOWN);
+        return FeatureRegistry.isDisabled(Feature.SYSTEM_GRACEFUL_SHUTDOWN);
     }
 
     // 8. Players Lifecycle
@@ -539,9 +569,9 @@ public final class ApisHooks {
         return FeatureRegistry.isEnabled(Feature.PLAYERS_STATISTICS);
     }
 
-    // 9. World Time & Physics
+    // 9. World Time, Block Entities & Physics
     public static boolean isDaylightCycleEnabled() {
-        return FeatureRegistry.isEnabled(Feature.WORLD_DAYLIGHT_CYCLE);
+        return FeatureRegistry.isEnabled(Feature.ENV_DAYLIGHT_CYCLE);
     }
 
     public static boolean isBlockGravityDisabled() {
@@ -549,11 +579,12 @@ public final class ApisHooks {
     }
 
     public static boolean isHopperTickingDisabled() {
-        return FeatureRegistry.isDisabled(Feature.PHYSICS_HOPPER_TICKING);
+        return FeatureRegistry.isDisabled(Feature.BLOCK_ENTITIES_TICKING)
+            || FeatureRegistry.isDisabled(Feature.BLOCK_ENTITIES_HOPPERS);
     }
 
     public static boolean isBlockEntityTickingEnabled() {
-        return FeatureRegistry.isEnabled(Feature.PHYSICS_BLOCK_ENTITY_TICKING);
+        return FeatureRegistry.isEnabled(Feature.BLOCK_ENTITIES_TICKING);
     }
 
     public static boolean isItemPhysicsEnabled() {

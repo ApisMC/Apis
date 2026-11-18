@@ -5,7 +5,7 @@
          this.connection.tickClientLoadTimeout();
          this.gameMode.tick();
 -        this.wardenSpawnTracker.tick();
-+        if (org.apismc.apis.hooks.ApisHooks.isWardenAndSleepEnabled()) this.wardenSpawnTracker.tick(); // Apis
++        if (org.apismc.apis.hooks.ApisHooks.isWardenTrackerEnabled()) this.wardenSpawnTracker.tick(); // Apis
          if (this.damageCooldownTime > 0) {
              this.damageCooldownTime--;
          }

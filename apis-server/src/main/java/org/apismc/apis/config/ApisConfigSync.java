@@ -52,8 +52,8 @@ public final class ApisConfigSync {
     public static void syncGlobal(final GlobalConfiguration global) {
         global.misc.enableNether = !ApisHooks.isDimensionDisabled(Level.NETHER);
         global.collisions.enablePlayerCollisions = !ApisHooks.isPlayerCollisionDisabled();
-        global.spark.enabled = !ApisHooks.isMetricsAndProfilerDisabled();
-        if (ApisHooks.isMetricsAndProfilerDisabled()) {
+        global.spark.enabled = !ApisHooks.isSparkDisabled();
+        if (ApisHooks.isSparkDisabled()) {
             global.spark.enableImmediately = false;
         }
         global.updateChecker.enabled = ApisHooks.isPaperVersionCheckEnabled();

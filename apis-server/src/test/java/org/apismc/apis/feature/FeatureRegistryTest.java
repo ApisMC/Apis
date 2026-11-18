@@ -43,6 +43,7 @@ import org.slf4j.LoggerFactory;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 @AllFeatures
@@ -74,45 +75,51 @@ class FeatureRegistryTest {
         cfg.startup.datafixers = false;
         cfg.startup.searchSpawnPoint = false;
         cfg.startup.initialChunkLoad = false;
-        cfg.startup.validateRegistries = false;
         cfg.startup.mojangServiceDiscovery = false;
         cfg.startup.paperVersionCheck = false;
-        cfg.startup.eagerBlockstateCache = false;
-        cfg.startup.eagerCraftblockdataCache = false;
-        cfg.worlds.customWorlds = false;
-        cfg.worlds.portals = false;
-        cfg.entities.ai.enabled = false;
+        cfg.startup.validateCreativeTabs = false;
+        cfg.startup.validateLoot = false;
+        cfg.startup.testRegistries = false;
+        cfg.caches.eagerBlockstateCache = false;
+        cfg.caches.eagerCraftblockdataCache = false;
+        cfg.caches.eagerMapColorCache = false;
+        cfg.dimensions.customWorlds = false;
+        cfg.dimensions.portals = false;
         cfg.chunks.structures = false;
         cfg.chunks.biomeDecoration = false;
-        cfg.gameplay.redstone = false;
-        cfg.gameplay.monsters = false;
-        cfg.gameplay.animals = false;
+        cfg.blockEntities.ticking.enabled = false;
+        cfg.blocksAndPhysics.redstone = false;
+        cfg.blocksAndPhysics.blockGravity = false;
+        cfg.blocksAndPhysics.leafDecay = false;
+        cfg.blocksAndPhysics.fireSpread = false;
+        cfg.blocksAndPhysics.itemPhysics = false;
+        cfg.worldEnvironment.daylightCycle = false;
+        cfg.worldEnvironment.raids = false;
+        cfg.worldEnvironment.sleepCycle = false;
+        cfg.worldEnvironment.endDragonFight = false;
+        cfg.spawning.natural.subFeatures.monsters = false;
+        cfg.spawning.natural.subFeatures.animals = false;
+        cfg.entities.ai.enabled = false;
+        cfg.entities.collisions.players = false;
         cfg.gameplay.advancements = false;
         cfg.gameplay.recipes = false;
         cfg.gameplay.lootTables = false;
-        cfg.gameplay.wardenAndSleep = false;
         cfg.gameplay.commandFunctions = false;
+        cfg.players.dataSaving = false;
+        cfg.players.hunger = false;
+        cfg.players.statistics = false;
+        cfg.players.wardenTracker = false;
         cfg.network.generateKeypair = false;
-        cfg.network.analytics.metricsAndProfiler = false;
-        cfg.network.tracking.playerCollisions = false;
-        cfg.network.tracking.fullPacketBroadcast = false;
-        cfg.network.tracking.serverPingSample = false;
-        cfg.network.tracking.tabLatencyUpdates = false;
-        cfg.storage.ephemeral.worldSaving = false;
-        cfg.storage.ephemeral.gracefulShutdown = false;
-        cfg.players.lifecycle.playerDataSaving = false;
-        cfg.players.lifecycle.hunger = false;
-        cfg.players.lifecycle.statistics = false;
-        cfg.world.daylightCycle = false;
-        cfg.world.physics.blockGravity = false;
-        cfg.world.physics.hopperTicking = false;
-        cfg.world.physics.blockEntityTicking = false;
-        cfg.world.physics.itemPhysics = false;
-        cfg.world.physics.leafDecay = false;
-        cfg.world.physics.fireSpread = false;
+        cfg.network.analytics.bstats = false;
+        cfg.network.analytics.spark = false;
+        cfg.network.analytics.tickMonitor = false;
+        cfg.network.playerList.serverPingSample = false;
+        cfg.network.playerList.tabLatencyUpdates = false;
+        cfg.network.packetRangeClamping.fullPacketBroadcast = false;
+        cfg.storage.worldSaving = false;
+        cfg.system.lifecycle.gracefulShutdown = false;
         cfg.compatibility.legacy.pluginBytecodeRerouting = false;
         cfg.compatibility.legacy.bootstrapDataTables = false;
-        cfg.compatibility.legacy.eagerMapColorCache = false;
         cfg.compatibility.legacy.validateEntityAttributes = false;
 
         FeatureRegistry.applyEarly(cfg);
@@ -120,13 +127,17 @@ class FeatureRegistryTest {
         assertFalse(ApisHooks.isDataFixersEnabled());
         assertFalse(ApisHooks.isSearchSpawnPointEnabled());
         assertFalse(ApisHooks.isInitialChunkLoadEnabled());
-        assertFalse(ApisHooks.isValidateRegistriesEnabled());
+        assertFalse(ApisHooks.isValidateCreativeTabsEnabled());
+        assertFalse(ApisHooks.isValidateLootEnabled());
         assertFalse(ApisHooks.isMojangServiceDiscoveryEnabled());
         assertFalse(ApisHooks.isPaperVersionCheckEnabled());
         assertFalse(ApisHooks.isEagerBlockStateCacheEnabled());
         assertFalse(ApisHooks.isEagerCraftBlockDataCacheEnabled());
+        assertFalse(ApisHooks.isEagerMapColorCacheEnabled());
         assertFalse(ApisHooks.isGenerateKeypairEnabled());
-        assertFalse(ApisHooks.isWardenAndSleepEnabled());
+        assertFalse(ApisHooks.isWardenTrackerEnabled());
+        assertFalse(ApisHooks.isSleepCycleEnabled());
+        assertFalse(ApisHooks.isEndDragonFightEnabled());
         assertFalse(ApisHooks.isCommandFunctionsEnabled());
         assertFalse(ApisHooks.isTabLatencyUpdatesEnabled());
         assertFalse(ApisHooks.isHungerEnabled());
@@ -136,8 +147,10 @@ class FeatureRegistryTest {
         assertFalse(ApisHooks.isItemPhysicsEnabled());
         assertFalse(ApisHooks.isPluginBytecodeReroutingEnabled());
         assertFalse(ApisHooks.isBootstrapDataTablesEnabled());
-        assertFalse(ApisHooks.isEagerMapColorCacheEnabled());
         assertFalse(ApisHooks.isValidateEntityAttributesEnabled());
+        assertTrue(ApisHooks.isBstatsDisabled());
+        assertTrue(ApisHooks.isSparkDisabled());
+        assertTrue(ApisHooks.isTickMonitorDisabled());
 
         assertTrue(ApisHooks.shouldPruneRegistryAtLoad(Registries.RECIPE));
         assertTrue(ApisHooks.shouldPruneRegistryAtLoad(Registries.ADVANCEMENT));
@@ -148,7 +161,7 @@ class FeatureRegistryTest {
         assertFalse(ApisHooks.shouldPruneRegistryAtLoad(Registries.BIOME));
         assertEquals(Biome.NETWORK_CODEC, ApisHooks.resolveRegistryDecoder(Registries.BIOME, Biome.DIRECT_CODEC));
         assertTrue(DefaultAttributes.hasSupplier(EntityTypes.ZOMBIE));
-        assertTrue(DefaultAttributes.getSupplier(EntityTypes.PLAYER) != null);
+        assertNotNull(DefaultAttributes.getSupplier(EntityTypes.PLAYER));
 
         assertTrue(ApisHooks.isMemoryOnlyWorld());
         assertTrue(ApisHooks.isFastShutdown());
@@ -158,32 +171,103 @@ class FeatureRegistryTest {
         assertTrue(ApisHooks.isMobCategoryDisabled(MobCategory.CREATURE));
         assertFalse(ApisHooks.isMobCategoryDisabled(MobCategory.MISC));
 
-        assertTrue(FeatureRegistry.isEnabled(Feature.GAMEPLAY_WEATHER));
-        assertFalse(FeatureRegistry.isDisabled(Feature.GAMEPLAY_WEATHER));
-        assertEquals(43, FeatureRegistry.activeKillSwitches().size());
+        assertTrue(FeatureRegistry.isEnabled(Feature.ENV_WEATHER));
+        assertFalse(FeatureRegistry.isDisabled(Feature.ENV_WEATHER));
+        assertEquals(49, FeatureRegistry.activeKillSwitches().size());
     }
 
     @Test
-    void dimensionAndEntityFiltersWorkBeforeAndAfterRegistryResolution() {
+    void masterSwitchesBypassSubFeaturesAndSplitSwitchesRemainIndependent() {
         final ApisConfig cfg = new ApisConfig();
-        cfg.worlds.disabledDimensions = List.of("minecraft:overworld", "minecraft:the_nether", "custom:arena");
-        cfg.entities.ai.disabledTypes = List.of("zombie", "minecraft:villager");
+        cfg.entities.ai.enabled = false;
+        cfg.chunks.ticking.enabled = false;
+        cfg.spawning.natural.enabled = false;
+        cfg.blockEntities.ticking.enabled = false;
+        cfg.entities.collisions.entities = false;
 
         FeatureRegistry.applyEarly(cfg);
 
-        final ResourceKey<Level> customArena = ResourceKey.create(Registries.DIMENSION, Identifier.fromNamespaceAndPath("custom", "arena"));
+        assertTrue(ApisHooks.isGoalSelectorDisabled());
+        assertTrue(ApisHooks.isBrainDisabled());
+        assertTrue(ApisHooks.isPathfindingDisabled());
+        assertTrue(ApisHooks.isSensorsDisabled());
+        assertTrue(ApisHooks.isAiDisabled(EntityTypes.CREEPER));
+
+        assertTrue(ApisHooks.isChunkTickingDisabled());
+        assertTrue(ApisHooks.isRandomTicksDisabled());
+        assertTrue(ApisHooks.isBlockTicksDisabled());
+        assertTrue(ApisHooks.isFluidTicksDisabled());
+
+        assertTrue(ApisHooks.isNaturalSpawningDisabled());
+        assertTrue(ApisHooks.isMonstersDisabled());
+        assertTrue(ApisHooks.isAnimalsDisabled());
+        assertTrue(ApisHooks.isCustomSpawnersDisabled());
+        assertTrue(ApisHooks.isMobCategoryDisabled(MobCategory.MONSTER));
+        assertTrue(ApisHooks.isMobCategoryDisabled(MobCategory.CREATURE));
+
+        assertFalse(ApisHooks.isBlockEntityTickingEnabled());
+        assertTrue(ApisHooks.isHopperTickingDisabled());
+
+        assertTrue(ApisHooks.isPlayerCollisionDisabled());
+
+        // Split switches must operate independently
+        final ApisConfig splitCfg = new ApisConfig();
+        splitCfg.players.wardenTracker = false;
+        splitCfg.network.analytics.bstats = false;
+        splitCfg.startup.validateCreativeTabs = false;
+        FeatureRegistry.applyEarly(splitCfg);
+
+        assertFalse(ApisHooks.isWardenTrackerEnabled());
+        assertTrue(ApisHooks.isSleepCycleEnabled());
+        assertTrue(ApisHooks.isEndDragonFightEnabled());
+
+        assertTrue(ApisHooks.isBstatsDisabled());
+        assertFalse(ApisHooks.isSparkDisabled());
+        assertFalse(ApisHooks.isTickMonitorDisabled());
+
+        assertFalse(ApisHooks.isValidateCreativeTabsEnabled());
+        assertTrue(ApisHooks.isValidateLootEnabled());
+        assertFalse(ApisHooks.shouldPruneRegistryAtLoad(Registries.TEST_INSTANCE));
+    }
+
+    @Test
+    void dimensionAndEntityWhitelistsWorkBeforeAndAfterRegistryResolution() {
+        final ApisConfig cfg = new ApisConfig();
+        cfg.dimensions.enabled = List.of("minecraft:the_end");
+        cfg.dimensions.ticking = List.of("minecraft:overworld", "custom:arena");
+        cfg.entities.ai.typeFilter = List.of("zombie", "minecraft:villager");
+
+        FeatureRegistry.applyEarly(cfg);
+
+        final ResourceKey<Level> customArena = ResourceKey.create(
+            Registries.DIMENSION,
+            Identifier.fromNamespaceAndPath("custom", "arena")
+        );
+        assertFalse(FeatureRegistry.isDimensionDisabled(Level.OVERWORLD), "Overworld must never be disabled");
+        assertFalse(FeatureRegistry.isDimensionDisabled(Level.END));
         assertTrue(FeatureRegistry.isDimensionDisabled(Level.NETHER));
         assertTrue(FeatureRegistry.isDimensionDisabled(customArena));
-        assertFalse(FeatureRegistry.isDimensionDisabled(Level.END));
+
+        assertFalse(FeatureRegistry.isWorldTickDisabled(Level.OVERWORLD));
+        assertFalse(FeatureRegistry.isWorldTickDisabled(customArena));
+        assertTrue(FeatureRegistry.isWorldTickDisabled(Level.NETHER));
 
         FeatureRegistry.resolveRegistries(null, LoggerFactory.getLogger("ApisTest"));
 
         assertFalse(FeatureRegistry.isDimensionDisabled(Level.OVERWORLD), "Overworld must never be disabled");
+        assertFalse(FeatureRegistry.isDimensionDisabled(Level.END));
         assertTrue(FeatureRegistry.isDimensionDisabled(Level.NETHER));
         assertTrue(FeatureRegistry.isDimensionDisabled(customArena));
+        assertFalse(FeatureRegistry.isWorldTickDisabled(Level.OVERWORLD));
+        assertTrue(FeatureRegistry.isWorldTickDisabled(Level.NETHER));
         assertTrue(FeatureRegistry.isEntityAiDisabled(EntityTypes.ZOMBIE));
         assertTrue(FeatureRegistry.isEntityAiDisabled(EntityTypes.VILLAGER));
         assertFalse(FeatureRegistry.isEntityAiDisabled(EntityTypes.CREEPER));
+
+        cfg.dimensions.enabled = List.of("*");
+        FeatureRegistry.applyEarly(cfg);
+        assertFalse(FeatureRegistry.isDimensionDisabled(Level.NETHER));
+        assertFalse(FeatureRegistry.isDimensionDisabled(customArena));
     }
 
     @Test
@@ -215,7 +299,10 @@ class FeatureRegistryTest {
         structureRegistry.bindAllTagsToEmpty();
         structureRegistry.freeze();
 
-        final TagKey<Structure> treasureMaps = TagKey.create(Registries.STRUCTURE, Identifier.withDefaultNamespace("on_treasure_maps"));
+        final TagKey<Structure> treasureMaps = TagKey.create(
+            Registries.STRUCTURE,
+            Identifier.withDefaultNamespace("on_treasure_maps")
+        );
         final HolderSet.Named<Structure> emptyTag = structureRegistry.get(treasureMaps).orElseThrow();
         assertTrue(emptyTag.isBound());
         assertEquals(0, emptyTag.size());
@@ -231,7 +318,10 @@ class FeatureRegistryTest {
         assertEquals(0, decoded.getOrThrow().size());
 
         final MappedRegistry<LootTable> lootRegistry = new MappedRegistry<>(Registries.LOOT_TABLE, Lifecycle.stable());
-        final ResourceKey<LootTable> chestKey = ResourceKey.create(Registries.LOOT_TABLE, Identifier.withDefaultNamespace("chests/shipwreck_map"));
+        final ResourceKey<LootTable> chestKey = ResourceKey.create(
+            Registries.LOOT_TABLE,
+            Identifier.withDefaultNamespace("chests/shipwreck_map")
+        );
         lootRegistry.createRegistrationLookup().getOrThrow(chestKey);
         lootRegistry.bindAllTagsToEmpty();
         ApisHooks.bindPrunedFallbackHolders(lootRegistry);

@@ -15,7 +15,7 @@
  
          int percentage = this.getGameRules().get(GameRules.PLAYERS_SLEEPING_PERCENTAGE);
 -        if (this.sleepStatus.areEnoughSleeping(percentage) && this.sleepStatus.areEnoughDeepSleeping(percentage, this.players)) {
-+        if (org.apismc.apis.hooks.ApisHooks.isWardenAndSleepEnabled() && this.sleepStatus.areEnoughSleeping(percentage) && this.sleepStatus.areEnoughDeepSleeping(percentage, this.players)) { // Apis
++        if (org.apismc.apis.hooks.ApisHooks.isSleepCycleEnabled() && this.sleepStatus.areEnoughSleeping(percentage) && this.sleepStatus.areEnoughDeepSleeping(percentage, this.players)) { // Apis
              Optional<Holder<WorldClock>> defaultClock = this.dimensionType().defaultClock();
              org.bukkit.event.world.ClockTimeSkipEvent event = null; // Paper - per-world time
              if (this.getGameRules().get(GameRules.ADVANCE_TIME) && defaultClock.isPresent()) {
@@ -61,7 +61,7 @@
          if (this.emptyTime < 300) {
              profiler.push("entities");
 -            if (this.dragonFight != null && runs) {
-+            if (this.dragonFight != null && runs && org.apismc.apis.hooks.ApisHooks.isWardenAndSleepEnabled()) { // Apis
++            if (this.dragonFight != null && runs && org.apismc.apis.hooks.ApisHooks.isEndDragonFightEnabled()) { // Apis
                  profiler.push("dragonFight");
                  this.dragonFight.tick();
                  profiler.pop();

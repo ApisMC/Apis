@@ -6,7 +6,7 @@
          this.server.enablePlugins(org.bukkit.plugin.PluginLoadOrder.POSTWORLD);
 -        this.server.spark.registerCommandBeforePlugins(this.server); // Paper - spark
 -        this.server.spark.enableAfterPlugins(this.server); // Paper - spark
-+        if (!org.apismc.apis.hooks.ApisHooks.isMetricsAndProfilerDisabled()) { // Apis
++        if (!org.apismc.apis.hooks.ApisHooks.isSparkDisabled()) { // Apis
 +            this.server.spark.registerCommandBeforePlugins(this.server); // Paper - spark
 +            this.server.spark.enableAfterPlugins(this.server); // Paper - spark
 +        } // Apis
@@ -113,7 +113,7 @@
              this.status = this.buildServerStatus();
  
 -            this.server.spark.enableBeforePlugins(); // Paper - spark
-+            if (!org.apismc.apis.hooks.ApisHooks.isMetricsAndProfilerDisabled()) this.server.spark.enableBeforePlugins(); // Paper - spark // Apis
++            if (!org.apismc.apis.hooks.ApisHooks.isSparkDisabled()) this.server.spark.enableBeforePlugins(); // Paper - spark // Apis
              // Spigot start
              // Paper start
              LOGGER.info("Running delayed init tasks");
@@ -184,7 +184,7 @@
  
          profiler.pop();
 -        this.serverActivityMonitor.tick();
-+        if (!org.apismc.apis.hooks.ApisHooks.isMetricsAndProfilerDisabled()) { // Apis
++        if (!org.apismc.apis.hooks.ApisHooks.isTickMonitorDisabled()) { // Apis
 +            this.serverActivityMonitor.tick();
 +        }
      }

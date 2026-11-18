@@ -25,14 +25,20 @@ import org.spongepowered.configurate.yaml.YamlConfigurationLoader;
 /**
  * Positive-logic YAML configuration for Apis capabilities (all comments in ENG | UA).
  * Setting a flag to {@code true} keeps standard Vanilla/Paper behavior active; setting {@code false}
- * activates the O(1) kill-switch and cuts out the subsystem completely.
+ * activates the O(1) kill-switch and cuts out the subsystem cleanly.
  */
 @ConfigSerializable
 public final class ApisConfig {
 
     public static final String DEFAULT_FILE_NAME = "apis.yml";
-    private static final Logger LOGGER = LoggerFactory.getLogger("Minecraft");
+    public static final List<String> DEFAULT_ENABLED_DIMENSIONS = List.of(
+        "minecraft:overworld",
+        "minecraft:the_nether",
+        "minecraft:the_end"
+    );
+    public static final List<String> DEFAULT_TICKING_DIMENSIONS = List.of("*");
 
+    private static final Logger LOGGER = LoggerFactory.getLogger("Minecraft");
     private static final String HEADER = """
         Apis Feature Matrix | Позитивна матриця модулів Apis
         true = standard Vanilla/Paper behavior enabled | true = стандартна механіка увімкнена
@@ -43,43 +49,63 @@ public final class ApisConfig {
     private static volatile Path configPath = Path.of(ApisPaths.CONFIG_DIR, DEFAULT_FILE_NAME);
 
     @Setting("startup")
-    @Comment("Bootstrap & cold-start subsystems (true = active, false = skip at boot) | Підсистеми холодного старту (true = увімкнено, false = пропустити)")
+    @Comment("Bootstrap, discovery & validation switches at cold boot | Прапори холодного старту, перевірок та завантаження датапаків")
     public StartupSection startup = new StartupSection();
 
-    @Setting("worlds")
-    @Comment("Worlds & dimensions loading/ticking switches (true = active, false = cut) | Світи, виміри та портали (true = увімкнено, false = вирізано)")
-    public WorldsSection worlds = new WorldsSection();
+    @Setting("caches")
+    @Comment("Eager vs lazy cache initialization strategies | Стратегії попереднього прогріву кешів ядра")
+    public CachesSection caches = new CachesSection();
 
-    @Setting("entities")
-    @Comment("Entity & AI capability matrix (true = active, false = cut) | Сутності та штучний інтелект (true = увімкнено, false = вирізано)")
-    public EntitiesSection entities = new EntitiesSection();
+    @Setting("dimensions")
+    @Comment("Dimension whitelists, runtime world creation & portals | Білі списки вимірів, створення світів та портали")
+    public DimensionsSection dimensions = new DimensionsSection();
 
     @Setting("chunks")
-    @Comment("Chunk generation & ticking capabilities (true = active, false = cut) | Генерація та тіки чанків (true = увімкнено, false = вирізано)")
+    @Comment("Chunk generation & chunk-ticking hierarchy | Генерація чанків та ієрархія їх тікінгу")
     public ChunksSection chunks = new ChunksSection();
 
+    @Setting("block-entities")
+    @Comment("Tile/block-entity ticking controls | Керування тікінгом тайл-ентіті (блоків-сутностей)")
+    public BlockEntitiesSection blockEntities = new BlockEntitiesSection();
+
+    @Setting("blocks-and-physics")
+    @Comment("Block behavior, redstone & physical world simulation | Фізика блоків, редстоун та падіння предметів")
+    public BlocksAndPhysicsSection blocksAndPhysics = new BlocksAndPhysicsSection();
+
+    @Setting("world-environment")
+    @Comment("Time, weather, raids, sleep & dragon fight mechanics | Час доби, погода, рейди, сон та бій із драконом")
+    public WorldEnvironmentSection worldEnvironment = new WorldEnvironmentSection();
+
+    @Setting("spawning")
+    @Comment("Natural mob spawning & overworld custom spawners | Природний спавн мобів та спеціальні спавнери")
+    public SpawningSection spawning = new SpawningSection();
+
+    @Setting("entities")
+    @Comment("Entity AI subsystems & collision handling | Інтелект мобів (AI) та фізичні колізії сутностей")
+    public EntitiesSection entities = new EntitiesSection();
+
     @Setting("gameplay")
-    @Comment("Vanilla gameplay mechanics (true = active, false = cut) | Ігрові механіки ванілли (true = увімкнено, false = вирізано)")
+    @Comment("Datapack progression, recipes, loot & functions | Досягнення, рецепти, таблиці луту та функції датапаків")
     public GameplaySection gameplay = new GameplaySection();
 
+    @Setting("players")
+    @Comment("Per-player persistence, vital mechanics & stats | Збереження гравців, голод, статистика та трекер вардена")
+    public PlayersSection players = new PlayersSection();
+
     @Setting("network")
-    @Comment("Network, crypto, tracking & telemetry switches (true = active, false = cut) | Мережа, шифрування, трекінг і метрики (true = увімкнено, false = вирізано)")
+    @Comment("Crypto, telemetry, player lists & packet range clamping | Мережа, телеметрія, списки гравців і фільтрація пакетів")
     public NetworkSection network = new NetworkSection();
 
     @Setting("storage")
-    @Comment("Container disk storage & shutdown lifecycle (true = standard, false = ephemeral) | Сховище світу та вимкнення (true = стандартно, false = ефемерний режим)")
+    @Comment("Disk persistence for worlds & chunk regions | Запис світів і чанків на диск (false = режим лише в RAM)")
     public StorageSection storage = new StorageSection();
 
-    @Setting("players")
-    @Comment("Player persistence, hunger & statistics (true = active, false = cut) | Профілі, голод і статистика гравців (true = увімкнено, false = вирізано)")
-    public PlayersSection players = new PlayersSection();
-
-    @Setting("world")
-    @Comment("World time & block/item physics (true = active, false = cut) | Час світу та фізика блоків/предметів (true = увімкнено, false = вирізано)")
-    public WorldSection world = new WorldSection();
+    @Setting("system")
+    @Comment("JVM process lifecycle & shutdown behavior | Життєвий цикл процесу сервера та вимкнення")
+    public SystemSection system = new SystemSection();
 
     @Setting("compatibility")
-    @Comment("Legacy Bukkit/Minecraft compatibility layers (true = standard, false = disabled for speed/RAM) | Застарілі механізми сумісності (true = стандарт, false = вимкнено для швидкості і RAM)")
+    @Comment("Legacy Bukkit/Mojang compatibility subsystems | Застарілі механізми сумісності зі старими плагінами/даними")
     public CompatibilitySection compatibility = new CompatibilitySection();
 
     public static ApisConfig get() {
@@ -121,7 +147,7 @@ public final class ApisConfig {
 
     static ApisConfig loadOrCreate(final Path path, final Logger logger) {
         try {
-            final Path parent = path.normalize().getParent();
+            final Path parent = path.toAbsolutePath().getParent();
             if (parent != null && Files.notExists(parent)) {
                 Files.createDirectories(parent);
             }
@@ -249,44 +275,66 @@ public final class ApisConfig {
 
     void sanitize(final Logger logger) {
         if (this.startup == null) this.startup = new StartupSection();
-        if (this.worlds == null) this.worlds = new WorldsSection();
-        if (this.worlds.disabledDimensions == null) this.worlds.disabledDimensions = new ArrayList<>();
-        if (this.worlds.disabledTickingDimensions == null) this.worlds.disabledTickingDimensions = new ArrayList<>();
+        if (this.caches == null) this.caches = new CachesSection();
+        if (this.dimensions == null) this.dimensions = new DimensionsSection();
+        if (this.dimensions.enabled == null) this.dimensions.enabled = new ArrayList<>(DEFAULT_ENABLED_DIMENSIONS);
+        if (this.dimensions.ticking == null) this.dimensions.ticking = new ArrayList<>(DEFAULT_TICKING_DIMENSIONS);
+        if (this.chunks == null) this.chunks = new ChunksSection();
+        if (this.chunks.ticking == null) this.chunks.ticking = new ChunkTickingSection();
+        if (this.chunks.ticking.subFeatures == null) this.chunks.ticking.subFeatures = new ChunkTickingSubFeaturesSection();
+        if (this.blockEntities == null) this.blockEntities = new BlockEntitiesSection();
+        if (this.blockEntities.ticking == null) this.blockEntities.ticking = new BlockEntityTickingSection();
+        if (this.blockEntities.ticking.subFeatures == null) {
+            this.blockEntities.ticking.subFeatures = new BlockEntityTickingSubFeaturesSection();
+        }
+        if (this.blocksAndPhysics == null) this.blocksAndPhysics = new BlocksAndPhysicsSection();
+        if (this.worldEnvironment == null) this.worldEnvironment = new WorldEnvironmentSection();
+        if (this.spawning == null) this.spawning = new SpawningSection();
+        if (this.spawning.natural == null) this.spawning.natural = new NaturalSpawningSection();
+        if (this.spawning.natural.subFeatures == null) this.spawning.natural.subFeatures = new NaturalSpawningSubFeaturesSection();
         if (this.entities == null) this.entities = new EntitiesSection();
         if (this.entities.ai == null) this.entities.ai = new AiSection();
-        if (this.entities.ai.disabledTypes == null) this.entities.ai.disabledTypes = new ArrayList<>();
-        if (this.chunks == null) this.chunks = new ChunksSection();
+        if (this.entities.ai.typeFilter == null) this.entities.ai.typeFilter = new ArrayList<>();
+        if (this.entities.ai.subFeatures == null) this.entities.ai.subFeatures = new AiSubFeaturesSection();
+        if (this.entities.collisions == null) this.entities.collisions = new CollisionsSection();
         if (this.gameplay == null) this.gameplay = new GameplaySection();
+        if (this.players == null) this.players = new PlayersSection();
         if (this.network == null) this.network = new NetworkSection();
         if (this.network.analytics == null) this.network.analytics = new AnalyticsSection();
-        if (this.network.tracking == null) this.network.tracking = new TrackingSection();
+        if (this.network.playerList == null) this.network.playerList = new PlayerListSection();
+        if (this.network.packetRangeClamping == null) this.network.packetRangeClamping = new PacketRangeClampingSection();
         if (this.storage == null) this.storage = new StorageSection();
-        if (this.storage.ephemeral == null) this.storage.ephemeral = new EphemeralStorageSection();
-        if (this.players == null) this.players = new PlayersSection();
-        if (this.players.lifecycle == null) this.players.lifecycle = new PlayerLifecycleSection();
-        if (this.world == null) this.world = new WorldSection();
-        if (this.world.physics == null) this.world.physics = new PhysicsSection();
+        if (this.system == null) this.system = new SystemSection();
+        if (this.system.lifecycle == null) this.system.lifecycle = new SystemLifecycleSection();
         if (this.compatibility == null) this.compatibility = new CompatibilitySection();
         if (this.compatibility.legacy == null) this.compatibility.legacy = new LegacySection();
 
-        this.network.tracking.projectileTrackingRange = clampInt(
-            this.network.tracking.projectileTrackingRange, 0, 256, "network.tracking.projectile-tracking-range", logger
+        this.network.packetRangeClamping.projectileTrackingRange = clampInt(
+            this.network.packetRangeClamping.projectileTrackingRange,
+            0,
+            256,
+            "network.packet-range-clamping.projectile-tracking-range",
+            logger
         );
-        this.network.tracking.armorEquipmentRange = clampInt(
-            this.network.tracking.armorEquipmentRange, 0, 256, "network.tracking.armor-equipment-range", logger
+        this.network.packetRangeClamping.armorEquipmentRange = clampInt(
+            this.network.packetRangeClamping.armorEquipmentRange,
+            0,
+            256,
+            "network.packet-range-clamping.armor-equipment-range",
+            logger
         );
-        if (Double.isNaN(this.network.tracking.particleBroadcastRange)
-            || this.network.tracking.particleBroadcastRange < 0.0d
-            || this.network.tracking.particleBroadcastRange > 256.0d) {
-            final double clamped = Double.isNaN(this.network.tracking.particleBroadcastRange)
+        if (Double.isNaN(this.network.packetRangeClamping.particleBroadcastRange)
+            || this.network.packetRangeClamping.particleBroadcastRange < 0.0d
+            || this.network.packetRangeClamping.particleBroadcastRange > 256.0d) {
+            final double clamped = Double.isNaN(this.network.packetRangeClamping.particleBroadcastRange)
                 ? 16.0d
-                : Math.max(0.0d, Math.min(256.0d, this.network.tracking.particleBroadcastRange));
+                : Math.max(0.0d, Math.min(256.0d, this.network.packetRangeClamping.particleBroadcastRange));
             logger.warn(
-                "Clamping network.tracking.particle-broadcast-range={} to [0.0, 256.0] -> {}",
-                this.network.tracking.particleBroadcastRange,
+                "Clamping network.packet-range-clamping.particle-broadcast-range={} to [0.0, 256.0] -> {}",
+                this.network.packetRangeClamping.particleBroadcastRange,
                 clamped
             );
-            this.network.tracking.particleBroadcastRange = clamped;
+            this.network.packetRangeClamping.particleBroadcastRange = clamped;
         }
     }
 
@@ -302,306 +350,398 @@ public final class ApisConfig {
     @ConfigSerializable
     public static final class StartupSection {
         @Setting("datafixers")
-        @Comment("true = build DFU/DataConverter legacy migration schemas; false = skip DFU/MCTypeRegistry init (~240ms+ boot gain) | true = конвертери DFU, false = пропустити на старті")
+        @Comment("Build DFU/DataConverter schemas & migrate old level/item formats; false = skip DFU completely (fast boot, breaks pre-26.3 world upgrades) | Будувати схеми DFU/DataConverter та мігрувати старі світи; false = пропустити ініціалізацію DFU для прискорення старту")
         public boolean datafixers = true;
 
         @Setting("search-spawn-point")
-        @Comment("true = scan 11x11 chunks for safe spawn; false = instant deterministic spawn at (0, seaLevel, 0) | true = пошук спавна 11x11, false = миттєво (0, seaLevel, 0)")
+        @Comment("Scan 11x11 spawn chunks for a safe surface coordinate; false = instant deterministic spawn at (0, seaLevel, 0) | Шукати безпечний спавн у сітці 11x11 чанків; false = миттєво встановлювати спавн на (0, seaLevel, 0)")
         public boolean searchSpawnPoint = true;
 
         @Setting("initial-chunk-load")
-        @Comment("true = preload and wait for spawn chunks before Done; false = skip initial chunk wait loop | true = чекати стартові чанки, false = не блокувати запуск")
+        @Comment("Preload and wait for spawn ticketed chunks before Done; false = finish boot immediately without waiting for spawn chunks | Передзавантажувати й чекати стартові чанки до Done; false = пропустити цикл очікування чанків")
         public boolean initialChunkLoad = true;
 
-        @Setting("validate-registries")
-        @Comment("true = validate creative tabs & loot tables at boot; false = skip validation checks | true = валідувати вкладки і лут, false = пропустити валідацію")
-        public boolean validateRegistries = true;
-
         @Setting("mojang-service-discovery")
-        @Comment("true = query discovery.minecraftservices.com at boot; false = use offline stub without HTTP/DNS wait (~1.5-2s gain offline) | true = запитувати сервіси Mojang, false = офлайн-заглушка без мережевої затримки")
+        @Comment("Query discovery.minecraftservices.com at boot; false = offline stub with zero HTTP/DNS wait (~1.5-2s faster without internet) | Запитувати сервіси Mojang під час запуску; false = офлайн-заглушка без затримок мережі")
         public boolean mojangServiceDiscovery = true;
 
         @Setting("paper-version-check")
-        @Comment("true = query fill.papermc.io / api.github.com for Paper build updates; false = disable startup version check | true = перевіряти оновлення Paper на старті, false = вимкнути мережеву перевірку версії")
+        @Comment("Check Paper/GitHub API for newer builds on startup; false = skip version update query | Перевіряти оновлення збірки на старті; false = вимкнути мережеву перевірку версії")
         public boolean paperVersionCheck = true;
 
+        @Setting("validate-creative-tabs")
+        @Comment("Validate CreativeModeTabs & LootContextParamSets in Bootstrap; false = skip startup consistency checks | Валідувати вкладки креативу та набори контекстів у Bootstrap; false = пропустити перевірки")
+        public boolean validateCreativeTabs = true;
+
+        @Setting("validate-loot")
+        @Comment("Run ReloadableServerRegistries loot validation after datapack load; false = skip loot reference validation | Перевіряти цілісність таблиць луту після завантаження датапаків; false = пропустити валідацію луту")
+        public boolean validateLoot = true;
+
+        @Setting("test-registries")
+        @Comment("Load GameTest datapack registries (test_environment, test_instance); false = prune them before disk/JSON parsing | Завантажувати тестові реєстри датапаків (test_environment, test_instance); false = вирізати до читання з диска")
+        public boolean testRegistries = true;
+    }
+
+    @ConfigSerializable
+    public static final class CachesSection {
         @Setting("eager-blockstate-cache")
-        @Comment("true = precompute collision, occlusion & shape caches for all 27k+ BlockStates at boot; false = lazy on-demand per state | true = прогрівати кеш усіх станів блоків на старті, false = ледачий розрахунок по запиту")
+        @Comment("Precompute collision, occlusion & light caches for all ~27k+ BlockStates at boot; false = calculate lazily on first access per state | Прогрівати кеші колізій та оклюзії всіх станів блоків на старті; false = лінивий розрахунок при першому зверненні")
         public boolean eagerBlockstateCache = true;
 
         @Setting("eager-craftblockdata-cache")
-        @Comment("true = pre-populate CraftBlockData ENCODER_CACHE & clones on class init; false = lazy on-demand parsing & caching | true = заповнювати кеш CraftBlockData на старті, false = ледаче кешування")
+        @Comment("Pre-populate CraftBlockData caches & clones on class init; false = allocate & parse lazily on demand | Попередньо заповнювати кеш CraftBlockData при старті; false = ліниве кешування за вимогою")
         public boolean eagerCraftblockdataCache = true;
+
+        @Setting("eager-map-color-cache")
+        @Comment("Allocate & build the 16 MB CraftMapColorCache lookup table at startup; false = match map colors lazily on demand (saves 16 MB RAM) | Будувати 16 МБ таблицю кольорів карт на старті; false = лінивий підбір без виділення буфера")
+        public boolean eagerMapColorCache = true;
     }
 
     @ConfigSerializable
-    public static final class WorldsSection {
-        @Setting("disabled-dimensions")
-        @Comment("Dimensions skipped before ServerLevel allocation (e.g. minecraft:the_nether, minecraft:the_end) | Виміри, що не завантажуються і не алокуються в пам'яті")
-        public List<String> disabledDimensions = new ArrayList<>();
+    public static final class DimensionsSection {
+        @Setting("enabled")
+        @Comment("Positive whitelist of dimensions allowed to load (minecraft:overworld is always protected and loaded; remove the_nether/the_end to skip allocation) | Позитивний білий список вимірів, дозволених до завантаження (minecraft:overworld завжди захищений і завантажується)")
+        public List<String> enabled = new ArrayList<>(DEFAULT_ENABLED_DIMENSIONS);
+
+        @Setting("ticking")
+        @Comment("Positive whitelist of loaded dimensions allowed to tick entities & chunks (use '*' for all loaded dimensions) | Позитивний білий список вимірів, де виконуються тіки сутностей і чанків ('*' = усі завантажені світи)")
+        public List<String> ticking = new ArrayList<>(DEFAULT_TICKING_DIMENSIONS);
 
         @Setting("custom-worlds")
-        @Comment("true = allow plugins to create/load extra worlds; false = block runtime world creation | true = дозволити додаткові світи, false = заблокувати створення")
+        @Comment("Allow plugins to create or load extra worlds at runtime via CraftServer.createWorld; false = block runtime world creation | Дозволити плагінам створювати або завантажувати додаткові світи; false = заблокувати створення світів")
         public boolean customWorlds = true;
 
         @Setting("portals")
-        @Comment("true = allow Nether/End portal transitions; false = block all portal travel | true = портали працюють, false = переходи вимкнено")
+        @Comment("Allow Nether and End portal entity transitions; false = cancel portal teleportation completely | Дозволити телепортацію через портали Незера й Енда; false = повністю вимкнути переходи порталами")
         public boolean portals = true;
-
-        @Setting("disabled-ticking-dimensions")
-        @Comment("Dimensions that load without ticking entities or chunks | Виміри, що завантажуються без тіків сутностей і чанків")
-        public List<String> disabledTickingDimensions = new ArrayList<>();
-    }
-
-    @ConfigSerializable
-    public static final class EntitiesSection {
-        @Setting("ai")
-        @Comment("Entity AI, brains, goals & collision flags | Прапори ШІ, мозку, цілей та колізій сутностей")
-        public AiSection ai = new AiSection();
-    }
-
-    @ConfigSerializable
-    public static final class AiSection {
-        @Setting("enabled")
-        @Comment("true = enable mob AI execution globally; false = strip AI & goal registration from all mobs | true = ШІ працює, false = вимкнути ШІ у всіх мобів")
-        public boolean enabled = true;
-
-        @Setting("disabled-types")
-        @Comment("Entity types with AI disabled (e.g. minecraft:villager) | Типи сутностей, для яких вимкнено ШІ")
-        public List<String> disabledTypes = new ArrayList<>();
-
-        @Setting("goal-selector")
-        @Comment("true = tick GoalSelector & targetSelector; false = skip goal execution | true = тікати GoalSelector, false = пропустити цілі")
-        public boolean goalSelector = true;
-
-        @Setting("brain")
-        @Comment("true = initialize & tick mob Brain; false = skip Brain logic | true = мозок Brain активний, false = вимкнути Brain")
-        public boolean brain = true;
-
-        @Setting("pathfinding")
-        @Comment("true = run PathNavigation path recalculation; false = skip navigation ticks | true = пошук шляхів увімкнено, false = вимкнути навігацію")
-        public boolean pathfinding = true;
-
-        @Setting("sensors")
-        @Comment("true = tick mob Sensing & brain sensors; false = skip sensor updates | true = сенсори активні, false = вимкнути сенсори")
-        public boolean sensors = true;
-
-        @Setting("collisions")
-        @Comment("true = enable entity-to-entity collisions; false = disable all push collisions | true = фізичні колізії увімкнено, false = вимкнути зіштовхування")
-        public boolean collisions = true;
     }
 
     @ConfigSerializable
     public static final class ChunksSection {
         @Setting("structures")
-        @Comment("true = generate world structures; false = skip structure placement & search | true = генерація структур, false = вирізати структури")
+        @Comment("Load structure registries, generate world structures & allow /locate structure; false = prune structure registries at boot and skip structure placement | Завантажувати та генерувати структури світу (і пошук структур); false = вирізати реєстри структур і їх генерацію")
         public boolean structures = true;
 
         @Setting("biome-decoration")
-        @Comment("true = generate ores, trees & biome features; false = skip decoration | true = декорація біомів, false = пропустити генерацію руд і дерев")
+        @Comment("Load feature/carver registries and generate ores, trees & features; false = use slim NETWORK_CODEC for biomes and skip decoration | Генерувати руди, дерева й декорації біомів; false = полегшений декодер біомів без читання фіч на старті")
         public boolean biomeDecoration = true;
 
-        @Setting("chunk-ticking")
-        @Comment("true = tick loaded chunks in ServerChunkCache; false = skip chunk ticking loop | true = тікінг чанків, false = зупинити цикл тіків чанків")
-        public boolean chunkTicking = true;
+        @Setting("ticking")
+        @Comment("Master chunk ticking controller and per-subsystem tick flags | Головний контролер тікінгу чанків та дочірні підсистеми")
+        public ChunkTickingSection ticking = new ChunkTickingSection();
+    }
 
+    @ConfigSerializable
+    public static final class ChunkTickingSection {
+        @Setting("enabled")
+        @Comment("[MASTER SWITCH] false = cuts chunk ticking completely in ServerChunkCache; sub-features below are bypassed | [ГОЛОВНИЙ РУБИЛЬНИК] false = повністю зупиняє цикл тіків чанків; параметри нижче ігноруються")
+        public boolean enabled = true;
+
+        @Setting("sub-features")
+        @Comment("Granular tick loops active when chunks.ticking.enabled=true | Окремі цикли тіків, активні коли chunks.ticking.enabled=true")
+        public ChunkTickingSubFeaturesSection subFeatures = new ChunkTickingSubFeaturesSection();
+    }
+
+    @ConfigSerializable
+    public static final class ChunkTickingSubFeaturesSection {
         @Setting("random-ticks")
-        @Comment("true = run random block ticks (crops, grass, ice); false = freeze random ticks | true = випадкові тіки блоків, false = вимкнути")
+        @Comment("Tick random block updates (crop growth, grass spread, ice melt); false = freeze random ticks | Виконувати випадкові тіки блоків (ріст рослин, трава, танення льоду); false = заморозити")
         public boolean randomTicks = true;
 
         @Setting("block-ticks")
-        @Comment("true = run scheduled block ticks; false = skip scheduled block ticks | true = заплановані тіки блоків, false = вимкнути")
+        @Comment("Tick scheduled block updates in ServerLevel; false = skip block tick queue | Виконувати заплановані тіки блоків; false = пропускати чергу запланованих оновлень блоків")
         public boolean blockTicks = true;
 
         @Setting("fluid-ticks")
-        @Comment("true = run scheduled water/lava fluid ticks; false = freeze fluid updates | true = тіки рідин (вода/лава), false = зупинити рідини")
+        @Comment("Tick scheduled water/lava flow updates in ServerLevel; false = freeze all fluid flow | Виконувати тіки рідин (води та лави); false = зупинити розтікання рідин")
         public boolean fluidTicks = true;
     }
 
     @ConfigSerializable
-    public static final class GameplaySection {
+    public static final class BlockEntitiesSection {
+        @Setting("ticking")
+        @Comment("Master block-entity ticking controller and specific exemptions | Головний контролер тікінгу тайл-ентіті та окремі підтипи")
+        public BlockEntityTickingSection ticking = new BlockEntityTickingSection();
+    }
+
+    @ConfigSerializable
+    public static final class BlockEntityTickingSection {
+        @Setting("enabled")
+        @Comment("[MASTER SWITCH] false = cuts all block-entity ticking (furnaces, beacons, chests, hoppers); sub-features below are bypassed | [ГОЛОВНИЙ РУБИЛЬНИК] false = вимикає тікінг усіх тайл-ентіті (печі, маяки, воронки); параметри нижче ігноруються")
+        public boolean enabled = true;
+
+        @Setting("sub-features")
+        @Comment("Granular block-entity controls active when block-entities.ticking.enabled=true | Точкові вимкнення тайл-ентіті, коли block-entities.ticking.enabled=true")
+        public BlockEntityTickingSubFeaturesSection subFeatures = new BlockEntityTickingSubFeaturesSection();
+    }
+
+    @ConfigSerializable
+    public static final class BlockEntityTickingSubFeaturesSection {
+        @Setting("hoppers")
+        @Comment("Tick HopperBlockEntity item transfers; false = freeze hopper pull/push logic while keeping other block-entities active | Тікати перенесення предметів воронками; false = заморозити лише воронки, не чіпаючи інші тайл-ентіті")
+        public boolean hoppers = true;
+    }
+
+    @ConfigSerializable
+    public static final class BlocksAndPhysicsSection {
+        @Setting("redstone")
+        @Comment("Evaluate RedstoneWireBlock power & neighbor updates; false = disable redstone wire signal propagation | Обчислювати редстоун-сигнал та оновлення дротів; false = вимкнути логіку редстоун-пилу")
+        public boolean redstone = true;
+
+        @Setting("block-gravity")
+        @Comment("Allow sand, gravel & anvils to fall; false = skip FallingBlock physics ticks | Дозволити падіння піску, гравію та ковадл; false = вимкнути гравітацію блоків")
+        public boolean blockGravity = true;
+
+        @Setting("leaf-decay")
+        @Comment("Allow natural leaf decay random ticks; false = keep leaves permanent without wood nearby | Дозволити природне опадання листя; false = листя ніколи не зникає самостійно")
+        public boolean leafDecay = true;
+
+        @Setting("fire-spread")
+        @Comment("Allow fire burning & spreading ticks; false = freeze fire spread completely | Дозволити горіння та поширення вогню; false = заблокувати поширення вогню")
+        public boolean fireSpread = true;
+
+        @Setting("item-physics")
+        @Comment("Run movement, gravity & collision physics on dropped ItemEntity; false = keep pickup/despawn timers without motion physics | Прораховувати рух і колізії викинутих предметів; false = залишити лише таймер підбору/деспавну без фізики")
+        public boolean itemPhysics = true;
+    }
+
+    @ConfigSerializable
+    public static final class WorldEnvironmentSection {
+        @Setting("daylight-cycle")
+        @Comment("Tick WorldClock time, sky brightness & SetTime broadcasts; false = freeze world time with zero packet spam | Рухати цикл дня/ночі та розсилати пакети часу; false = заморозити час доби без мережевого спаму")
+        public boolean daylightCycle = true;
+
         @Setting("weather")
-        @Comment("true = allow rain/thunder cycles; false = force clear weather | true = погода змінюється, false = завжди ясно")
+        @Comment("Allow rain, thunder & ice/snow accumulation; false = lock clear weather across all levels | Дозволити дощ, грозу та утворення снігу/льоду; false = зафіксувати ясну погоду")
         public boolean weather = true;
 
         @Setting("raids")
-        @Comment("true = allow village raids; false = disable raid creation & ticking | true = рейди активні, false = вимкнути рейди")
+        @Comment("Allow village raid creation and ticking; false = skip Raids#tick | Дозволити рейди на села; false = вимкнути створення і тікінг рейдів")
         public boolean raids = true;
 
-        @Setting("redstone")
-        @Comment("true = evaluate redstone wire & neighbor updates; false = kill redstone logic | true = редстоун працює, false = вимкнути редстоун")
-        public boolean redstone = true;
+        @Setting("sleep-cycle")
+        @Comment("Allow players sleeping in beds to skip the night; false = disable ServerLevel sleep night-skip checks | Дозволити пропуск ночі через сон у ліжку; false = вимкнути перевірки сну в ServerLevel")
+        public boolean sleepCycle = true;
 
-        @Setting("natural-spawning")
-        @Comment("true = allow natural mob spawning in chunks; false = stop natural spawning | true = природний спавн мобів, false = вимкнути спавн")
-        public boolean naturalSpawning = true;
+        @Setting("end-dragon-fight")
+        @Comment("Run EndDragonFight logic in The End; false = skip Ender Dragon fight bossbar & battle ticks | Виконувати логіку бою з Драконом Края в Енді; false = пропустити тіки EndDragonFight")
+        public boolean endDragonFight = true;
+    }
 
-        @Setting("custom-spawners")
-        @Comment("true = enable phantom, patrol, cat, siege & trader spawners; false = skip them | true = фантоми/патрулі/торговці, false = вирізати спавнери")
-        public boolean customSpawners = true;
+    @ConfigSerializable
+    public static final class SpawningSection {
+        @Setting("natural")
+        @Comment("Master natural mob-spawning controller and category filters | Головний контролер природного спавну та категорії мобів")
+        public NaturalSpawningSection natural = new NaturalSpawningSection();
+    }
 
+    @ConfigSerializable
+    public static final class NaturalSpawningSection {
+        @Setting("enabled")
+        @Comment("[MASTER SWITCH] false = cuts natural mob spawning and overworld custom spawners completely; sub-features below are bypassed | [ГОЛОВНИЙ РУБИЛЬНИК] false = повністю зупиняє природний спавн мобів і спецспавнери; параметри нижче ігноруються")
+        public boolean enabled = true;
+
+        @Setting("sub-features")
+        @Comment("Granular spawning categories active when spawning.natural.enabled=true | Окремі категорії спавну, активні коли spawning.natural.enabled=true")
+        public NaturalSpawningSubFeaturesSection subFeatures = new NaturalSpawningSubFeaturesSection();
+    }
+
+    @ConfigSerializable
+    public static final class NaturalSpawningSubFeaturesSection {
         @Setting("monsters")
-        @Comment("true = allow natural monster spawning; false = block MobCategory.MONSTER spawns | true = природний спавн монстрів, false = заборонити")
+        @Comment("Allow natural spawning of MobCategory.MONSTER; false = block hostile monster natural spawns | Дозволити природний спавн ворожих монстрів; false = заборонити спавн категорії MONSTER")
         public boolean monsters = true;
 
         @Setting("animals")
-        @Comment("true = allow natural animal & ambient spawning; false = block friendly category spawns | true = природний спавн тварин, false = заборонити")
+        @Comment("Allow natural spawning of animals, ambient, water & friendly categories; false = block non-monster natural spawns | Дозволити природний спавн тварин і мирних мобів; false = заблокувати мирні категорії")
         public boolean animals = true;
 
+        @Setting("custom-spawners")
+        @Comment("Enable Phantom, Patrol, Cat, VillageSiege & WanderingTrader spawners in Overworld; false = skip registering custom spawners | Увімкнути спавнери фантомів, патрулів, котів, осад і мандрівних торговців; false = вирізати їх реєстрацію")
+        public boolean customSpawners = true;
+    }
+
+    @ConfigSerializable
+    public static final class EntitiesSection {
+        @Setting("ai")
+        @Comment("Master mob AI controller, per-type override & AI sub-features | Головний контролер ШІ мобів, фільтр типів і дочірні модулі")
+        public AiSection ai = new AiSection();
+
+        @Setting("collisions")
+        @Comment("Physical pushing & entity collision controls | Налаштування фізичного зіштовхування сутностей і гравців")
+        public CollisionsSection collisions = new CollisionsSection();
+    }
+
+    @ConfigSerializable
+    public static final class AiSection {
+        @Setting("enabled")
+        @Comment("[MASTER SWITCH] false = strips Goal allocation and Brain/AI execution from all mobs; sub-features below are bypassed | [ГОЛОВНИЙ РУБИЛЬНИК] false = повністю вирізає ШІ та цілі у всіх мобів; параметри нижче ігноруються")
+        public boolean enabled = true;
+
+        @Setting("type-filter")
+        @Comment("Specific entity type IDs whose AI is suppressed even while entities.ai.enabled=true (e.g. minecraft:villager) | Список ID типів сутностей, яким ШІ вимикається індивідуально (навіть при entities.ai.enabled=true)")
+        public List<String> typeFilter = new ArrayList<>();
+
+        @Setting("sub-features")
+        @Comment("Granular AI modules active when entities.ai.enabled=true | Окремі підсистеми ШІ, активні коли entities.ai.enabled=true")
+        public AiSubFeaturesSection subFeatures = new AiSubFeaturesSection();
+    }
+
+    @ConfigSerializable
+    public static final class AiSubFeaturesSection {
+        @Setting("goal-selector")
+        @Comment("Tick GoalSelector & targetSelector for mobs; false = skip goal execution ticks | Тікати GoalSelector і targetSelector у мобів; false = пропускати виконання цілей")
+        public boolean goalSelector = true;
+
+        @Setting("brain")
+        @Comment("Initialize and tick mob Brain schedules & activities; false = skip Brain logic | Ініціалізувати та тікати мозок Brain; false = пропустити логіку Brain")
+        public boolean brain = true;
+
+        @Setting("pathfinding")
+        @Comment("Recalculate & follow paths in PathNavigation; false = freeze mob pathfinding | Виконувати пошук і оновлення шляхів у PathNavigation; false = зупинити навігацію")
+        public boolean pathfinding = true;
+
+        @Setting("sensors")
+        @Comment("Update mob Brain sensors and Sensing line-of-sight cache; false = skip sensor ticks | Оновлювати сенсори Brain та кеш видимості Sensing; false = пропустити сенсори")
+        public boolean sensors = true;
+    }
+
+    @ConfigSerializable
+    public static final class CollisionsSection {
+        @Setting("entities")
+        @Comment("[MASTER SWITCH] false = disables entity-to-entity push collisions globally (also bypasses entities.collisions.players) | [ГОЛОВНИЙ РУБИЛЬНИК] false = глобально вимикає фізичні зіштовхування між усіма сутностями (включно з гравцями)")
+        public boolean entities = true;
+
+        @Setting("players")
+        @Comment("Allow player-to-player pushing collisions when entities.collisions.entities=true; false = disable player collisions & collideRule sync | Дозволити штовхання гравців між собою (коли entities.collisions.entities=true); false = вимкнути колізії гравців")
+        public boolean players = true;
+    }
+
+    @ConfigSerializable
+    public static final class GameplaySection {
         @Setting("advancements")
-        @Comment("true = compile & track advancements; false = skip ServerAdvancementManager tree & player tracking | true = досягнення, false = вирізати повністю")
+        @Comment("Load datapack advancements, track criteria & save progress; false = prune ADVANCEMENT registry at boot and stub PlayerAdvancements | Завантажувати та рахувати досягнення; false = вирізати реєстр ADVANCEMENT на старті й заглушити трекінг")
         public boolean advancements = true;
 
         @Setting("recipes")
-        @Comment("true = compile & sync server recipe book; false = skip RecipeManager compilation & sync | true = рецепти, false = вирізати компіляцію і синхронізацію")
+        @Comment("Load recipes & sync recipe books to clients; false = prune RECIPE registry at boot and skip RecipeManager sync | Завантажувати та синхронізувати рецепти; false = вирізати реєстр RECIPE на старті й відправку клієнтам")
         public boolean recipes = true;
 
         @Setting("loot-tables")
-        @Comment("true = parse datapack loot_table JSON definitions; false = skip loot table loading (returns LootTable.EMPTY) | true = завантажувати таблиці луту, false = пропустити на старті")
+        @Comment("Parse ~1100 datapack loot_table JSON definitions at boot; false = prune LOOT_TABLE registry (queries return LootTable.EMPTY) | Парсити JSON-таблиці луту з датапака; false = пропустити на старті (запити повертають LootTable.EMPTY)")
         public boolean lootTables = true;
 
-        @Setting("warden-and-sleep")
-        @Comment("true = tick warden spawn tracker, sleep night-skip & dragon fight; false = skip all three | true = варден/сон/дракон, false = вимкнути")
-        public boolean wardenAndSleep = true;
-
         @Setting("command-functions")
-        @Comment("true = tick datapack .mcfunction schedules; false = skip ServerFunctionManager#tick | true = тіки .mcfunction, false = вимкнути функції датапаків")
+        @Comment("Tick datapack .mcfunction schedules each server tick; false = skip ServerFunctionManager#tick | Виконувати розклад функцій .mcfunction щотіку; false = вимкнути тіки функцій датапаків")
         public boolean commandFunctions = true;
+    }
+
+    @ConfigSerializable
+    public static final class PlayersSection {
+        @Setting("data-saving")
+        @Comment("Persist playerdata .dat files to disk (automatically bypassed when storage.world-saving=false); false = skip player disk writes | Зберігати .dat файли гравців на диск (вимикається також при storage.world-saving=false); false = не писати playerdata")
+        public boolean dataSaving = true;
+
+        @Setting("hunger")
+        @Comment("Tick player FoodData (hunger, exhaustion & natural saturation regen); false = freeze hunger bar | Тікати голод і регенерацію гравців у FoodData; false = заморозити голод")
+        public boolean hunger = true;
+
+        @Setting("statistics")
+        @Comment("Increment player statistics & per-tick advancement stat triggers; false = skip stats increments | Нараховувати статистику гравцям та тік-тригери статистики; false = пропустити оновлення")
+        public boolean statistics = true;
+
+        @Setting("warden-tracker")
+        @Comment("Tick WardenSpawnTracker per player; false = disable Warden shriek warning escalation | Тікати WardenSpawnTracker для кожного гравця; false = вимкнути накопичення попереджень Вардена")
+        public boolean wardenTracker = true;
     }
 
     @ConfigSerializable
     public static final class NetworkSection {
         @Setting("generate-keypair")
-        @Comment("true = generate RSA keypair on boot; false = skip in offline/proxy mode (RustyConnector/Velocity) | true = RSA-ключі на старті, false = пропустити в offline")
+        @Comment("Generate RSA encryption keypair on startup; false = skip RSA generation until needed (ideal behind Velocity/BungeeCord proxies) | Генерувати пару RSA-ключів на старті; false = пропустити генерацію за проксі або в offline-режимі")
         public boolean generateKeypair = true;
 
         @Setting("analytics")
-        @Comment("Telemetry, profiler & debug sync flags | Метрики, профайлер та дебаг-синхронізація")
+        @Comment("Independent metrics, profiling & debug telemetry switches | Незалежні перемикачі метрик, профайлерів та дебаг-синхронізації")
         public AnalyticsSection analytics = new AnalyticsSection();
 
-        @Setting("tracking")
-        @Comment("Player collisions, packet range filtering & ping flags | Колізії гравців, фільтрація пакетів і пінг")
-        public TrackingSection tracking = new TrackingSection();
+        @Setting("player-list")
+        @Comment("MOTD server ping sample & Tab latency packet controls | Налаштування списку гравців у MOTD та пакетів пінгу в Tab")
+        public PlayerListSection playerList = new PlayerListSection();
+
+        @Setting("packet-range-clamping")
+        @Comment("Optional distance clamping for noisy broadcast packets | Обмеження дальності розсилки частих пакетів (снаряди, партикли, броня)")
+        public PacketRangeClampingSection packetRangeClamping = new PacketRangeClampingSection();
     }
 
     @ConfigSerializable
     public static final class AnalyticsSection {
-        @Setting("metrics-and-profiler")
-        @Comment("true = enable bStats metrics, Spark & activity monitor; false = cut telemetry | true = метрики та Spark, false = вимкнути телеметрію")
-        public boolean metricsAndProfiler = true;
+        @Setting("bstats")
+        @Comment("Start Paper bStats metrics collector on boot; false = disable bStats telemetry completely | Запускати збірник метрик Paper bStats на старті; false = вимкнути bStats")
+        public boolean bstats = true;
+
+        @Setting("spark")
+        @Comment("Enable bundled Spark profiler, /spark command & tick hooks; false = suppress Spark init, banner and per-tick callbacks | Увімкнути вбудований профайлер Spark; false = повністю пропустити ініціалізацію й тіки Spark")
+        public boolean spark = true;
+
+        @Setting("tick-monitor")
+        @Comment("Tick MinecraftServer activity/JFR tick monitor; false = skip serverActivityMonitor#tick per server tick | Оновлювати монітор активності тіків сервера; false = пропустити serverActivityMonitor#tick")
+        public boolean tickMonitor = true;
 
         @Setting("debug-synchronizers")
-        @Comment("true = tick server debug synchronizers; false = skip debug sync ticks | true = дебаг-синхронізатори, false = вимкнути")
+        @Comment("Tick ServerLevel debug synchronizer broadcasts; false = skip debugSynchronizers#tick | Тікати дебаг-синхронізатори світу; false = пропустити debugSynchronizers#tick")
         public boolean debugSynchronizers = true;
     }
 
     @ConfigSerializable
-    public static final class TrackingSection {
-        @Setting("player-collisions")
-        @Comment("true = players collide/push each other; false = disable player pushing (lobbies/PvP) | true = штовхання гравців, false = вимкнути колізії гравців")
-        public boolean playerCollisions = true;
-
-        @Setting("full-packet-broadcast")
-        @Comment("true = vanilla tracking distances; false = clamp projectile/particle/armor ranges below | true = ванільна дальність пакетів, false = урізати радіуси")
-        public boolean fullPacketBroadcast = true;
-
-        @Setting("projectile-tracking-range")
-        @Comment("Max block range for projectile tracking when full-packet-broadcast is false | Макс. дистанція трекінгу снарядів при full-packet-broadcast=false")
-        public int projectileTrackingRange = 32;
-
-        @Setting("particle-broadcast-range")
-        @Comment("Max block range for particle packets when full-packet-broadcast is false | Макс. дистанція пакетів партиклів при full-packet-broadcast=false")
-        public double particleBroadcastRange = 16.0d;
-
-        @Setting("armor-equipment-range")
-        @Comment("Max block range for equipment updates when full-packet-broadcast is false | Макс. дистанція пакетів броні при full-packet-broadcast=false")
-        public int armorEquipmentRange = 32;
-
+    public static final class PlayerListSection {
         @Setting("server-ping-sample")
-        @Comment("true = include player list sample in MOTD ping; false = omit sample for proxies | true = список гравців у пінгу, false = сховати")
+        @Comment("Include online player sample in server list MOTD ping response; false = send empty sample list | Передавати список гравців у MOTD-пінгу; false = надсилати порожній список гравців")
         public boolean serverPingSample = true;
 
         @Setting("tab-latency-updates")
-        @Comment("true = run periodic O(N^2) PlayerList latency broadcast; false = skip tab ping sync | true = оновлення пінгу в Tab, false = вимкнути O(N^2) цикл")
+        @Comment("Run periodic O(N^2) player ping latency broadcasts in PlayerList; false = skip Tab latency packet loop | Виконувати періодичну O(N^2) розсилку пінгу гравців у Tab; false = вимкнути оновлення пінгу")
         public boolean tabLatencyUpdates = true;
     }
 
     @ConfigSerializable
+    public static final class PacketRangeClampingSection {
+        @Setting("full-packet-broadcast")
+        @Comment("[MASTER SWITCH] true = standard vanilla broadcast ranges (caps below ignored); false = clamp projectile, particle & armor packets using the limits below | [ГОЛОВНИЙ РУБИЛЬНИК] true = ванільні дистанції пакетів (ліміти нижче ігноруються); false = урізати радіуси за лімітами нижче")
+        public boolean fullPacketBroadcast = true;
+
+        @Setting("projectile-tracking-range")
+        @Comment("Max block range for Projectile tracking when full-packet-broadcast=false ([0..256]) | Макс. дистанція трекінгу снарядів при full-packet-broadcast=false ([0..256])")
+        public int projectileTrackingRange = 32;
+
+        @Setting("particle-broadcast-range")
+        @Comment("Max block range for particle packets when full-packet-broadcast=false ([0.0..256.0]) | Макс. дистанція розсилки пакетів партиклів при full-packet-broadcast=false ([0.0..256.0])")
+        public double particleBroadcastRange = 16.0d;
+
+        @Setting("armor-equipment-range")
+        @Comment("Max block range for LivingEntity equipment updates when full-packet-broadcast=false ([0..256]) | Макс. дистанція пакетів оновлення броні/спорядження при full-packet-broadcast=false ([0..256])")
+        public int armorEquipmentRange = 32;
+    }
+
+    @ConfigSerializable
     public static final class StorageSection {
-        @Setting("ephemeral")
-        @Comment("Disk persistence & shutdown behavior for Docker arenas | Збереження світу на диск та вимкнення для Docker-арен")
-        public EphemeralStorageSection ephemeral = new EphemeralStorageSection();
-    }
-
-    @ConfigSerializable
-    public static final class EphemeralStorageSection {
         @Setting("world-saving")
-        @Comment("true = persist chunks, regions & level.dat to disk; false = ephemeral memory-only world (0 I/O) | true = запис на диск, false = лише RAM (0 I/O)")
+        @Comment("Persist chunks, region files, level.dat, SavedData & advancements to disk; false = ephemeral RAM-only worlds with 0 disk writes (also disables players.data-saving) | Зберігати чанки, регіони, level.dat і дані на диск; false = ефемерний режим лише в RAM (0 I/O, також вимикає players.data-saving)")
         public boolean worldSaving = true;
-
-        @Setting("graceful-shutdown")
-        @Comment("true = flush chunks & pools on stop; false = instant SIGTERM container shutdown | true = плавна зупинка з флашем, false = миттєвий SIGTERM стоп")
-        public boolean gracefulShutdown = true;
     }
 
     @ConfigSerializable
-    public static final class PlayersSection {
+    public static final class SystemSection {
         @Setting("lifecycle")
-        @Comment("Player save, hunger & statistics flags | Збереження гравців, голод і статистика")
-        public PlayerLifecycleSection lifecycle = new PlayerLifecycleSection();
+        @Comment("JVM server process lifecycle controls | Керування життєвим циклом процесу сервера")
+        public SystemLifecycleSection lifecycle = new SystemLifecycleSection();
     }
 
     @ConfigSerializable
-    public static final class PlayerLifecycleSection {
-        @Setting("player-data-saving")
-        @Comment("true = save playerdata .dat files; false = skip playerdata disk writes | true = зберігати .dat гравців, false = не писати playerdata")
-        public boolean playerDataSaving = true;
-
-        @Setting("hunger")
-        @Comment("true = tick player hunger, exhaustion & regen; false = freeze hunger | true = голод і регенерація, false = вимкнути FoodData#tick")
-        public boolean hunger = true;
-
-        @Setting("statistics")
-        @Comment("true = record player stats & per-tick criteria triggers; false = skip stats increments | true = статистика гравців, false = не рахувати")
-        public boolean statistics = true;
-    }
-
-    @ConfigSerializable
-    public static final class WorldSection {
-        @Setting("daylight-cycle")
-        @Comment("true = tick WorldClock time & broadcast SetTime packets; false = freeze time without network spam | true = цикл дня/ночі, false = заморозити час")
-        public boolean daylightCycle = true;
-
-        @Setting("physics")
-        @Comment("Block & item physics capabilities | Фізика блоків, тайл-еніті та предметів")
-        public PhysicsSection physics = new PhysicsSection();
-    }
-
-    @ConfigSerializable
-    public static final class PhysicsSection {
-        @Setting("block-gravity")
-        @Comment("true = allow falling sand, gravel & anvils; false = disable block gravity | true = падіння піску/гравію/ковадл, false = вимкнути гравітацію")
-        public boolean blockGravity = true;
-
-        @Setting("hopper-ticking")
-        @Comment("true = tick HopperBlockEntity transfers; false = freeze hoppers | true = тіки воронок, false = вимкнути воронки")
-        public boolean hopperTicking = true;
-
-        @Setting("block-entity-ticking")
-        @Comment("true = tick furnaces, beacons, chests & all block-entities; false = skip block-entity ticking | true = тікінг усіх тайл-еніті, false = вимкнути")
-        public boolean blockEntityTicking = true;
-
-        @Setting("item-physics")
-        @Comment("true = run movement & collision physics on ItemEntity; false = keep age/despawn without physics | true = фізика предметів, false = без колізій/руху")
-        public boolean itemPhysics = true;
-
-        @Setting("leaf-decay")
-        @Comment("true = allow natural leaf decay ticks; false = keep leaves permanent | true = опадання листя, false = вимкнути")
-        public boolean leafDecay = true;
-
-        @Setting("fire-spread")
-        @Comment("true = allow fire spread & burn ticks; false = disable fire spread | true = поширення вогню, false = вимкнути")
-        public boolean fireSpread = true;
+    public static final class SystemLifecycleSection {
+        @Setting("graceful-shutdown")
+        @Comment("Wait for async tasks, player saves & full chunk flush on stop; false = fast container shutdown without waiting on world/player flush | Плавна зупинка з очікуванням асинхронних задач і запису чанків; false = швидке вимкнення для контейнерів")
+        public boolean gracefulShutdown = true;
     }
 
     @ConfigSerializable
@@ -614,19 +754,15 @@ public final class ApisConfig {
     @ConfigSerializable
     public static final class LegacySection {
         @Setting("plugin-bytecode-rerouting")
-        @Comment("true = run ASM Commodore bytecode rerouting for old Bukkit plugins; false = load plugin bytecode directly | true = ASM-переписування плагінів Commodore, false = без трансформації байткоду")
+        @Comment("Run ASM Commodore bytecode rerouting for old Bukkit plugins; false = skip ASM plugin class transformation (only for modern 1.20.5+ plugins) | Застосовувати ASM-переписування байткоду плагінів (Commodore); false = без трансформації для сучасних плагінів")
         public boolean pluginBytecodeRerouting = true;
 
         @Setting("bootstrap-data-tables")
-        @Comment("true = build pre-1.13 block/item conversion tables in Bootstrap; false = skip legacy conversion maps | true = таблиці конвертації до 1.13 у Bootstrap, false = пропустити")
+        @Comment("Build pre-1.13 block/item conversion tables in Bootstrap; false = skip allocating legacy CraftBukkit lookup maps | Будувати таблиці конвертації блоків/предметів до 1.13 у Bootstrap; false = пропустити на старті")
         public boolean bootstrapDataTables = true;
 
-        @Setting("eager-map-color-cache")
-        @Comment("true = enable 16 MB CraftMapColorCache lookup table & background build; false = direct lazy color matching (0 MB) | true = таблиця кольорів карт 16 МБ, false = лінивий підбір без буфера")
-        public boolean eagerMapColorCache = true;
-
         @Setting("validate-entity-attributes")
-        @Comment("true = eagerly load all mob classes & validate attributes in Bootstrap; false = lazy attribute resolution | true = валідація атрибутів усіх мобів на старті, false = лінива ініціалізація")
+        @Comment("Eagerly load all mob classes & validate DefaultAttributes in Bootstrap; false = resolve entity attributes lazily per type | Завантажувати класи всіх мобів і валідувати DefaultAttributes на старті; false = лінива ініціалізація")
         public boolean validateEntityAttributes = true;
     }
 }

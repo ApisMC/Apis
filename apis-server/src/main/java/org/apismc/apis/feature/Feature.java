@@ -5,81 +5,93 @@ package org.apismc.apis.feature;
  * Semantics: {@code true} keeps vanilla/Paper behavior enabled; {@code false} activates the kill-switch.
  */
 public enum Feature {
-    // 1. Startup & Bootstrap
+    // 1. Startup & Boot
     STARTUP_DATAFIXERS("startup.datafixers"),
     STARTUP_SEARCH_SPAWN_POINT("startup.search-spawn-point"),
     STARTUP_INITIAL_CHUNK_LOAD("startup.initial-chunk-load"),
-    STARTUP_VALIDATE_REGISTRIES("startup.validate-registries"),
     STARTUP_MOJANG_SERVICE_DISCOVERY("startup.mojang-service-discovery"),
     STARTUP_PAPER_VERSION_CHECK("startup.paper-version-check"),
-    STARTUP_EAGER_BLOCKSTATE_CACHE("startup.eager-blockstate-cache"),
-    STARTUP_EAGER_CRAFTBLOCKDATA_CACHE("startup.eager-craftblockdata-cache"),
+    STARTUP_VALIDATE_CREATIVE_TABS("startup.validate-creative-tabs"),
+    STARTUP_VALIDATE_LOOT("startup.validate-loot"),
+    STARTUP_TEST_REGISTRIES("startup.test-registries"),
 
-    // 2. Worlds & Dimensions
-    WORLDS_CUSTOM_WORLDS("worlds.custom-worlds"),
-    WORLDS_PORTALS("worlds.portals"),
+    // 2. Caches (Eager vs Lazy)
+    CACHES_EAGER_BLOCKSTATE("caches.eager-blockstate-cache"),
+    CACHES_EAGER_CRAFTBLOCKDATA("caches.eager-craftblockdata-cache"),
+    CACHES_EAGER_MAP_COLOR("caches.eager-map-color-cache"),
 
-    // 3. Entities & AI
-    AI_ENABLED("entities.ai.enabled"),
-    AI_GOAL_SELECTOR("entities.ai.goal-selector"),
-    AI_BRAIN("entities.ai.brain"),
-    AI_PATHFINDING("entities.ai.pathfinding"),
-    AI_SENSORS("entities.ai.sensors"),
-    ENTITIES_COLLISIONS("entities.ai.collisions"),
+    // 3. Dimensions
+    DIMENSIONS_CUSTOM_WORLDS("dimensions.custom-worlds"),
+    DIMENSIONS_PORTALS("dimensions.portals"),
 
-    // 4. Chunks & Generation
+    // 4. Chunks & Tick Sub-features
     CHUNKS_STRUCTURES("chunks.structures"),
     CHUNKS_BIOME_DECORATION("chunks.biome-decoration"),
-    CHUNKS_TICKING("chunks.chunk-ticking"),
-    CHUNKS_RANDOM_TICKS("chunks.random-ticks"),
-    CHUNKS_BLOCK_TICKS("chunks.block-ticks"),
-    CHUNKS_FLUID_TICKS("chunks.fluid-ticks"),
+    CHUNKS_TICKING("chunks.ticking.enabled"),
+    CHUNKS_RANDOM_TICKS("chunks.ticking.sub-features.random-ticks"),
+    CHUNKS_BLOCK_TICKS("chunks.ticking.sub-features.block-ticks"),
+    CHUNKS_FLUID_TICKS("chunks.ticking.sub-features.fluid-ticks"),
 
-    // 5. Gameplay & Environment
-    GAMEPLAY_WEATHER("gameplay.weather"),
-    GAMEPLAY_RAIDS("gameplay.raids"),
-    GAMEPLAY_REDSTONE("gameplay.redstone"),
-    GAMEPLAY_NATURAL_SPAWNING("gameplay.natural-spawning"),
-    GAMEPLAY_CUSTOM_SPAWNERS("gameplay.custom-spawners"),
-    GAMEPLAY_MONSTERS("gameplay.monsters"),
-    GAMEPLAY_ANIMALS("gameplay.animals"),
+    // 5. Block Entities & Physics
+    BLOCK_ENTITIES_TICKING("block-entities.ticking.enabled"),
+    BLOCK_ENTITIES_HOPPERS("block-entities.ticking.sub-features.hoppers"),
+    PHYSICS_REDSTONE("blocks-and-physics.redstone"),
+    PHYSICS_BLOCK_GRAVITY("blocks-and-physics.block-gravity"),
+    PHYSICS_LEAF_DECAY("blocks-and-physics.leaf-decay"),
+    PHYSICS_FIRE_SPREAD("blocks-and-physics.fire-spread"),
+    PHYSICS_ITEM_PHYSICS("blocks-and-physics.item-physics"),
+
+    // 6. World Environment
+    ENV_DAYLIGHT_CYCLE("world-environment.daylight-cycle"),
+    ENV_WEATHER("world-environment.weather"),
+    ENV_RAIDS("world-environment.raids"),
+    ENV_SLEEP_CYCLE("world-environment.sleep-cycle"),
+    ENV_END_DRAGON_FIGHT("world-environment.end-dragon-fight"),
+
+    // 7. Spawning
+    SPAWNING_NATURAL("spawning.natural.enabled"),
+    SPAWNING_MONSTERS("spawning.natural.sub-features.monsters"),
+    SPAWNING_ANIMALS("spawning.natural.sub-features.animals"),
+    SPAWNING_CUSTOM_SPAWNERS("spawning.natural.sub-features.custom-spawners"),
+
+    // 8. Entities & AI
+    ENTITIES_AI_ENABLED("entities.ai.enabled"),
+    ENTITIES_AI_GOAL_SELECTOR("entities.ai.sub-features.goal-selector"),
+    ENTITIES_AI_BRAIN("entities.ai.sub-features.brain"),
+    ENTITIES_AI_PATHFINDING("entities.ai.sub-features.pathfinding"),
+    ENTITIES_AI_SENSORS("entities.ai.sub-features.sensors"),
+    ENTITIES_COLLISIONS("entities.collisions.entities"),
+    ENTITIES_PLAYER_COLLISIONS("entities.collisions.players"),
+
+    // 9. Gameplay & Datapacks
     GAMEPLAY_ADVANCEMENTS("gameplay.advancements"),
     GAMEPLAY_RECIPES("gameplay.recipes"),
     GAMEPLAY_LOOT_TABLES("gameplay.loot-tables"),
-    GAMEPLAY_WARDEN_AND_SLEEP("gameplay.warden-and-sleep"),
     GAMEPLAY_COMMAND_FUNCTIONS("gameplay.command-functions"),
 
-    // 6. Network & Analytics
+    // 10. Players
+    PLAYERS_DATA_SAVING("players.data-saving"),
+    PLAYERS_HUNGER("players.hunger"),
+    PLAYERS_STATISTICS("players.statistics"),
+    PLAYERS_WARDEN_TRACKER("players.warden-tracker"),
+
+    // 11. Network, Analytics & Status
     NETWORK_GENERATE_KEYPAIR("network.generate-keypair"),
-    ANALYTICS_METRICS_AND_PROFILER("network.analytics.metrics-and-profiler"),
+    ANALYTICS_BSTATS("network.analytics.bstats"),
+    ANALYTICS_SPARK("network.analytics.spark"),
+    ANALYTICS_TICK_MONITOR("network.analytics.tick-monitor"),
     ANALYTICS_DEBUG_SYNCHRONIZERS("network.analytics.debug-synchronizers"),
-    NETWORK_PLAYER_COLLISIONS("network.tracking.player-collisions"),
-    NETWORK_FULL_PACKET_BROADCAST("network.tracking.full-packet-broadcast"),
-    NETWORK_SERVER_PING_SAMPLE("network.tracking.server-ping-sample"),
-    NETWORK_TAB_LATENCY_UPDATES("network.tracking.tab-latency-updates"),
+    NETWORK_SERVER_PING_SAMPLE("network.player-list.server-ping-sample"),
+    NETWORK_TAB_LATENCY_UPDATES("network.player-list.tab-latency-updates"),
+    NETWORK_FULL_PACKET_BROADCAST("network.packet-range-clamping.full-packet-broadcast"),
 
-    // 7. Ephemeral Container Lifecycle & Storage
-    STORAGE_WORLD_SAVING("storage.ephemeral.world-saving"),
-    STORAGE_GRACEFUL_SHUTDOWN("storage.ephemeral.graceful-shutdown"),
+    // 12. Storage & System Lifecycle
+    STORAGE_WORLD_SAVING("storage.world-saving"),
+    SYSTEM_GRACEFUL_SHUTDOWN("system.lifecycle.graceful-shutdown"),
 
-    // 8. Players Lifecycle
-    PLAYERS_DATA_SAVING("players.lifecycle.player-data-saving"),
-    PLAYERS_HUNGER("players.lifecycle.hunger"),
-    PLAYERS_STATISTICS("players.lifecycle.statistics"),
-
-    // 9. World Time & Physics
-    WORLD_DAYLIGHT_CYCLE("world.daylight-cycle"),
-    PHYSICS_BLOCK_GRAVITY("world.physics.block-gravity"),
-    PHYSICS_HOPPER_TICKING("world.physics.hopper-ticking"),
-    PHYSICS_BLOCK_ENTITY_TICKING("world.physics.block-entity-ticking"),
-    PHYSICS_ITEM_PHYSICS("world.physics.item-physics"),
-    PHYSICS_LEAF_DECAY("world.physics.leaf-decay"),
-    PHYSICS_FIRE_SPREAD("world.physics.fire-spread"),
-
-    // 10. Compatibility & Legacy
+    // 13. Compatibility & Legacy
     LEGACY_PLUGIN_BYTECODE_REROUTING("compatibility.legacy.plugin-bytecode-rerouting"),
     LEGACY_BOOTSTRAP_DATA_TABLES("compatibility.legacy.bootstrap-data-tables"),
-    LEGACY_EAGER_MAP_COLOR_CACHE("compatibility.legacy.eager-map-color-cache"),
     LEGACY_VALIDATE_ENTITY_ATTRIBUTES("compatibility.legacy.validate-entity-attributes");
 
     static final int MAX_SUPPORTED_FEATURES = 128;
