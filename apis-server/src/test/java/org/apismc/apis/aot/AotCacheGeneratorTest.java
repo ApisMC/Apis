@@ -58,6 +58,81 @@ class AotCacheGeneratorTest {
             ),
             createCmd
         );
+
+        final List<String> filteredJvmArgs = AotCacheGenerator.filterAotJvmArgs(
+            List.of(
+                "-Xms2G",
+                "-Xmx3G",
+                "-XX:+UseParallelGC",
+                "-XX:AOTMode=off",
+                "-XX:AOTConfiguration=old.aotconf",
+                "-XX:AOTCache=old.aot",
+                "-Djdk.graal.CompilerConfiguration=community",
+                "--add-modules=jdk.incubator.vector"
+            )
+        );
+        assertEquals(
+            List.of(
+                "-Xms2G",
+                "-Xmx3G",
+                "-XX:+UseParallelGC",
+                "-Djdk.graal.CompilerConfiguration=community",
+                "--add-modules=jdk.incubator.vector"
+            ),
+            filteredJvmArgs
+        );
+
+        final List<String> recordWithInherited = AotCacheGenerator.buildRecordCommand(
+            javaBin,
+            filteredJvmArgs,
+            jarPath,
+            new String[] {"--generate-aot", "--configs-dir=configs"}
+        );
+        assertEquals(
+            List.of(
+                javaBin.toString(),
+                "-Xms2G",
+                "-Xmx3G",
+                "-XX:+UseParallelGC",
+                "-Djdk.graal.CompilerConfiguration=community",
+                "--add-modules=jdk.incubator.vector",
+                "-XX:AOTMode=record",
+                "-XX:AOTConfiguration=cache/apis.aotconf",
+                "-jar",
+                "apis-bundler-26.3-release.jar",
+                "--configs-dir=configs",
+                "--nogui",
+                "--aot-internal-warmup"
+            ),
+            recordWithInherited
+        );
+
+        final List<String> createWithInherited = AotCacheGenerator.buildCreateCommand(
+            javaBin,
+            filteredJvmArgs,
+            jarPath
+        );
+        assertEquals(
+            List.of(
+                javaBin.toString(),
+                "-Xms2G",
+                "-Xmx3G",
+                "-XX:+UseParallelGC",
+                "-Djdk.graal.CompilerConfiguration=community",
+                "--add-modules=jdk.incubator.vector",
+                "-XX:AOTMode=create",
+                "-XX:AOTConfiguration=cache/apis.aotconf",
+                "-XX:AOTCache=cache/apis.aot",
+                "-jar",
+                "apis-bundler-26.3-release.jar"
+            ),
+            createWithInherited
+        );
+
+        assertEquals(
+            "java -Xms2G -Xmx3G -XX:+UseParallelGC -Djdk.graal.CompilerConfiguration=community --add-modules=jdk.incubator.vector -XX:AOTCache=cache/apis.aot -jar apis-bundler-26.3-release.jar --nogui",
+            AotCacheGenerator.buildLaunchHint(filteredJvmArgs, jarPath)
+        );
     }
 
     @Test

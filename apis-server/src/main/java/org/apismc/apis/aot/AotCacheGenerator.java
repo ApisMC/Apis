@@ -4,6 +4,7 @@ import java.io.BufferedReader;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStreamReader;
+import java.lang.management.ManagementFactory;
 import java.net.URISyntaxException;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
@@ -128,9 +129,11 @@ public final class AotCacheGenerator {
             return 1;
         }
 
+        final List<String> inheritedJvmArgs = resolveInheritedJvmArgs();
+
         try {
             logInfo("Recording AOT profile with loaded plugins...");
-            final List<String> recordCmd = buildRecordCommand(javaBin, jarPath, originalArgs);
+            final List<String> recordCmd = buildRecordCommand(javaBin, inheritedJvmArgs, jarPath, originalArgs);
             final PhaseResult recordResult = runPhase(recordCmd, true);
             if (recordResult.eulaMissing) {
                 logError("Cannot record AOT profile: please accept eula.txt first.");
@@ -143,7 +146,7 @@ public final class AotCacheGenerator {
             }
 
             logInfo("Compiling AOT cache to " + AOT_CACHE_PATH + "...");
-            final List<String> createCmd = buildCreateCommand(javaBin, jarPath);
+            final List<String> createCmd = buildCreateCommand(javaBin, inheritedJvmArgs, jarPath);
             final PhaseResult createResult = runPhase(createCmd, false);
             if (createResult.exitCode != 0 || !Files.isRegularFile(aotCache) || fileSizeSafe(aotCache) <= 0L) {
                 logError("AOT cache compilation failed (exit code " + createResult.exitCode + ").");
@@ -154,7 +157,7 @@ public final class AotCacheGenerator {
             final double sizeMb = Files.size(aotCache) / (1024.0d * 1024.0d);
             logInfo(String.format(Locale.ROOT, "AOT cache generated successfully (%.1f MB).", sizeMb));
             logInfo("Run server using:");
-            System.out.println("java -XX:AOTCache=" + AOT_CACHE_PATH + " -jar " + jarPath.getFileName() + " --nogui");
+            System.out.println(buildLaunchHint(inheritedJvmArgs, jarPath));
             return 0;
         } catch (final IOException ex) {
             logError("I/O error during AOT generation: " + ex.getMessage());
@@ -187,9 +190,40 @@ public final class AotCacheGenerator {
         shutdownThread.start();
     }
 
+    static List<String> resolveInheritedJvmArgs() {
+        return filterAotJvmArgs(ManagementFactory.getRuntimeMXBean().getInputArguments());
+    }
+
+    static List<String> filterAotJvmArgs(final @Nullable List<String> inputArgs) {
+        if (inputArgs == null || inputArgs.isEmpty()) {
+            return List.of();
+        }
+        final List<String> filtered = new ArrayList<>(inputArgs.size());
+        for (final String arg : inputArgs) {
+            if (arg == null) {
+                continue;
+            }
+            final String trimmed = arg.trim();
+            if (!trimmed.isEmpty() && !isAotSpecificFlag(trimmed)) {
+                filtered.add(trimmed);
+            }
+        }
+        return List.copyOf(filtered);
+    }
+
     static List<String> buildRecordCommand(final Path javaBin, final Path jarPath, final String[] originalArgs) {
+        return buildRecordCommand(javaBin, List.of(), jarPath, originalArgs);
+    }
+
+    static List<String> buildRecordCommand(
+        final Path javaBin,
+        final List<String> inheritedJvmArgs,
+        final Path jarPath,
+        final String[] originalArgs
+    ) {
         final List<String> cmd = new ArrayList<>();
         cmd.add(javaBin.toString());
+        cmd.addAll(inheritedJvmArgs);
         cmd.add("-XX:AOTMode=record");
         cmd.add("-XX:AOTConfiguration=" + AOT_CONF_PATH);
         cmd.add("-jar");
@@ -203,14 +237,49 @@ public final class AotCacheGenerator {
     }
 
     static List<String> buildCreateCommand(final Path javaBin, final Path jarPath) {
-        return List.of(
-            javaBin.toString(),
-            "-XX:AOTMode=create",
-            "-XX:AOTConfiguration=" + AOT_CONF_PATH,
-            "-XX:AOTCache=" + AOT_CACHE_PATH,
-            "-jar",
-            jarPath.toString()
-        );
+        return buildCreateCommand(javaBin, List.of(), jarPath);
+    }
+
+    static List<String> buildCreateCommand(
+        final Path javaBin,
+        final List<String> inheritedJvmArgs,
+        final Path jarPath
+    ) {
+        final List<String> cmd = new ArrayList<>(inheritedJvmArgs.size() + 6);
+        cmd.add(javaBin.toString());
+        cmd.addAll(inheritedJvmArgs);
+        cmd.add("-XX:AOTMode=create");
+        cmd.add("-XX:AOTConfiguration=" + AOT_CONF_PATH);
+        cmd.add("-XX:AOTCache=" + AOT_CACHE_PATH);
+        cmd.add("-jar");
+        cmd.add(jarPath.toString());
+        return List.copyOf(cmd);
+    }
+
+    static String buildLaunchHint(final List<String> inheritedJvmArgs, final Path jarPath) {
+        final List<String> parts = new ArrayList<>(inheritedJvmArgs.size() + 5);
+        parts.add("java");
+        for (final String arg : inheritedJvmArgs) {
+            parts.add(formatShellToken(arg));
+        }
+        parts.add("-XX:AOTCache=" + AOT_CACHE_PATH);
+        parts.add("-jar");
+        parts.add(formatShellToken(jarPath.getFileName().toString()));
+        parts.add("--nogui");
+        return String.join(" ", parts);
+    }
+
+    private static boolean isAotSpecificFlag(final String arg) {
+        return "-XX:AOTMode".equals(arg) || arg.startsWith("-XX:AOTMode=")
+            || "-XX:AOTConfiguration".equals(arg) || arg.startsWith("-XX:AOTConfiguration=")
+            || "-XX:AOTCache".equals(arg) || arg.startsWith("-XX:AOTCache=");
+    }
+
+    private static String formatShellToken(final String token) {
+        if (token.indexOf(' ') >= 0 || token.indexOf('\t') >= 0) {
+            return '"' + token.replace("\"", "\\\"") + '"';
+        }
+        return token;
     }
 
     static boolean isAotLogLine(final @Nullable String rawLine) {
