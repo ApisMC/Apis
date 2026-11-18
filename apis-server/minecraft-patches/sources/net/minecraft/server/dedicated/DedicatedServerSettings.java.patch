@@ -1,0 +1,11 @@
+--- a/net/minecraft/server/dedicated/DedicatedServerSettings.java
++++ b/net/minecraft/server/dedicated/DedicatedServerSettings.java
+@@ -9,7 +_,7 @@
+ 
+     // CraftBukkit start
+     public DedicatedServerSettings(joptsimple.OptionSet options) {
+-        this.source = ((java.io.File) options.valueOf("config")).toPath();
++        this.source = org.apismc.apis.hooks.ApisHooks.resolveCliConfigFile(options, "config", "server.properties").toPath(); // Apis
+         this.properties = DedicatedServerProperties.fromFile(this.source, options);
+         // CraftBukkit end
+     }

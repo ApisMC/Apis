@@ -1,6 +1,13 @@
 --- a/net/minecraft/server/dedicated/DedicatedServer.java
 +++ b/net/minecraft/server/dedicated/DedicatedServer.java
-@@ -237,8 +_,9 @@
+@@ -231,14 +_,15 @@
+ 
+         // Spigot start
+         this.setPlayerList(new DedicatedPlayerList(this, this.registries(), this.playerDataStorage));
+-        org.spigotmc.SpigotConfig.init((java.io.File) this.options.valueOf("spigot-settings"));
++        org.spigotmc.SpigotConfig.init(org.apismc.apis.hooks.ApisHooks.resolveCliConfigFile(this.options, "spigot-settings", "spigot.yml")); // Apis
+         org.spigotmc.SpigotConfig.registerCommands();
+         // Spigot end
          // Paper start - initialize global and world-defaults configuration
          this.paperConfigurations.initializeGlobalConfiguration(this.registryAccess());
          this.paperConfigurations.initializeWorldDefaultsConfiguration(this.registryAccess());

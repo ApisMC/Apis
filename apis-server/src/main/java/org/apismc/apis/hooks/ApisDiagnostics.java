@@ -82,7 +82,7 @@ public final class ApisDiagnostics {
             return false;
         }
         final boolean userFile = RELOCATED_USER_FILES.contains(missingFile);
-        final String targetDir = userFile ? "users/" : "config/";
+        final String targetDir = userFile ? "users/" : "configs/";
         final String kind = userFile ? "file" : "configuration file";
         final String category = userFile ? "player data files" : "configs";
         ROOT_STYLE_LOGGER.error(

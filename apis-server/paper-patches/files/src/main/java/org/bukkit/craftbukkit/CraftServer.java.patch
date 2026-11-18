@@ -15,6 +15,20 @@
              MapPalette.setMapColorCache(new CraftMapColorCache(this.logger));
          }
          this.potionBrewer = new io.papermc.paper.potion.PaperPotionBrewer(console); // Paper - custom potion mixes
+@@ -469,11 +_,11 @@
+     }
+ 
+     private File getConfigFile() {
+-        return (File) this.console.options.valueOf("bukkit-settings");
++        return org.apismc.apis.hooks.ApisHooks.resolveCliConfigFile(this.console.options, "bukkit-settings", "bukkit.yml"); // Apis
+     }
+ 
+     private File getCommandsConfigFile() {
+-        return (File) this.console.options.valueOf("commands-settings");
++        return org.apismc.apis.hooks.ApisHooks.resolveCliConfigFile(this.console.options, "commands-settings", "commands.yml"); // Apis
+     }
+ 
+     private void overrideSpawnLimits() {
 @@ -486,6 +_,7 @@
  
      private void saveConfig() {
@@ -43,6 +57,24 @@
  
          try {
              this.playerList.getIpBans().load();
+@@ -966,7 +_,7 @@
+             this.logger.log(Level.WARNING, "Failed to load banned-players.json, " + ex.getMessage());
+         }
+ 
+-        org.spigotmc.SpigotConfig.init((File) this.console.options.valueOf("spigot-settings")); // Spigot
++        org.spigotmc.SpigotConfig.init(org.apismc.apis.hooks.ApisHooks.resolveCliConfigFile(this.console.options, "spigot-settings", "spigot.yml")); // Spigot // Apis
+         this.console.paperConfigurations.reloadConfigs(this.console);
+         for (ServerLevel world : this.console.getAllLevels()) {
+             // world.serverLevelData.setDifficulty(config.difficulty); // Paper - per level difficulty
+@@ -1095,7 +_,7 @@
+     }
+ 
+     private void loadCustomPermissions() {
+-        File file = new File(this.configuration.getString("settings.permissions-file"));
++        File file = org.apismc.apis.hooks.ApisHooks.resolveConfigRelativeFile(this.configuration.getString("settings.permissions-file"), "permissions.yml"); // Apis - Store permissions.yml inside <configs-dir>
+         if (!file.isFile()) {
+             return;
+         }
 @@ -1150,6 +_,9 @@
          Preconditions.checkState(this.console.getAllLevels().iterator().hasNext(), "Cannot create additional worlds on STARTUP");
          //Preconditions.checkState(!this.console.isIteratingOverLevels, "Cannot create a world while worlds are being ticked"); // Paper - Cat - Temp disable. We'll see how this goes.

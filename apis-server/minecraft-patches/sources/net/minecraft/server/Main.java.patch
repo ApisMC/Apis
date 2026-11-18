@@ -13,18 +13,34 @@
              // Paper end - Perf: Init DataConverter asynchronously
              Util.startTimerHackThread();
 -            Path settingsFile = Paths.get("server.properties");
-+            Path settingsFile = ((File) options.valueOf("config")).toPath(); // Apis
++            Path settingsFile = org.apismc.apis.hooks.ApisHooks.resolveCliConfigFile(options, "config", "server.properties").toPath(); // Apis
              DedicatedServerSettings settings = new DedicatedServerSettings(options); // CraftBukkit - CLI argument support
              settings.forceSave();
              // Paper start
-@@ -142,6 +_,7 @@
+@@ -133,18 +_,19 @@
+             Path eulaFile = Paths.get("eula.txt");
+             Eula eula = new Eula(eulaFile);
+             // Paper start - load config files early for access below if needed
+-            org.bukkit.configuration.file.YamlConfiguration bukkitConfiguration = io.papermc.paper.configuration.PaperConfigurations.loadLegacyConfigFile((File) options.valueOf("bukkit-settings"));
+-            org.bukkit.configuration.file.YamlConfiguration spigotConfiguration = io.papermc.paper.configuration.PaperConfigurations.loadLegacyConfigFile((File) options.valueOf("spigot-settings"));
++            org.bukkit.configuration.file.YamlConfiguration bukkitConfiguration = io.papermc.paper.configuration.PaperConfigurations.loadLegacyConfigFile(org.apismc.apis.hooks.ApisHooks.resolveCliConfigFile(options, "bukkit-settings", "bukkit.yml")); // Apis
++            org.bukkit.configuration.file.YamlConfiguration spigotConfiguration = io.papermc.paper.configuration.PaperConfigurations.loadLegacyConfigFile(org.apismc.apis.hooks.ApisHooks.resolveCliConfigFile(options, "spigot-settings", "spigot.yml")); // Apis
+             // Paper end - load config files early for access below if needed
+             if (options.has("initSettings")) { // CraftBukkit
+                 // CraftBukkit start - SPIGOT-5761: Create bukkit.yml and commands.yml if not present
+-                File configFile = (File) options.valueOf("bukkit-settings");
++                File configFile = org.apismc.apis.hooks.ApisHooks.resolveCliConfigFile(options, "bukkit-settings", "bukkit.yml"); // Apis
                  org.bukkit.configuration.file.YamlConfiguration configuration = org.bukkit.configuration.file.YamlConfiguration.loadConfiguration(configFile);
                  configuration.options().copyDefaults(true);
                  configuration.setDefaults(org.bukkit.configuration.file.YamlConfiguration.loadConfiguration(new java.io.InputStreamReader(Main.class.getClassLoader().getResourceAsStream("configurations/bukkit.yml"), java.nio.charset.StandardCharsets.UTF_8)));
 +                org.apismc.apis.config.ApisConfigSync.stripLegacyBukkitSettings(configuration); // Apis
                  configuration.save(configFile);
  
-                 File commandFile = (File) options.valueOf("commands-settings");
+-                File commandFile = (File) options.valueOf("commands-settings");
++                File commandFile = org.apismc.apis.hooks.ApisHooks.resolveCliConfigFile(options, "commands-settings", "commands.yml"); // Apis
+                 org.bukkit.configuration.file.YamlConfiguration commandsConfiguration = org.bukkit.configuration.file.YamlConfiguration.loadConfiguration(commandFile);
+                 commandsConfiguration.options().copyDefaults(true);
+                 commandsConfiguration.setDefaults(org.bukkit.configuration.file.YamlConfiguration.loadConfiguration(new java.io.InputStreamReader(Main.class.getClassLoader().getResourceAsStream("configurations/commands.yml"), java.nio.charset.StandardCharsets.UTF_8)));
 @@ -178,22 +_,25 @@
              }
              // Paper end - Detect headless JRE
@@ -41,7 +57,7 @@
              } else {
                  universePath = new File(bukkitConfiguration.getString("settings.world-container", "."));
              }
-+            universePath = org.apismc.apis.hooks.ApisHooks.resolveUniversePath(universePath); // Apis - Isolate standalone worlds into worlds/
++            universePath = org.apismc.apis.hooks.ApisHooks.resolveUniversePath(options, bukkitConfiguration, universePath); // Apis - Resolve --worlds-dir / world-container
 +            File userCacheFile = org.apismc.apis.config.ApisPaths.resolveUserFile(universePath, Services.USERID_CACHE_FILE, options.has("universe")); // Apis
              // Paper end - fix SPIGOT-5824
              Services services = Services.create(com.destroystokyo.paper.profile.PaperServicesDiscoveryService.create(Proxy.NO_PROXY), universePath, userCacheFile, options); // Paper - pass OptionSet to load paper config files; override authentication service; fix world-container

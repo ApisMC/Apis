@@ -10,7 +10,7 @@ import org.bukkit.command.CommandSender;
 import org.jspecify.annotations.Nullable;
 
 /**
- * Renders MiniMessage command responses configured in {@code config/apis.yml} with mute-on-empty support.
+ * Renders MiniMessage command responses configured in {@code configs/apis.yml} with mute-on-empty support.
  */
 public final class ApisMessageRenderer {
 

@@ -1,0 +1,11 @@
+--- a/src/main/java/io/papermc/paper/plugin/entrypoint/classloader/PaperPluginClassLoader.java
++++ b/src/main/java/io/papermc/paper/plugin/entrypoint/classloader/PaperPluginClassLoader.java
+@@ -173,7 +_,7 @@
+             List.of() // Libraries
+         );
+ 
+-        File dataFolder = new File(Bukkit.getPluginsFolder(), pluginDescriptionFile.getName());
++        File dataFolder = org.apismc.apis.hooks.ApisHooks.resolvePluginDataFolder(pluginDescriptionFile.getName()).toFile(); // Apis - Redirect plugin data to <configs-dir>
+ 
+         plugin.init(Bukkit.getServer(), pluginDescriptionFile, dataFolder, this.source.toFile(), this, config, this.logger);
+ 

@@ -1,0 +1,11 @@
+--- a/src/main/java/io/papermc/paper/plugin/provider/type/spigot/SpigotPluginProvider.java
++++ b/src/main/java/io/papermc/paper/plugin/provider/type/spigot/SpigotPluginProvider.java
+@@ -69,7 +_,7 @@
+         Server server = Bukkit.getServer();
+         try {
+ 
+-            final File parentFile = server.getPluginsFolder(); // Paper
++            final File parentFile = org.apismc.apis.hooks.ApisHooks.resolvePluginDataRoot().toFile(); // Paper // Apis - Redirect plugin data to <configs-dir>
+             final File dataFolder = new File(parentFile, this.description.getName());
+             @SuppressWarnings("deprecation") final File oldDataFolder = new File(parentFile, this.description.getRawName());
+ 

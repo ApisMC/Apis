@@ -13,6 +13,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Stream;
+import joptsimple.OptionSet;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.core.HolderSet;
@@ -32,9 +33,11 @@ import net.minecraft.world.level.storage.LevelData;
 import net.minecraft.world.phys.Vec2;
 import net.minecraft.world.phys.Vec3;
 import org.apismc.apis.config.ApisConfig;
+import org.apismc.apis.config.ApisPaths;
 import org.bukkit.Location;
 import org.bukkit.World;
 import org.bukkit.WorldCreator;
+import org.bukkit.configuration.file.YamlConfiguration;
 import org.bukkit.craftbukkit.CraftWorld;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
@@ -52,14 +55,14 @@ public final class StandaloneWorldManager {
     private static final Map<String, WorldEntry> WORLD_CACHE = new ConcurrentHashMap<>();
     private static final ThreadLocal<Boolean> INTERNAL_DISCOVERY = ThreadLocal.withInitial(() -> Boolean.FALSE);
 
-    private static volatile Path containerRoot = Path.of(WORLDS_CONTAINER);
+    private static volatile Path containerRoot = ApisPaths.worldsDir();
     private static volatile boolean fallbackWorldNewOnBoot;
 
     private StandaloneWorldManager() {
     }
 
     /**
-     * Returns whether standalone world architecture is enabled in {@code config/apis.yml}.
+     * Returns whether standalone world architecture is enabled in {@code configs/apis.yml}.
      *
      * @return {@code true} if {@code dimensions.mode == standalone}
      */
@@ -86,23 +89,42 @@ public final class StandaloneWorldManager {
     }
 
     /**
-     * Returns {@code worlds/} container directory when standalone mode is active and ensures it exists.
+     * Resolves the server world container directory using priority:
+     * {@code --worlds-dir} &gt; explicit {@code -W/--world-dir/--universe} &gt; {@code bukkit.yml world-container}
+     * (in vanilla mode) &gt; default {@code worlds/}, creating the target directory if missing.
      *
-     * @param vanillaUniverse standard server universe path
+     * @param options             parsed CLI options
+     * @param bukkitConfiguration loaded {@code bukkit.yml} (nullable)
+     * @param vanillaUniverse     legacy vanilla universe candidate
      * @return resolved universe directory
      */
-    public static File resolveUniversePath(final File vanillaUniverse) {
-        if (!isStandaloneMode()) {
-            return vanillaUniverse;
+    public static File resolveUniversePath(
+        final OptionSet options,
+        final @Nullable YamlConfiguration bukkitConfiguration,
+        final File vanillaUniverse
+    ) {
+        final Path resolved;
+        if (options.has("worlds-dir")) {
+            resolved = ((Path) options.valueOf("worlds-dir")).toAbsolutePath().normalize();
+        } else if (options.has("universe")) {
+            resolved = ((File) options.valueOf("universe")).toPath().toAbsolutePath().normalize();
+        } else if (!isStandaloneMode()
+            && bukkitConfiguration != null
+            && bukkitConfiguration.contains("settings.world-container")) {
+            final String configured = bukkitConfiguration.getString("settings.world-container", ".");
+            resolved = configured == null || configured.isBlank() || ".".equals(configured.trim())
+                ? ApisPaths.worldsDir()
+                : Path.of(configured.trim()).toAbsolutePath().normalize();
+        } else {
+            resolved = ApisPaths.worldsDir();
         }
-        final Path path = Path.of(WORLDS_CONTAINER);
         try {
-            Files.createDirectories(path);
+            Files.createDirectories(resolved);
         } catch (final IOException ex) {
-            LOGGER.error("Failed to create standalone worlds directory '{}': {}", path, ex.getMessage());
+            LOGGER.error("Failed to create worlds directory '{}': {}", resolved, ex.getMessage());
         }
-        containerRoot = path;
-        return path.toFile();
+        containerRoot = resolved;
+        return resolved.toFile();
     }
 
     /**
@@ -485,7 +507,7 @@ public final class StandaloneWorldManager {
         DIMENSION_FOLDERS.clear();
         WORLD_CACHE.clear();
         fallbackWorldNewOnBoot = false;
-        containerRoot = Path.of(WORLDS_CONTAINER);
+        containerRoot = ApisPaths.worldsDir();
     }
 
     private static boolean isAllowedTargetWorld(final MinecraftServer server, final World world) {

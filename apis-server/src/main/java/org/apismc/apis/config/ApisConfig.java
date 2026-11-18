@@ -50,7 +50,7 @@ public final class ApisConfig {
         """;
 
     private static volatile ApisConfig instance = new ApisConfig();
-    private static volatile Path configPath = Path.of(ApisPaths.CONFIG_DIR, DEFAULT_FILE_NAME);
+    private static volatile Path configPath = Path.of(ApisPaths.DEFAULT_CONFIGS_DIR, DEFAULT_FILE_NAME);
 
     @Setting("startup")
     @Comment("Bootstrap, discovery & validation switches at cold boot | Прапори холодного старту, перевірок та завантаження датапаків")

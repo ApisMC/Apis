@@ -1,0 +1,11 @@
+--- a/src/main/java/com/destroystokyo/paper/Metrics.java
++++ b/src/main/java/com/destroystokyo/paper/Metrics.java
+@@ -563,7 +_,7 @@
+     public static class PaperMetrics {
+         public static void startMetrics() {
+             // Get the config file
+-            File configFile = new File(new File((File) MinecraftServer.getServer().options.valueOf("plugins"), "bStats"), "config.yml");
++            File configFile = new File(new File(org.apismc.apis.hooks.ApisHooks.resolvePluginDataRoot().toFile(), "bStats"), "config.yml"); // Apis - Redirect bStats config to <configs-dir>
+             YamlConfiguration config = YamlConfiguration.loadConfiguration(configFile);
+ 
+             // Check if the config file exists

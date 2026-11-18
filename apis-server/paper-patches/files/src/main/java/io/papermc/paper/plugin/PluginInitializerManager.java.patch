@@ -1,0 +1,11 @@
+--- a/src/main/java/io/papermc/paper/plugin/PluginInitializerManager.java
++++ b/src/main/java/io/papermc/paper/plugin/PluginInitializerManager.java
+@@ -35,7 +_,7 @@
+ 
+     private static PluginInitializerManager parse(@NotNull final OptionSet minecraftOptionSet) throws Exception {
+         // We have to load the bukkit configuration inorder to get the update folder location.
+-        final File configFileLocationBukkit = (File) minecraftOptionSet.valueOf("bukkit-settings");
++        final File configFileLocationBukkit = org.apismc.apis.hooks.ApisHooks.resolveCliConfigFile(minecraftOptionSet, "bukkit-settings", "bukkit.yml"); // Apis
+ 
+         final Path pluginDirectory = ((File) minecraftOptionSet.valueOf("plugins")).toPath();
+ 

@@ -71,7 +71,7 @@ class StandaloneWorldTest {
 
     @Test
     void resolvesStandaloneWorldFoldersDirectlyInsideWorldsDir(final @TempDir Path tempDir) throws IOException {
-        final Path cfgPath = tempDir.resolve("config").resolve("apis.yml");
+        final Path cfgPath = tempDir.resolve("configs").resolve("apis.yml");
         ApisConfig.loadEarly(cfgPath);
 
         final Path worldsRoot = tempDir.resolve("worlds");

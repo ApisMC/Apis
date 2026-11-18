@@ -14,6 +14,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Supplier;
+import joptsimple.OptionSet;
 import net.kyori.adventure.key.Key;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.core.MappedRegistry;
@@ -44,6 +45,7 @@ import org.apismc.apis.world.ApisVoidChunkGenerator;
 import org.apismc.apis.world.StandaloneWorldManager;
 import org.bukkit.NamespacedKey;
 import org.bukkit.WorldCreator;
+import org.bukkit.configuration.file.YamlConfiguration;
 import org.bukkit.craftbukkit.util.CraftNamespacedKey;
 import org.bukkit.generator.BiomeProvider;
 import org.jspecify.annotations.Nullable;
@@ -611,13 +613,45 @@ public final class ApisHooks {
         return FeatureRegistry.isDisabled(Feature.PHYSICS_FIRE_SPREAD);
     }
 
-    // 10. Standalone Worlds Architecture
+    // 10. Standalone Worlds & Organized Directories Architecture
+    public static void configureCliDirectories(final OptionSet options) {
+        ApisPaths.configureFromOptions(options);
+    }
+
+    public static File resolveCliConfigFile(
+        final OptionSet options,
+        final String optionName,
+        final String defaultFileName
+    ) {
+        return ApisPaths.resolveOptionConfigFile(options, optionName, defaultFileName);
+    }
+
+    public static Path resolvePaperDir(final OptionSet options) {
+        return ApisPaths.resolvePaperDir(options);
+    }
+
+    public static Path resolvePluginDataRoot() {
+        return ApisPaths.configsDir();
+    }
+
+    public static Path resolvePluginDataFolder(final String pluginName) {
+        return ApisPaths.resolvePluginDataFolder(pluginName);
+    }
+
+    public static File resolveConfigRelativeFile(final @Nullable String configuredPath, final String defaultFileName) {
+        return ApisPaths.resolveConfigRelativeFile(configuredPath, defaultFileName);
+    }
+
     public static boolean isStandaloneWorldsMode() {
         return StandaloneWorldManager.isStandaloneMode();
     }
 
-    public static File resolveUniversePath(final File vanillaUniverse) {
-        return StandaloneWorldManager.resolveUniversePath(vanillaUniverse);
+    public static File resolveUniversePath(
+        final OptionSet options,
+        final YamlConfiguration bukkitConfiguration,
+        final File vanillaUniverse
+    ) {
+        return StandaloneWorldManager.resolveUniversePath(options, bukkitConfiguration, vanillaUniverse);
     }
 
     public static String resolveStartupLevelName(final String vanillaLevelName) {

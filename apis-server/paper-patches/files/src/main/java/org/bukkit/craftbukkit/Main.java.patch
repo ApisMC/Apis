@@ -1,11 +1,26 @@
 --- a/src/main/java/org/bukkit/craftbukkit/Main.java
 +++ b/src/main/java/org/bukkit/craftbukkit/Main.java
-@@ -35,7 +_,7 @@
+@@ -32,10 +_,22 @@
+             {
+                 this.acceptsAll(asList("?", "help"), "Show the help");
+ 
++                this.accepts("configs-dir", "Base directory for server configurations and plugin data") // Apis
++                        .withRequiredArg()
++                        .withValuesConvertedBy(new PathConverter())
++                        .defaultsTo(java.nio.file.Path.of(org.apismc.apis.config.ApisPaths.DEFAULT_CONFIGS_DIR))
++                        .describedAs("Config directory");
++
++                this.accepts("worlds-dir", "Base directory for standalone and vanilla world containers") // Apis
++                        .withRequiredArg()
++                        .withValuesConvertedBy(new PathConverter())
++                        .defaultsTo(java.nio.file.Path.of(org.apismc.apis.config.ApisPaths.DEFAULT_WORLDS_DIR))
++                        .describedAs("Worlds directory");
++
                  this.acceptsAll(asList("c", "config"), "Properties file to use")
                          .withRequiredArg()
                          .ofType(File.class)
 -                        .defaultsTo(new File("server.properties"))
-+                        .defaultsTo(org.apismc.apis.config.ApisPaths.resolveConfigFile("server.properties"))
++                        .defaultsTo(new File(org.apismc.apis.config.ApisPaths.DEFAULT_CONFIGS_DIR, "server.properties"))
                          .describedAs("Properties file");
  
                  this.acceptsAll(asList("P", "plugins"), "Plugin directory to use")
@@ -14,14 +29,14 @@
                          .withRequiredArg()
                          .ofType(File.class)
 -                        .defaultsTo(new File("bukkit.yml"))
-+                        .defaultsTo(org.apismc.apis.config.ApisPaths.resolveConfigFile("bukkit.yml"))
++                        .defaultsTo(new File(org.apismc.apis.config.ApisPaths.DEFAULT_CONFIGS_DIR, "bukkit.yml"))
                          .describedAs("Yml file");
  
                  this.acceptsAll(asList("C", "commands-settings"), "File for command settings")
                          .withRequiredArg()
                          .ofType(File.class)
 -                        .defaultsTo(new File("commands.yml"))
-+                        .defaultsTo(org.apismc.apis.config.ApisPaths.resolveConfigFile("commands.yml"))
++                        .defaultsTo(new File(org.apismc.apis.config.ApisPaths.DEFAULT_CONFIGS_DIR, "commands.yml"))
                          .describedAs("Yml file");
  
                  this.accepts("forceUpgrade", "Whether to force a world upgrade");
@@ -35,7 +50,7 @@
                          .withRequiredArg()
                          .ofType(File.class)
 -                        .defaultsTo(new File("spigot.yml"))
-+                        .defaultsTo(org.apismc.apis.config.ApisPaths.resolveConfigFile("spigot.yml"))
++                        .defaultsTo(new File(org.apismc.apis.config.ApisPaths.DEFAULT_CONFIGS_DIR, "spigot.yml"))
                          .describedAs("Yml file");
  
                  this.acceptsAll(asList("paper-dir", "paper-settings-directory"), "Directory for Paper settings")
@@ -44,7 +59,7 @@
                          .withRequiredArg()
                          .ofType(File.class)
 -                        .defaultsTo(new File("paper.yml"))
-+                        .defaultsTo(org.apismc.apis.config.ApisPaths.resolveConfigFile("paper.yml"))
++                        .defaultsTo(new File(org.apismc.apis.config.ApisPaths.DEFAULT_CONFIGS_DIR, "paper.yml"))
                          .describedAs("Yml file");
  
                  this.acceptsAll(asList("add-plugin", "add-extra-plugin-jar"), "Specify paths to extra plugin jars to be loaded in addition to those in the plugins folder. This argument can be specified multiple times, once for each extra plugin jar path.")
@@ -70,15 +85,17 @@
          } catch (joptsimple.OptionException ex) {
              Logger.getLogger(Main.class.getName()).log(Level.SEVERE, ex.getLocalizedMessage());
          }
-@@ -168,6 +_,8 @@
-             }
+@@ -169,6 +_,10 @@
          } else if (options.has("v")) {
              System.out.println(CraftServer.class.getPackage().getImplementationVersion());
-+        } else if (options.has("generate-aot")) { // Apis - Two-phase AOT cache generator
-+            System.exit(org.apismc.apis.aot.AotCacheGenerator.generate(args, Main.class));
          } else {
++            org.apismc.apis.hooks.ApisHooks.configureCliDirectories(options); // Apis - Resolve and create --configs-dir / --worlds-dir
++            if (options.has("generate-aot")) { // Apis - Two-phase AOT cache generator
++                System.exit(org.apismc.apis.aot.AotCacheGenerator.generate(args, Main.class));
++            }
              // Do you love Java using + and ! as string based identifiers? I sure do!
              String path = new File(".").getAbsolutePath();
+             if (path.contains("!") || path.contains("+")) {
 @@ -197,7 +_,7 @@
                      useJline = false;
                  }

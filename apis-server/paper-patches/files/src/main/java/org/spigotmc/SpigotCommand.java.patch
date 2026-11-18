@@ -1,0 +1,11 @@
+--- a/src/main/java/org/spigotmc/SpigotCommand.java
++++ b/src/main/java/org/spigotmc/SpigotCommand.java
+@@ -36,7 +_,7 @@
+         );
+ 
+         MinecraftServer console = MinecraftServer.getServer();
+-        org.spigotmc.SpigotConfig.init((File) console.options.valueOf("spigot-settings"));
++        org.spigotmc.SpigotConfig.init(org.apismc.apis.hooks.ApisHooks.resolveCliConfigFile(console.options, "spigot-settings", "spigot.yml")); // Apis
+         for (ServerLevel world : console.getAllLevels()) {
+             world.spigotConfig.init();
+         }
