@@ -6,11 +6,14 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Comparator;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Stream;
 import joptsimple.OptionSet;
@@ -22,6 +25,8 @@ import net.minecraft.resources.Identifier;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.level.GameType;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.biome.Biomes;
 import net.minecraft.world.level.block.Blocks;
@@ -34,11 +39,17 @@ import net.minecraft.world.phys.Vec2;
 import net.minecraft.world.phys.Vec3;
 import org.apismc.apis.config.ApisConfig;
 import org.apismc.apis.config.ApisPaths;
+import org.apismc.apis.feature.Feature;
+import org.apismc.apis.feature.FeatureRegistry;
+import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.World;
 import org.bukkit.WorldCreator;
 import org.bukkit.configuration.file.YamlConfiguration;
 import org.bukkit.craftbukkit.CraftWorld;
+import org.bukkit.entity.Player;
+import org.bukkit.event.player.PlayerGameModeChangeEvent;
+import org.bukkit.event.player.PlayerTeleportEvent;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -286,38 +297,15 @@ public final class StandaloneWorldManager {
 
         final String fallbackName = fallbackWorldName();
         for (final String folder : discoveredFolders) {
-            if (folder.equalsIgnoreCase(fallbackName) || server.server.getWorld(folder) != null) {
+            if (folder.equalsIgnoreCase(fallbackName) || resolveLoadedStandaloneWorld(server, folder) != null) {
                 continue;
             }
-            final String normalizedKey = folder.toLowerCase(Locale.ROOT).replace(' ', '_');
-            if (Identifier.tryParse("minecraft:" + normalizedKey) == null) {
+            if (!isValidWorldFolderName(folder)) {
                 LOGGER.warn("Skipping invalid standalone world directory name '{}'.", folder);
                 continue;
             }
-            final Path worldDir = root.resolve(folder);
-            final StandaloneWorldConfig worldCfg = StandaloneWorldConfig.loadOrCreate(worldDir);
-            cacheConfig(folder, worldDir, worldCfg);
-
-            final WorldCreator creator = new WorldCreator(folder)
-                .generator(ApisVoidChunkGenerator.INSTANCE)
-                .biomeProvider(ApisVoidChunkGenerator.VOID_BIOME_PROVIDER)
-                .generateStructures(false);
-            final ResourceKey<Level> dimensionKey = ResourceKey.create(
-                Registries.DIMENSION,
-                Identifier.fromNamespaceAndPath("minecraft", normalizedKey)
-            );
-            DIMENSION_FOLDERS.put(dimensionKey, folder);
-
-            INTERNAL_DISCOVERY.set(Boolean.TRUE);
-            final @Nullable World loaded;
-            try {
-                loaded = server.server.createWorld(creator);
-            } finally {
-                INTERNAL_DISCOVERY.set(Boolean.FALSE);
-            }
-            if (loaded instanceof CraftWorld craftWorld) {
-                applySpawnToLevel(craftWorld.getHandle(), worldCfg);
-                LOGGER.info("Auto-loaded standalone world '{}' from {}.", folder, worldDir);
+            if (loadWorldFromDisk(server, root, folder) != null) {
+                LOGGER.info("Auto-loaded standalone world '{}' from {}.", folder, root.resolve(folder));
             }
         }
     }
@@ -501,6 +489,285 @@ public final class StandaloneWorldManager {
     }
 
     /**
+     * Resolves the configured default {@link GameType} from {@code world.yml} for {@code level}.
+     *
+     * @param level target server level
+     * @return configured {@link GameType}
+     */
+    public static GameType resolveWorldGameMode(final ServerLevel level) {
+        return getOrLoadConfig(level).toGameType();
+    }
+
+    /**
+     * Enforces {@code default-game-mode} from the player's current world {@code world.yml} in standalone mode.
+     *
+     * @param player            target player
+     * @param sendNetworkUpdate whether to send game mode change packets ({@code false} before login packet)
+     */
+    public static void applyWorldGameMode(final ServerPlayer player, final boolean sendNetworkUpdate) {
+        if (!isStandaloneMode()) {
+            return;
+        }
+        final GameType targetMode = resolveWorldGameMode(player.level());
+        if (!sendNetworkUpdate) {
+            player.applySilentGameMode(targetMode);
+            return;
+        }
+        if (player.gameMode.getGameModeForPlayer() != targetMode) {
+            player.setGameMode(targetMode, PlayerGameModeChangeEvent.Cause.DEFAULT_GAMEMODE, null);
+        }
+    }
+
+    /**
+     * Checks whether {@code world} is the protected base fallback world ({@code Level.OVERWORLD}
+     * or configured {@code dimensions.fallback-world}).
+     *
+     * @param server active server
+     * @param world  candidate Bukkit world
+     * @return {@code true} if base world
+     */
+    public static boolean isFallbackWorld(final MinecraftServer server, final World world) {
+        if (world instanceof CraftWorld craftWorld && Level.OVERWORLD.equals(craftWorld.getHandle().dimension())) {
+            return true;
+        }
+        final @Nullable String fallbackName = fallbackWorldName();
+        return fallbackName != null && !fallbackName.isBlank() && world.getName().equalsIgnoreCase(fallbackName);
+    }
+
+    /**
+     * Resolves the currently configured and loaded base fallback world, or {@code null} if unassigned or unloaded.
+     *
+     * @param server active server
+     * @return loaded fallback {@link World}, or {@code null}
+     */
+    public static @Nullable World resolveValidFallbackWorld(final MinecraftServer server) {
+        final @Nullable String fallbackName = fallbackWorldName();
+        if (fallbackName == null || fallbackName.isBlank()) {
+            return null;
+        }
+        final @Nullable World exact = server.server.getWorld(fallbackName);
+        if (exact != null) {
+            return exact;
+        }
+        for (final World world : server.server.getWorlds()) {
+            if (world.getName().equalsIgnoreCase(fallbackName)) {
+                return world;
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Lists unloaded standalone world directory names present in {@code worlds/} that can be loaded.
+     *
+     * @param server active server
+     * @return sorted list of unloaded world names
+     */
+    public static List<String> getUnloadedStandaloneWorldNames(final MinecraftServer server) {
+        final Path root = containerRoot(server);
+        if (!Files.isDirectory(root)) {
+            return List.of();
+        }
+        final Set<String> loadedLower = new HashSet<>();
+        for (final ServerLevel level : server.getAllLevels()) {
+            loadedLower.add(level.getWorld().getName().toLowerCase(Locale.ROOT));
+        }
+        final @Nullable String fallbackName = fallbackWorldName();
+        final List<String> unloaded = new ArrayList<>();
+        try (Stream<Path> stream = Files.list(root)) {
+            stream.filter(Files::isDirectory)
+                .map(path -> path.getFileName().toString())
+                .filter(name -> !name.startsWith("."))
+                .filter(StandaloneWorldManager::isValidWorldFolderName)
+                .filter(name -> !loadedLower.contains(name.toLowerCase(Locale.ROOT)))
+                .filter(name -> fallbackName == null || !name.equalsIgnoreCase(fallbackName))
+                .sorted(String.CASE_INSENSITIVE_ORDER)
+                .forEach(unloaded::add);
+        } catch (IOException _) {
+        }
+        return List.copyOf(unloaded);
+    }
+
+    /**
+     * Lists loaded standalone world names that are eligible for unloading (excluding the base fallback world).
+     *
+     * @param server active server
+     * @return sorted list of unloadable world names
+     */
+    public static List<String> getUnloadableStandaloneWorldNames(final MinecraftServer server) {
+        final List<String> result = new ArrayList<>();
+        for (final String name : getLoadedStandaloneWorldNames(server)) {
+            final @Nullable World world = resolveLoadedStandaloneWorld(server, name);
+            if (world != null && !isFallbackWorld(server, world)) {
+                result.add(world.getName());
+            }
+        }
+        return List.copyOf(result);
+    }
+
+    /**
+     * Dynamically loads a standalone world folder from {@code worlds/} into memory.
+     *
+     * @param server    active server
+     * @param worldName requested folder name
+     * @return operation outcome
+     */
+    public static LoadResult loadStandaloneWorld(final MinecraftServer server, final String worldName) {
+        if (resolveLoadedStandaloneWorld(server, worldName) != null) {
+            return new LoadResult(LoadStatus.ALREADY_LOADED, worldName);
+        }
+        final Path root = containerRoot(server);
+        final @Nullable String resolvedFolder = findDiskFolderCaseInsensitive(root, worldName);
+        if (resolvedFolder == null || !isValidWorldFolderName(resolvedFolder)) {
+            return new LoadResult(LoadStatus.NOT_FOUND_ON_DISK, worldName);
+        }
+        final @Nullable World loaded = loadWorldFromDisk(server, root, resolvedFolder);
+        if (loaded == null) {
+            return new LoadResult(LoadStatus.FAILED, resolvedFolder);
+        }
+        return new LoadResult(LoadStatus.LOADED, loaded.getName());
+    }
+
+    /**
+     * Safely evacuates players to the base fallback world and unloads a standalone non-base world.
+     *
+     * @param server    active server
+     * @param worldName target loaded world name
+     * @return operation outcome
+     */
+    public static UnloadResult unloadStandaloneWorld(final MinecraftServer server, final String worldName) {
+        final @Nullable World targetWorld = resolveLoadedWorldAnyCase(server, worldName);
+        if (targetWorld == null) {
+            final @Nullable String fallbackName = fallbackWorldName();
+            if (fallbackName != null && fallbackName.equalsIgnoreCase(worldName)) {
+                return new UnloadResult(UnloadStatus.CANNOT_UNLOAD_FALLBACK, worldName, fallbackName, 0);
+            }
+            return new UnloadResult(UnloadStatus.NOT_LOADED, worldName, "", 0);
+        }
+        if (isFallbackWorld(server, targetWorld)) {
+            return new UnloadResult(UnloadStatus.CANNOT_UNLOAD_FALLBACK, targetWorld.getName(), targetWorld.getName(), 0);
+        }
+        final @Nullable World fallbackWorld = resolveValidFallbackWorld(server);
+        if (fallbackWorld == null || targetWorld.equals(fallbackWorld)) {
+            return new UnloadResult(UnloadStatus.NO_FALLBACK_WORLD, targetWorld.getName(), "", 0);
+        }
+
+        final List<UUID> evacuated = evacuatePlayers(targetWorld, fallbackWorld);
+        if (!targetWorld.getPlayers().isEmpty()) {
+            return new UnloadResult(UnloadStatus.FAILED, targetWorld.getName(), fallbackWorld.getName(), evacuated.size());
+        }
+
+        final boolean saveChunks = FeatureRegistry.isEnabled(Feature.STORAGE_WORLD_SAVING);
+        if (!unloadWorldAndClearCache(server, targetWorld, saveChunks)) {
+            return new UnloadResult(UnloadStatus.FAILED, targetWorld.getName(), fallbackWorld.getName(), evacuated.size());
+        }
+        return new UnloadResult(UnloadStatus.UNLOADED, targetWorld.getName(), fallbackWorld.getName(), evacuated.size());
+    }
+
+    /**
+     * Reloads a single already-loaded standalone world.
+     * <ul>
+     *   <li>Base fallback world: reloads {@code world.yml}, spawn and player game modes only.</li>
+     *   <li>Non-base world missing on disk: evacuates players and unloads it.</li>
+     *   <li>Non-base world present on disk: evacuates players to fallback, unloads without saving,
+     *       reloads world and {@code world.yml} from disk, and returns players to spawn.</li>
+     * </ul>
+     *
+     * @param server    active server
+     * @param worldName target loaded world name
+     * @return operation outcome
+     */
+    public static ReloadSingleResult reloadSingleStandaloneWorld(final MinecraftServer server, final String worldName) {
+        final @Nullable World loaded = resolveLoadedStandaloneWorld(server, worldName);
+        if (loaded == null) {
+            final @Nullable World rawLoaded = resolveLoadedWorldAnyCase(server, worldName);
+            if (rawLoaded == null) {
+                return new ReloadSingleResult(ReloadSingleStatus.NOT_LOADED, worldName, "", 0);
+            }
+            if (isFallbackWorld(server, rawLoaded)) {
+                refreshFallbackWorldConfig(rawLoaded);
+                return new ReloadSingleResult(
+                    ReloadSingleStatus.FALLBACK_CONFIG_ONLY,
+                    rawLoaded.getName(),
+                    rawLoaded.getName(),
+                    0
+                );
+            }
+            // Loaded in memory, but directory removed on disk -> evacuate and unload
+            return handleMissingFolderUnload(server, rawLoaded);
+        }
+
+        if (isFallbackWorld(server, loaded)) {
+            refreshFallbackWorldConfig(loaded);
+            return new ReloadSingleResult(ReloadSingleStatus.FALLBACK_CONFIG_ONLY, loaded.getName(), loaded.getName(), 0);
+        }
+
+        return reloadExtraWorldFromDisk(server, loaded);
+    }
+
+    /**
+     * Performs a full sync across all standalone worlds:
+     * unloads worlds whose directories were removed, reloads existing non-base worlds from disk,
+     * loads newly discovered world folders in {@code worlds/}, and refreshes the base fallback world's config.
+     *
+     * @param server active server
+     * @return aggregate reload summary
+     */
+    public static ReloadAllResult reloadAllStandaloneWorlds(final MinecraftServer server) {
+        final @Nullable World fallbackWorld = resolveValidFallbackWorld(server);
+        final String fallbackName = fallbackWorld != null ? fallbackWorld.getName() : String.valueOf(fallbackWorldName());
+
+        final List<World> extraWorlds = new ArrayList<>();
+        for (final World world : List.copyOf(server.server.getWorlds())) {
+            if (!isFallbackWorld(server, world)) {
+                extraWorlds.add(world);
+            }
+        }
+
+        // Fail fast before mutating any world if players need evacuation and fallback is unconfigured
+        for (final World extra : extraWorlds) {
+            if (!extra.getPlayers().isEmpty() && (fallbackWorld == null || extra.equals(fallbackWorld))) {
+                return new ReloadAllResult(ReloadAllStatus.NO_FALLBACK_WORLD, 0, 0, 0, fallbackName);
+            }
+        }
+
+        int reloaded = 0;
+        int unloaded = 0;
+        int loaded = 0;
+
+        for (final World extra : extraWorlds) {
+            final ServerLevel handle = ((CraftWorld) extra).getHandle();
+            final Path worldDir = resolveWorldConfigDir(handle);
+            if (!Files.isDirectory(worldDir)) {
+                final ReloadSingleResult missingRes = handleMissingFolderUnload(server, extra);
+                if (missingRes.status() == ReloadSingleStatus.MISSING_FOLDER_UNLOADED) {
+                    unloaded++;
+                }
+            } else {
+                final ReloadSingleResult singleRes = reloadExtraWorldFromDisk(server, extra);
+                if (singleRes.status() == ReloadSingleStatus.RELOADED) {
+                    reloaded++;
+                }
+            }
+        }
+
+        final Path root = containerRoot(server);
+        for (final String folder : getUnloadedStandaloneWorldNames(server)) {
+            if (loadWorldFromDisk(server, root, folder) != null) {
+                loaded++;
+            }
+        }
+
+        if (fallbackWorld != null) {
+            refreshFallbackWorldConfig(fallbackWorld);
+        } else {
+            refreshFallbackWorldConfig(((CraftWorld) server.overworld().getWorld()).getHandle().getWorld());
+        }
+
+        return new ReloadAllResult(ReloadAllStatus.SUCCESS, reloaded, loaded, unloaded, fallbackName);
+    }
+
+    /**
      * Clears in-memory state between unit tests.
      */
     public static void resetForTesting() {
@@ -573,6 +840,263 @@ public final class StandaloneWorldManager {
 
     private static String deriveFolderName(final Identifier id) {
         return "minecraft".equals(id.getNamespace()) ? id.getPath() : id.getNamespace() + "_" + id.getPath();
+    }
+
+    private static boolean isValidWorldFolderName(final String folderName) {
+        final String normalizedKey = folderName.toLowerCase(Locale.ROOT).replace(' ', '_');
+        return Identifier.tryParse("minecraft:" + normalizedKey) != null;
+    }
+
+    private static @Nullable String findDiskFolderCaseInsensitive(final Path root, final String requestedName) {
+        if (!Files.isDirectory(root)) {
+            return null;
+        }
+        final Path direct = root.resolve(requestedName);
+        if (Files.isDirectory(direct) && !requestedName.startsWith(".")) {
+            return direct.getFileName().toString();
+        }
+        try (Stream<Path> stream = Files.list(root)) {
+            return stream.filter(Files::isDirectory)
+                .map(path -> path.getFileName().toString())
+                .filter(name -> !name.startsWith("."))
+                .filter(name -> name.equalsIgnoreCase(requestedName))
+                .findFirst()
+                .orElse(null);
+        } catch (IOException _) {
+            return null;
+        }
+    }
+
+    private static @Nullable World resolveLoadedWorldAnyCase(final MinecraftServer server, final String worldName) {
+        final @Nullable World exact = server.server.getWorld(worldName);
+        if (exact != null) {
+            return exact;
+        }
+        for (final World world : server.server.getWorlds()) {
+            if (world.getName().equalsIgnoreCase(worldName)) {
+                return world;
+            }
+        }
+        return null;
+    }
+
+    private static @Nullable World loadWorldFromDisk(final MinecraftServer server, final Path root, final String folder) {
+        final Path worldDir = root.resolve(folder);
+        final StandaloneWorldConfig worldCfg = StandaloneWorldConfig.loadOrCreate(worldDir);
+        cacheConfig(folder, worldDir, worldCfg);
+
+        final String normalizedKey = folder.toLowerCase(Locale.ROOT).replace(' ', '_');
+        final WorldCreator creator = new WorldCreator(folder)
+            .generator(ApisVoidChunkGenerator.INSTANCE)
+            .biomeProvider(ApisVoidChunkGenerator.VOID_BIOME_PROVIDER)
+            .generateStructures(false);
+        final ResourceKey<Level> dimensionKey = ResourceKey.create(
+            Registries.DIMENSION,
+            Identifier.fromNamespaceAndPath("minecraft", normalizedKey)
+        );
+        DIMENSION_FOLDERS.put(dimensionKey, folder);
+
+        INTERNAL_DISCOVERY.set(Boolean.TRUE);
+        final @Nullable World loaded;
+        try {
+            loaded = server.server.createWorld(creator);
+        } finally {
+            INTERNAL_DISCOVERY.set(Boolean.FALSE);
+        }
+        if (loaded instanceof CraftWorld craftWorld) {
+            applySpawnToLevel(craftWorld.getHandle(), worldCfg);
+        }
+        return loaded;
+    }
+
+    private static void refreshFallbackWorldConfig(final World fallbackWorld) {
+        final CraftWorld craftWorld = (CraftWorld) fallbackWorld;
+        final ServerLevel level = craftWorld.getHandle();
+        final Path worldDir = resolveWorldConfigDir(level);
+        final StandaloneWorldConfig refreshed = StandaloneWorldConfig.loadOrCreate(worldDir);
+        cacheConfig(fallbackWorld.getName(), worldDir, refreshed);
+        applySpawnToLevel(level, refreshed);
+        for (final ServerPlayer player : List.copyOf(level.players())) {
+            applyWorldGameMode(player, true);
+        }
+    }
+
+    private static ReloadSingleResult handleMissingFolderUnload(final MinecraftServer server, final World world) {
+        final ServerLevel handle = ((CraftWorld) world).getHandle();
+        final Path worldDir = resolveWorldConfigDir(handle).toAbsolutePath().normalize();
+        final Path worldsRoot = containerRoot(server).toAbsolutePath().normalize();
+        final boolean existedBeforeUnload = Files.exists(worldDir);
+
+        final List<Player> players = world.getPlayers();
+        String fallbackName = "";
+        if (!players.isEmpty()) {
+            final @Nullable World fallbackWorld = resolveValidFallbackWorld(server);
+            if (fallbackWorld == null || world.equals(fallbackWorld)) {
+                return new ReloadSingleResult(ReloadSingleStatus.NO_FALLBACK_WORLD, world.getName(), "", 0);
+            }
+            fallbackName = fallbackWorld.getName();
+            evacuatePlayers(world, fallbackWorld);
+            if (!world.getPlayers().isEmpty()) {
+                return new ReloadSingleResult(ReloadSingleStatus.FAILED, world.getName(), fallbackName, 0);
+            }
+        }
+        if (!unloadWorldAndClearCache(server, world, false)) {
+            return new ReloadSingleResult(ReloadSingleStatus.FAILED, world.getName(), fallbackName, 0);
+        }
+        // SavedDataStorage.close() inside unloadWorld can re-create data/ under the deleted world directory.
+        // Clean it up when the folder was absent prior to unload so subsequent /world reload does not resurrect it.
+        if (!existedBeforeUnload
+            && !isFallbackWorld(server, world)
+            && worldDir.getParent() != null
+            && worldDir.getParent().equals(worldsRoot)
+            && Files.isDirectory(worldDir)) {
+            deleteDirectoryQuietly(worldDir);
+        }
+        return new ReloadSingleResult(ReloadSingleStatus.MISSING_FOLDER_UNLOADED, world.getName(), fallbackName, 0);
+    }
+
+    private static void deleteDirectoryQuietly(final Path directory) {
+        try (Stream<Path> walk = Files.walk(directory)) {
+            walk.sorted(Comparator.reverseOrder()).forEach(path -> {
+                try {
+                    Files.deleteIfExists(path);
+                } catch (IOException _) {
+                }
+            });
+        } catch (IOException _) {
+        }
+    }
+
+    private static ReloadSingleResult reloadExtraWorldFromDisk(final MinecraftServer server, final World world) {
+        final ServerLevel handle = ((CraftWorld) world).getHandle();
+        final Path worldDir = resolveWorldConfigDir(handle);
+        if (!Files.isDirectory(worldDir)) {
+            return handleMissingFolderUnload(server, world);
+        }
+
+        final String actualFolderName = worldDir.getFileName().toString();
+        final Path root = containerRoot(server);
+        final List<Player> players = world.getPlayers();
+        List<UUID> evacuatedUuids = List.of();
+        String fallbackName = "";
+
+        if (!players.isEmpty()) {
+            final @Nullable World fallbackWorld = resolveValidFallbackWorld(server);
+            if (fallbackWorld == null || world.equals(fallbackWorld)) {
+                return new ReloadSingleResult(ReloadSingleStatus.NO_FALLBACK_WORLD, world.getName(), "", 0);
+            }
+            fallbackName = fallbackWorld.getName();
+            evacuatedUuids = evacuatePlayers(world, fallbackWorld);
+            if (!world.getPlayers().isEmpty()) {
+                return new ReloadSingleResult(ReloadSingleStatus.FAILED, world.getName(), fallbackName, 0);
+            }
+        }
+
+        // Unload with save=false so stale in-memory chunks never overwrite replaced region files on disk.
+        if (!unloadWorldAndClearCache(server, world, false)) {
+            return new ReloadSingleResult(ReloadSingleStatus.FAILED, world.getName(), fallbackName, 0);
+        }
+
+        final @Nullable World reloadedWorld = loadWorldFromDisk(server, root, actualFolderName);
+        if (reloadedWorld == null) {
+            return new ReloadSingleResult(ReloadSingleStatus.FAILED, actualFolderName, fallbackName, 0);
+        }
+
+        int returned = 0;
+        if (!evacuatedUuids.isEmpty()) {
+            final Location targetSpawn = getSpawnLocation(reloadedWorld);
+            for (final UUID uuid : evacuatedUuids) {
+                final @Nullable Player online = Bukkit.getPlayer(uuid);
+                if (online != null && online.isOnline()) {
+                    if (online.teleport(targetSpawn, PlayerTeleportEvent.TeleportCause.PLUGIN)) {
+                        returned++;
+                    }
+                }
+            }
+        }
+        return new ReloadSingleResult(ReloadSingleStatus.RELOADED, reloadedWorld.getName(), fallbackName, returned);
+    }
+
+    private static List<UUID> evacuatePlayers(final World fromWorld, final World fallbackWorld) {
+        final List<Player> current = List.copyOf(fromWorld.getPlayers());
+        if (current.isEmpty()) {
+            return List.of();
+        }
+        final Location fallbackSpawn = getSpawnLocation(fallbackWorld);
+        final List<UUID> moved = new ArrayList<>(current.size());
+        for (final Player player : current) {
+            if (player.isOnline() && player.teleport(fallbackSpawn, PlayerTeleportEvent.TeleportCause.PLUGIN)) {
+                moved.add(player.getUniqueId());
+            }
+        }
+        return moved;
+    }
+
+    private static boolean unloadWorldAndClearCache(
+        final MinecraftServer server,
+        final World world,
+        final boolean save
+    ) {
+        final ServerLevel handle = ((CraftWorld) world).getHandle();
+        final String key = world.getName().toLowerCase(Locale.ROOT);
+        if (!server.server.unloadWorld(world, save)) {
+            return false;
+        }
+        WORLD_CACHE.remove(key);
+        DIMENSION_FOLDERS.remove(handle.dimension());
+        return true;
+    }
+
+    public enum LoadStatus {
+        LOADED,
+        ALREADY_LOADED,
+        NOT_FOUND_ON_DISK,
+        FAILED
+    }
+
+    public enum UnloadStatus {
+        UNLOADED,
+        NOT_LOADED,
+        CANNOT_UNLOAD_FALLBACK,
+        NO_FALLBACK_WORLD,
+        FAILED
+    }
+
+    public enum ReloadSingleStatus {
+        RELOADED,
+        FALLBACK_CONFIG_ONLY,
+        MISSING_FOLDER_UNLOADED,
+        NOT_LOADED,
+        NO_FALLBACK_WORLD,
+        FAILED
+    }
+
+    public enum ReloadAllStatus {
+        SUCCESS,
+        NO_FALLBACK_WORLD
+    }
+
+    public record LoadResult(LoadStatus status, String worldName) {
+    }
+
+    public record UnloadResult(UnloadStatus status, String worldName, String fallbackName, int movedPlayers) {
+    }
+
+    public record ReloadSingleResult(
+        ReloadSingleStatus status,
+        String worldName,
+        String fallbackName,
+        int returnedPlayers
+    ) {
+    }
+
+    public record ReloadAllResult(
+        ReloadAllStatus status,
+        int reloaded,
+        int loaded,
+        int unloaded,
+        String fallbackName
+    ) {
     }
 
     private record WorldEntry(Path worldDir, StandaloneWorldConfig config) {

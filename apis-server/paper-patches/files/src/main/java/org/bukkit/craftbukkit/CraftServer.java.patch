@@ -106,6 +106,37 @@
          net.minecraft.core.Registry<LevelStem> levelStemRegistry = registryAccess.lookupOrThrow(Registries.LEVEL_STEM);
          final LevelStem configuredStem = levelStemRegistry.getValue(actualDimension);
          if (configuredStem == null) {
+@@ -1210,16 +_,21 @@
+         if (worldGenSettings == null) {
+             WorldOptions worldOptions = new WorldOptions(creator.seed(), creator.generateStructures(), creator.bonusChest());
+ 
+-            String flatGenSettings = creator.generatorSettings();
+-            if (flatGenSettings.isEmpty()) {
+-                flatGenSettings = FlatLevelGeneratorSettings.CODEC.encodeStart(registryAccess.createSerializationContext(JsonOps.INSTANCE), FlatLevelGeneratorSettings.getDefault(
+-                    registryAccess.lookupOrThrow(Registries.BIOME),
+-                    registryAccess.lookupOrThrow(Registries.STRUCTURE_SET),
+-                    registryAccess.lookupOrThrow(Registries.PLACED_FEATURE)
+-                )).getOrThrow().toString();
++            WorldDimensions worldDimensions;
++            if (org.apismc.apis.hooks.ApisHooks.isStandaloneWorldsMode()) { // Apis - Build void dimensions without pruned WORLD_PRESET
++                worldDimensions = org.apismc.apis.hooks.ApisHooks.createVoidBukkitWorldDimensions(registryAccess, actualDimension);
++            } else {
++                String flatGenSettings = creator.generatorSettings();
++                if (flatGenSettings.isEmpty()) {
++                    flatGenSettings = FlatLevelGeneratorSettings.CODEC.encodeStart(registryAccess.createSerializationContext(JsonOps.INSTANCE), FlatLevelGeneratorSettings.getDefault(
++                        registryAccess.lookupOrThrow(Registries.BIOME),
++                        registryAccess.lookupOrThrow(Registries.STRUCTURE_SET),
++                        registryAccess.lookupOrThrow(Registries.PLACED_FEATURE)
++                    )).getOrThrow().toString();
++                }
++                DedicatedServerProperties.WorldDimensionData properties = new DedicatedServerProperties.WorldDimensionData(GsonHelper.parse(flatGenSettings), creator.type().name().toLowerCase(Locale.ROOT));
++                worldDimensions = properties.create(registryAccess);
+             }
+-            DedicatedServerProperties.WorldDimensionData properties = new DedicatedServerProperties.WorldDimensionData(GsonHelper.parse(flatGenSettings), creator.type().name().toLowerCase(Locale.ROOT));
+-            WorldDimensions worldDimensions = properties.create(registryAccess);
+ 
+             WorldDimensions.Complete complete = worldDimensions.bake(levelStemRegistry);
+             if (complete.dimensions().getValue(actualDimension) == null) {
 @@ -1293,6 +_,7 @@
          serverLevel.setSpawnSettings(true);
  

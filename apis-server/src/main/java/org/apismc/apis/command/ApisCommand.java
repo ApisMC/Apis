@@ -45,10 +45,12 @@ public final class ApisCommand extends Command {
             "Allows setting standalone world spawn in world.yml"
         );
         registerOpPermission(pluginManager, TpWorldCommand.PERMISSION, "Allows teleporting between standalone worlds");
+        registerOpPermission(pluginManager, WorldCommand.PERMISSION, "Allows loading, unloading, and reloading standalone worlds");
 
         final SimpleCommandMap commandMap = server.server.getCommandMap();
         commandMap.register("apis", new ApisCommand(server));
         commandMap.register("apis", new TpWorldCommand(server));
+        commandMap.register("apis", new WorldCommand(server));
         if (ApisHooks.isStandaloneWorldsMode()) {
             final @Nullable Command vanillaSetSpawn = commandMap.getCommand("setworldspawn");
             if (vanillaSetSpawn != null && commandMap.getCommand("minecraft:setworldspawn") == null) {

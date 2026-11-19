@@ -79,7 +79,6 @@ public final class ApisHooks {
     private static final boolean IS_LINUX = System.getProperty("os.name", "")
         .toLowerCase(Locale.ROOT)
         .contains("linux");
-    private static volatile boolean aotInternalWarmup;
 
     private ApisHooks() {
     }
@@ -93,14 +92,6 @@ public final class ApisHooks {
             return Runtime.getRuntime().availableProcessors();
         }
         return OSNuma.getNativeInstance().getTotalCores();
-    }
-
-    public static boolean isAotInternalWarmup() {
-        return aotInternalWarmup;
-    }
-
-    public static void setAotInternalWarmup(final boolean warmup) {
-        aotInternalWarmup = warmup;
     }
 
     /**
@@ -744,13 +735,28 @@ public final class ApisHooks {
         if (!StandaloneWorldManager.isStandaloneMode()) {
             return properties.createDimensions(registries);
         }
+        return createVoidBukkitWorldDimensions(registries, LevelStem.OVERWORLD);
+    }
+
+    public static WorldDimensions createVoidBukkitWorldDimensions(
+        final HolderLookup.Provider registries,
+        final ResourceKey<LevelStem> stemKey
+    ) {
         final HolderLookup.RegistryLookup<DimensionType> dimensionTypes =
             registries.lookupOrThrow(Registries.DIMENSION_TYPE);
-        final LevelStem overworldStem = new LevelStem(
-            dimensionTypes.getOrThrow(BuiltinDimensionTypes.OVERWORLD),
+        final ResourceKey<DimensionType> dimensionTypeKey;
+        if (LevelStem.NETHER.equals(stemKey)) {
+            dimensionTypeKey = BuiltinDimensionTypes.NETHER;
+        } else if (LevelStem.END.equals(stemKey)) {
+            dimensionTypeKey = BuiltinDimensionTypes.END;
+        } else {
+            dimensionTypeKey = BuiltinDimensionTypes.OVERWORLD;
+        }
+        final LevelStem stem = new LevelStem(
+            dimensionTypes.getOrThrow(dimensionTypeKey),
             StandaloneWorldManager.createVoidFlatLevelSource(registries)
         );
-        return new WorldDimensions(ImmutableMap.of(LevelStem.OVERWORLD, overworldStem));
+        return new WorldDimensions(ImmutableMap.of(stemKey, stem));
     }
 
     public static BiomeSource resolveLevelBiomeSource(
@@ -817,5 +823,13 @@ public final class ApisHooks {
         final TeleportTransition.PostTeleportTransition post
     ) {
         return StandaloneWorldManager.resolveRespawnDefault(server, post);
+    }
+
+    public static void applyStandaloneJoinGameMode(final ServerPlayer player) {
+        StandaloneWorldManager.applyWorldGameMode(player, false);
+    }
+
+    public static void applyStandaloneWorldGameMode(final ServerPlayer player) {
+        StandaloneWorldManager.applyWorldGameMode(player, true);
     }
 }

@@ -14,3 +14,11 @@
              this.state = new PrepareSpawnTask.Preparing(spawnLevel, spawnPosition, spawnAngle);
          }
      }
+@@ -310,6 +_,7 @@
+                 }
+                 // Paper end - Entity#getEntitySpawnReason
+                 player.snapTo(this.spawnPosition, this.spawnAngle.x, this.spawnAngle.y);
++                org.apismc.apis.hooks.ApisHooks.applyStandaloneJoinGameMode(player); // Apis
+                 PrepareSpawnTask.this.server.getPlayerList().placeNewPlayer(connection, player, cookie);
+                 input.ifPresent(tag -> {
+                     player.loadAndSpawnEnderPearls(tag);

@@ -15,6 +15,14 @@
      public static final Component CHAT_FILTERED_FULL = Component.translatable("chat.filtered_full");
      public static final Component DUPLICATE_LOGIN_DISCONNECT_MESSAGE = Component.translatable("multiplayer.disconnect.duplicate_login");
      private static final Logger LOGGER = LogUtils.getLogger();
+@@ -697,6 +_,7 @@
+ 
+         // It's possible for respawn to be in a diff dimension
+         if (fromLevel != level) {
++            org.apismc.apis.hooks.ApisHooks.applyStandaloneWorldGameMode(player); // Apis
+             new org.bukkit.event.player.PlayerChangedWorldEvent(player.getBukkitEntity(), fromLevel.getWorld()).callEvent();
+             player.triggerDimensionChangeTriggers(level);
+         }
 @@ -742,6 +_,7 @@
      }
  

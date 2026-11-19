@@ -40,12 +40,7 @@
                          .describedAs("Yml file");
  
                  this.accepts("forceUpgrade", "Whether to force a world upgrade");
-@@ -114,10 +_,12 @@
- 
-                 this.accepts("initSettings", "Only create configuration files and then exit"); // SPIGOT-5761: Add initSettings option
- 
-+                this.accepts("generate-aot", "Generates a JVM AOT cache (cache/apis.aot) and exits"); // Apis - AOT cache generator
-+
+@@ -117,7 +_,7 @@
                  this.acceptsAll(asList("S", "spigot-settings"), "File for spigot settings")
                          .withRequiredArg()
                          .ofType(File.class)
@@ -63,45 +58,11 @@
                          .describedAs("Yml file");
  
                  this.acceptsAll(asList("add-plugin", "add-extra-plugin-jar"), "Specify paths to extra plugin jars to be loaded in addition to those in the plugins folder. This argument can be specified multiple times, once for each extra plugin jar path.")
-@@ -152,10 +_,20 @@
-             }
-         };
- 
-+        final boolean aotWarmup = org.apismc.apis.aot.AotCacheGenerator.containsFlag(
-+                args, org.apismc.apis.aot.AotCacheGenerator.FLAG_INTERNAL_WARMUP
-+        ); // Apis
-+        if (aotWarmup) { // Apis
-+            org.apismc.apis.hooks.ApisHooks.setAotInternalWarmup(true);
-+        } // Apis
-+        final String[] parsedArgs = org.apismc.apis.aot.AotCacheGenerator.stripFlags(
-+                args, org.apismc.apis.aot.AotCacheGenerator.FLAG_INTERNAL_WARMUP
-+        ); // Apis
-+
-         OptionSet options = null;
- 
-         try {
--            options = parser.parse(args);
-+            options = parser.parse(parsedArgs); // Apis
-         } catch (joptsimple.OptionException ex) {
-             Logger.getLogger(Main.class.getName()).log(Level.SEVERE, ex.getLocalizedMessage());
-         }
-@@ -169,6 +_,10 @@
+@@ -169,6 +_,7 @@
          } else if (options.has("v")) {
              System.out.println(CraftServer.class.getPackage().getImplementationVersion());
          } else {
 +            org.apismc.apis.hooks.ApisHooks.configureCliDirectories(options); // Apis - Resolve and create --configs-dir / --worlds-dir
-+            if (options.has("generate-aot")) { // Apis - Two-phase AOT cache generator
-+                System.exit(org.apismc.apis.aot.AotCacheGenerator.generate(args, Main.class));
-+            }
              // Do you love Java using + and ! as string based identifiers? I sure do!
              String path = new File(".").getAbsolutePath();
              if (path.contains("!") || path.contains("+")) {
-@@ -197,7 +_,7 @@
-                     useJline = false;
-                 }
- 
--                if (options.has("noconsole")) {
-+                if (options.has("noconsole") || aotWarmup) { // Apis
-                     Main.useConsole = false;
-                     useJline = false; // Paper
-                     System.setProperty(net.minecrell.terminalconsole.TerminalConsoleAppender.JLINE_OVERRIDE_PROPERTY, "false"); // Paper

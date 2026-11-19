@@ -215,7 +215,13 @@ public final class ApisConfig {
         }
     }
 
-    private static Set<String> collectNodePaths(final CommentedConfigurationNode root) {
+    /**
+     * Collects dotted node paths for all keys inside a loaded Configurate tree.
+     *
+     * @param root configuration root node
+     * @return set of dotted key paths
+     */
+    public static Set<String> collectNodePaths(final CommentedConfigurationNode root) {
         final Set<String> paths = new HashSet<>();
         collectNodePaths("", root, paths);
         return paths;
@@ -256,7 +262,14 @@ public final class ApisConfig {
         Files.writeString(path, renderNodeComments(writer.toString(), root), StandardCharsets.UTF_8);
     }
 
-    private static String renderNodeComments(final String rawYaml, final CommentedConfigurationNode root) {
+    /**
+     * Injects line comments defined via {@link Comment} annotations into serialized YAML text.
+     *
+     * @param rawYaml raw YAML emitted by Configurate
+     * @param root    annotated Configurate root node
+     * @return YAML with rendered comments above matching keys
+     */
+    public static String renderNodeComments(final String rawYaml, final CommentedConfigurationNode root) {
         final StringBuilder out = new StringBuilder(rawYaml.length() + 2048);
         final Deque<String> keyPath = new ArrayDeque<>();
         for (final String line : rawYaml.split("\\r?\\n")) {
@@ -850,7 +863,7 @@ public final class ApisConfig {
     @ConfigSerializable
     public static final class MessagesSection {
         @Setting("commands")
-        @Comment("MiniMessage output templates for /setworldspawn and /tpworld | Шаблони відповідей MiniMessage для /setworldspawn та /tpworld")
+        @Comment("MiniMessage output templates for core world commands (/setworldspawn, /tpworld, /world) | Шаблони відповідей MiniMessage для команд світів")
         public CommandMessagesSection commands = new CommandMessagesSection();
     }
 
@@ -860,6 +873,7 @@ public final class ApisConfig {
         public static final String DEFAULT_PLAYER_ONLY = "<red>Only players can run this command without explicit world/coordinates.";
         public static final String DEFAULT_INVALID_SYNTAX_SETWORLDSPAWN = "<red>Usage: /setworldspawn [<x> <y> <z>] [<yaw> <pitch>]";
         public static final String DEFAULT_INVALID_SYNTAX_TPWORLD = "<red>Usage: /tpworld <world> [<player>] [<x> <y> <z>] [<yaw> <pitch>]";
+        public static final String DEFAULT_INVALID_SYNTAX_WORLD = "<red>Usage: /world <load <world>|unload <world>|reload [world]>";
         public static final String DEFAULT_INVALID_NUMBER = "<red>Invalid numeric argument '<input>'.";
         public static final String DEFAULT_WORLD_NOT_FOUND = "<red>World '<world>' is not loaded or does not exist.";
         public static final String DEFAULT_PLAYER_NOT_FOUND = "<red>Player '<player>' is not online.";
@@ -867,6 +881,20 @@ public final class ApisConfig {
         public static final String DEFAULT_TPWORLD_SUCCESS_SELF = "<green>Teleported to <white><world></white> at <gray>(<x>, <y>, <z>)</gray>.";
         public static final String DEFAULT_TPWORLD_SUCCESS_OTHER = "<green>Teleported <white><player></white> to <white><world></white> at <gray>(<x>, <y>, <z>)</gray>.";
         public static final String DEFAULT_TPWORLD_FAILED = "<red>Failed to teleport to world '<world>'.";
+        public static final String DEFAULT_WORLD_STANDALONE_ONLY = "<red>The /world command is only available when dimensions.mode is 'standalone'.";
+        public static final String DEFAULT_WORLD_ALREADY_LOADED = "<yellow>World '<world>' is already loaded.";
+        public static final String DEFAULT_WORLD_NOT_FOUND_ON_DISK = "<red>World folder '<world>' was not found in worlds/ or has an invalid name.";
+        public static final String DEFAULT_WORLD_LOAD_SUCCESS = "<green>Loaded world <white><world></white>.";
+        public static final String DEFAULT_WORLD_LOAD_FAILED = "<red>Failed to load world '<world>'.";
+        public static final String DEFAULT_WORLD_UNLOAD_FALLBACK_FORBIDDEN = "<red>Cannot unload the base fallback world '<world>'.";
+        public static final String DEFAULT_WORLD_FALLBACK_NOT_CONFIGURED = "<red>Base fallback world is not configured or not loaded; cannot evacuate players.";
+        public static final String DEFAULT_WORLD_UNLOAD_SUCCESS = "<green>Unloaded world <white><world></white> (moved <gray><players></gray> player(s) to <white><fallback></white>).";
+        public static final String DEFAULT_WORLD_UNLOAD_FAILED = "<red>Failed to unload world '<world>'.";
+        public static final String DEFAULT_WORLD_RELOAD_SINGLE_SUCCESS = "<green>Reloaded world <white><world></white> from disk (returned <gray><players></gray> player(s)).";
+        public static final String DEFAULT_WORLD_RELOAD_FALLBACK_NOTICE = "<yellow>Reloaded configuration for base world <white><world></white>. Full map reload is not supported for the base world.";
+        public static final String DEFAULT_WORLD_RELOAD_MISSING_UNLOADED = "<yellow>Folder for '<world>' no longer exists on disk; world unloaded.";
+        public static final String DEFAULT_WORLD_RELOAD_FAILED = "<red>Failed to reload world '<world>'.";
+        public static final String DEFAULT_WORLD_RELOAD_ALL_SUCCESS = "<green>Reloaded worlds: <white><reloaded></white> reloaded, <white><loaded></white> loaded, <white><unloaded></white> unloaded; base world '<fallback>' config refreshed (full base world reload is not supported).";
 
         @Setting("no-permission")
         @Comment("Sent when sender lacks permission ('' mutes) | Немає прав ('' вимикає повідомлення)")
@@ -883,6 +911,10 @@ public final class ApisConfig {
         @Setting("invalid-syntax-tpworld")
         @Comment("Sent when /tpworld argument count is invalid | Помилка синтаксису /tpworld")
         public @Nullable String invalidSyntaxTpWorld = DEFAULT_INVALID_SYNTAX_TPWORLD;
+
+        @Setting("invalid-syntax-world")
+        @Comment("Sent when /world subcommand or arguments are invalid | Помилка синтаксису /world")
+        public @Nullable String invalidSyntaxWorld = DEFAULT_INVALID_SYNTAX_WORLD;
 
         @Setting("invalid-number")
         @Comment("Sent when coordinate or rotation is not a valid finite number (placeholders: <input>) | Некоректне число (<input>)")
@@ -912,11 +944,68 @@ public final class ApisConfig {
         @Comment("Sent if async teleport fails (<world>, <player>) | Помилка телепортації")
         public @Nullable String tpWorldFailed = DEFAULT_TPWORLD_FAILED;
 
+        @Setting("world-standalone-only")
+        @Comment("Sent when /world is run outside dimensions.mode=standalone | /world доступний лише у standalone-режимі")
+        public @Nullable String worldStandaloneOnly = DEFAULT_WORLD_STANDALONE_ONLY;
+
+        @Setting("world-already-loaded")
+        @Comment("Sent when /world load targets an already loaded world (<world>) | Світ уже завантажено (<world>)")
+        public @Nullable String worldAlreadyLoaded = DEFAULT_WORLD_ALREADY_LOADED;
+
+        @Setting("world-not-found-on-disk")
+        @Comment("Sent when /world load cannot find a valid world folder in worlds/ (<world>) | Теку світу не знайдено в worlds/ (<world>)")
+        public @Nullable String worldNotFoundOnDisk = DEFAULT_WORLD_NOT_FOUND_ON_DISK;
+
+        @Setting("world-load-success")
+        @Comment("Sent after /world load succeeds (<world>) | Успішне завантаження світу (<world>)")
+        public @Nullable String worldLoadSuccess = DEFAULT_WORLD_LOAD_SUCCESS;
+
+        @Setting("world-load-failed")
+        @Comment("Sent if loading a world fails (<world>) | Помилка завантаження світу (<world>)")
+        public @Nullable String worldLoadFailed = DEFAULT_WORLD_LOAD_FAILED;
+
+        @Setting("world-unload-fallback-forbidden")
+        @Comment("Sent when attempting to unload the base fallback world (<world>) | Заборонено вивантажувати базовий світ (<world>)")
+        public @Nullable String worldUnloadFallbackForbidden = DEFAULT_WORLD_UNLOAD_FALLBACK_FORBIDDEN;
+
+        @Setting("world-fallback-not-configured")
+        @Comment("Sent when base fallback-world is not assigned or not loaded for player evacuation | Базовий світ не налаштовано або не завантажено")
+        public @Nullable String worldFallbackNotConfigured = DEFAULT_WORLD_FALLBACK_NOT_CONFIGURED;
+
+        @Setting("world-unload-success")
+        @Comment("Sent after /world unload succeeds (<world>, <players>, <fallback>) | Успішне вивантаження світу")
+        public @Nullable String worldUnloadSuccess = DEFAULT_WORLD_UNLOAD_SUCCESS;
+
+        @Setting("world-unload-failed")
+        @Comment("Sent if unloading a world fails (<world>) | Помилка вивантаження світу (<world>)")
+        public @Nullable String worldUnloadFailed = DEFAULT_WORLD_UNLOAD_FAILED;
+
+        @Setting("world-reload-single-success")
+        @Comment("Sent after reloading a non-base world from disk (<world>, <players>) | Успішне перезавантаження світу з диска")
+        public @Nullable String worldReloadSingleSuccess = DEFAULT_WORLD_RELOAD_SINGLE_SUCCESS;
+
+        @Setting("world-reload-fallback-notice")
+        @Comment("Sent when /world reload <base_world> refreshes only world.yml (<world>) | Для базового світу оновлено лише конфігурацію")
+        public @Nullable String worldReloadFallbackNotice = DEFAULT_WORLD_RELOAD_FALLBACK_NOTICE;
+
+        @Setting("world-reload-missing-unloaded")
+        @Comment("Sent when a reloaded world's folder no longer exists on disk (<world>) | Теку світу видалено на диску, світ вивантажено")
+        public @Nullable String worldReloadMissingUnloaded = DEFAULT_WORLD_RELOAD_MISSING_UNLOADED;
+
+        @Setting("world-reload-failed")
+        @Comment("Sent if reloading a world fails (<world>) | Помилка перезавантаження світу (<world>)")
+        public @Nullable String worldReloadFailed = DEFAULT_WORLD_RELOAD_FAILED;
+
+        @Setting("world-reload-all-success")
+        @Comment("Sent after /world reload refreshes all worlds (<reloaded>, <loaded>, <unloaded>, <fallback>) | Підсумок перезавантаження всіх світів")
+        public @Nullable String worldReloadAllSuccess = DEFAULT_WORLD_RELOAD_ALL_SUCCESS;
+
         void fillMissingDefaults() {
             if (this.noPermission == null) this.noPermission = DEFAULT_NO_PERMISSION;
             if (this.playerOnly == null) this.playerOnly = DEFAULT_PLAYER_ONLY;
             if (this.invalidSyntaxSetWorldSpawn == null) this.invalidSyntaxSetWorldSpawn = DEFAULT_INVALID_SYNTAX_SETWORLDSPAWN;
             if (this.invalidSyntaxTpWorld == null) this.invalidSyntaxTpWorld = DEFAULT_INVALID_SYNTAX_TPWORLD;
+            if (this.invalidSyntaxWorld == null) this.invalidSyntaxWorld = DEFAULT_INVALID_SYNTAX_WORLD;
             if (this.invalidNumber == null) this.invalidNumber = DEFAULT_INVALID_NUMBER;
             if (this.worldNotFound == null) this.worldNotFound = DEFAULT_WORLD_NOT_FOUND;
             if (this.playerNotFound == null) this.playerNotFound = DEFAULT_PLAYER_NOT_FOUND;
@@ -924,6 +1013,24 @@ public final class ApisConfig {
             if (this.tpWorldSuccessSelf == null) this.tpWorldSuccessSelf = DEFAULT_TPWORLD_SUCCESS_SELF;
             if (this.tpWorldSuccessOther == null) this.tpWorldSuccessOther = DEFAULT_TPWORLD_SUCCESS_OTHER;
             if (this.tpWorldFailed == null) this.tpWorldFailed = DEFAULT_TPWORLD_FAILED;
+            if (this.worldStandaloneOnly == null) this.worldStandaloneOnly = DEFAULT_WORLD_STANDALONE_ONLY;
+            if (this.worldAlreadyLoaded == null) this.worldAlreadyLoaded = DEFAULT_WORLD_ALREADY_LOADED;
+            if (this.worldNotFoundOnDisk == null) this.worldNotFoundOnDisk = DEFAULT_WORLD_NOT_FOUND_ON_DISK;
+            if (this.worldLoadSuccess == null) this.worldLoadSuccess = DEFAULT_WORLD_LOAD_SUCCESS;
+            if (this.worldLoadFailed == null) this.worldLoadFailed = DEFAULT_WORLD_LOAD_FAILED;
+            if (this.worldUnloadFallbackForbidden == null) {
+                this.worldUnloadFallbackForbidden = DEFAULT_WORLD_UNLOAD_FALLBACK_FORBIDDEN;
+            }
+            if (this.worldFallbackNotConfigured == null) {
+                this.worldFallbackNotConfigured = DEFAULT_WORLD_FALLBACK_NOT_CONFIGURED;
+            }
+            if (this.worldUnloadSuccess == null) this.worldUnloadSuccess = DEFAULT_WORLD_UNLOAD_SUCCESS;
+            if (this.worldUnloadFailed == null) this.worldUnloadFailed = DEFAULT_WORLD_UNLOAD_FAILED;
+            if (this.worldReloadSingleSuccess == null) this.worldReloadSingleSuccess = DEFAULT_WORLD_RELOAD_SINGLE_SUCCESS;
+            if (this.worldReloadFallbackNotice == null) this.worldReloadFallbackNotice = DEFAULT_WORLD_RELOAD_FALLBACK_NOTICE;
+            if (this.worldReloadMissingUnloaded == null) this.worldReloadMissingUnloaded = DEFAULT_WORLD_RELOAD_MISSING_UNLOADED;
+            if (this.worldReloadFailed == null) this.worldReloadFailed = DEFAULT_WORLD_RELOAD_FAILED;
+            if (this.worldReloadAllSuccess == null) this.worldReloadAllSuccess = DEFAULT_WORLD_RELOAD_ALL_SUCCESS;
         }
     }
 }

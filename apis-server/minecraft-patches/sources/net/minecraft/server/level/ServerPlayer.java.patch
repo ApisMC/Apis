@@ -74,3 +74,22 @@
          }
  
          org.bukkit.entity.Player respawnPlayer = this.getBukkitEntity();
+@@ -1615,6 +_,7 @@
+         this.lastSentHealth = -1.0F;
+         this.lastSentFood = -1;
+         this.teleportSpectators(transition, oldLevel);
++        org.apismc.apis.hooks.ApisHooks.applyStandaloneWorldGameMode(this); // Apis
+         // CraftBukkit start
+         org.bukkit.event.player.PlayerChangedWorldEvent changeEvent = new org.bukkit.event.player.PlayerChangedWorldEvent(this.getBukkitEntity(), oldLevel.getWorld());
+         this.level().getCraftServer().getPluginManager().callEvent(changeEvent);
+@@ -2376,6 +_,10 @@
+     @Override
+     public ServerLevel level() {
+         return (ServerLevel)super.level();
++    }
++
++    public void applySilentGameMode(final GameType mode) { // Apis
++        this.gameMode.setGameModeForPlayer(mode, null);
+     }
+ 
+     public boolean setGameMode(final GameType mode) {

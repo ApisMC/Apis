@@ -77,6 +77,12 @@ class ApisConfigTest {
         assertTrue(yamlText.contains("fallback-world: hub"));
         assertTrue(yamlText.contains("messages:"));
         assertTrue(yamlText.contains("setworldspawn-success:"));
+        assertTrue(yamlText.contains("invalid-syntax-world:"));
+        assertTrue(yamlText.contains("world-load-success:"));
+        assertTrue(yamlText.contains("world-unload-fallback-forbidden:"));
+        assertTrue(yamlText.contains("world-fallback-not-configured:"));
+        assertTrue(yamlText.contains("world-reload-fallback-notice:"));
+        assertTrue(yamlText.contains("world-reload-all-success:"));
         assertFalse(yamlText.contains("disable-portals"), "Legacy disable-* keys must not exist");
         assertFalse(yamlText.contains("disabled-dimensions"), "Legacy disabled-dimensions key must not exist");
         assertFalse(yamlText.contains("disabled-types"), "Legacy disabled-types key must not exist");
