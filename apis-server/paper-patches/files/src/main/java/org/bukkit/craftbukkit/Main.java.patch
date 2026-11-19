@@ -1,10 +1,10 @@
 --- a/src/main/java/org/bukkit/craftbukkit/Main.java
 +++ b/src/main/java/org/bukkit/craftbukkit/Main.java
-@@ -32,10 +_,22 @@
+@@ -32,10 +_,28 @@
              {
                  this.acceptsAll(asList("?", "help"), "Show the help");
  
-+                this.accepts("configs-dir", "Base directory for server configurations and plugin data") // Apis
++                this.accepts("configs-dir", "Base directory for server configurations") // Apis
 +                        .withRequiredArg()
 +                        .withValuesConvertedBy(new PathConverter())
 +                        .defaultsTo(java.nio.file.Path.of(org.apismc.apis.config.ApisPaths.DEFAULT_CONFIGS_DIR))
@@ -15,6 +15,12 @@
 +                        .withValuesConvertedBy(new PathConverter())
 +                        .defaultsTo(java.nio.file.Path.of(org.apismc.apis.config.ApisPaths.DEFAULT_WORLDS_DIR))
 +                        .describedAs("Worlds directory");
++
++                this.accepts("addons-dir", "Base directory for plugin/addon JAR files") // Apis
++                        .withRequiredArg()
++                        .withValuesConvertedBy(new PathConverter())
++                        .defaultsTo(java.nio.file.Path.of(org.apismc.apis.config.ApisPaths.DEFAULT_ADDONS_DIR))
++                        .describedAs("Addons directory");
 +
                  this.acceptsAll(asList("c", "config"), "Properties file to use")
                          .withRequiredArg()

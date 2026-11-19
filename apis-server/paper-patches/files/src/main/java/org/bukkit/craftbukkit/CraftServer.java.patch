@@ -46,6 +46,15 @@
      }
  
      @Override
+@@ -845,7 +_,7 @@
+ 
+     @Override
+     public File getUpdateFolderFile() {
+-        return new File((File) this.console.options.valueOf("plugins"), this.configuration.getString("settings.update-folder", "update"));
++        return new File(org.apismc.apis.hooks.ApisHooks.resolveAddonsDir(this.console.options).toFile(), this.configuration.getString("settings.update-folder", "update")); // Apis
+     }
+ 
+     @Override
 @@ -953,7 +_,9 @@
          this.console.autosavePeriod = this.configuration.getInt("ticks-per.autosave");
          this.loadIcon();

@@ -682,12 +682,8 @@ public final class ApisHooks {
         return ApisPaths.resolvePaperDir(options);
     }
 
-    public static Path resolvePluginDataRoot() {
-        return ApisPaths.configsDir();
-    }
-
-    public static Path resolvePluginDataFolder(final String pluginName) {
-        return ApisPaths.resolvePluginDataFolder(pluginName);
+    public static Path resolveAddonsDir(final OptionSet options) {
+        return ApisPaths.resolveAddonsDir(options);
     }
 
     public static File resolveConfigRelativeFile(final @Nullable String configuredPath, final String defaultFileName) {

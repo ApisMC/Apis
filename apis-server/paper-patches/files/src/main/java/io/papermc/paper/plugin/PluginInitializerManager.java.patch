@@ -1,6 +1,18 @@
 --- a/src/main/java/io/papermc/paper/plugin/PluginInitializerManager.java
 +++ b/src/main/java/io/papermc/paper/plugin/PluginInitializerManager.java
-@@ -35,7 +_,7 @@
+@@ -26,54 +_,57 @@
+     private static final Logger LOGGER = LogUtils.getClassLogger();
+     private static PluginInitializerManager impl;
+     private final Path pluginDirectory;
++    private final Path addonsDirectory; // Apis
+     private final Path updateDirectory;
+ 
+-    PluginInitializerManager(final Path pluginDirectory, final Path updateDirectory) {
++    PluginInitializerManager(final Path pluginDirectory, final Path addonsDirectory, final Path updateDirectory) { // Apis
+         this.pluginDirectory = pluginDirectory;
++        this.addonsDirectory = addonsDirectory; // Apis
+         this.updateDirectory = updateDirectory;
+     }
  
      private static PluginInitializerManager parse(@NotNull final OptionSet minecraftOptionSet) throws Exception {
          // We have to load the bukkit configuration inorder to get the update folder location.
@@ -8,4 +20,76 @@
 +        final File configFileLocationBukkit = org.apismc.apis.hooks.ApisHooks.resolveCliConfigFile(minecraftOptionSet, "bukkit-settings", "bukkit.yml"); // Apis
  
          final Path pluginDirectory = ((File) minecraftOptionSet.valueOf("plugins")).toPath();
++        final Path addonsDirectory = org.apismc.apis.hooks.ApisHooks.resolveAddonsDir(minecraftOptionSet); // Apis
  
+         final YamlConfiguration configuration = PaperConfigurations.loadLegacyConfigFile(configFileLocationBukkit);
+ 
+         final String updateDirectoryName = configuration.getString("settings.update-folder", "update");
+         if (updateDirectoryName.isBlank()) {
+-            return new PluginInitializerManager(pluginDirectory, null);
++            return new PluginInitializerManager(pluginDirectory, addonsDirectory, null); // Apis
+         }
+ 
+-        final Path resolvedUpdateDirectory = pluginDirectory.resolve(updateDirectoryName);
++        final Path resolvedUpdateDirectory = addonsDirectory.resolve(updateDirectoryName); // Apis
+         if (!Files.isDirectory(resolvedUpdateDirectory)) {
+             if (Files.exists(resolvedUpdateDirectory)) {
+                 LOGGER.error("Misconfigured update directory!");
+                 LOGGER.error("Your configured update directory ({}) in bukkit.yml is pointing to a non-directory path. " +
+                     "Auto updating functionality will not work.", resolvedUpdateDirectory);
+             }
+-            return new PluginInitializerManager(pluginDirectory, null);
++            return new PluginInitializerManager(pluginDirectory, addonsDirectory, null); // Apis
+         }
+ 
+         boolean isSameFile;
+         try {
+-            isSameFile = Files.isSameFile(resolvedUpdateDirectory, pluginDirectory);
++            isSameFile = Files.isSameFile(resolvedUpdateDirectory, addonsDirectory); // Apis
+         } catch (final IOException e) {
+             LOGGER.error("Misconfigured update directory!");
+-            LOGGER.error("Failed to compare update/plugin directory", e);
+-            return new PluginInitializerManager(pluginDirectory, null);
++            LOGGER.error("Failed to compare update/addon directory", e);
++            return new PluginInitializerManager(pluginDirectory, addonsDirectory, null); // Apis
+         }
+ 
+         if (isSameFile) {
+             LOGGER.error("Misconfigured update directory!");
+-            LOGGER.error(("Your configured update directory (%s) in bukkit.yml is pointing to the same location as the plugin directory (%s). " +
+-                "Disabling auto updating functionality.").formatted(resolvedUpdateDirectory, pluginDirectory));
++            LOGGER.error(("Your configured update directory (%s) in bukkit.yml is pointing to the same location as the addons directory (%s). " +
++                "Disabling auto updating functionality.").formatted(resolvedUpdateDirectory, addonsDirectory)); // Apis
+ 
+-            return new PluginInitializerManager(pluginDirectory, null);
++            return new PluginInitializerManager(pluginDirectory, addonsDirectory, null); // Apis
+         }
+ 
+-        return new PluginInitializerManager(pluginDirectory, resolvedUpdateDirectory);
++        return new PluginInitializerManager(pluginDirectory, addonsDirectory, resolvedUpdateDirectory); // Apis
+     }
+ 
+     public static PluginInitializerManager init(final OptionSet optionSet) throws Exception {
+@@ -90,6 +_,11 @@
+         return pluginDirectory;
+     }
+ 
++    @NotNull
++    public Path addonsDirectoryPath() { // Apis
++        return addonsDirectory;
++    }
++
+     @Nullable
+     public Path pluginUpdatePath() {
+         return updateDirectory;
+@@ -100,8 +_,8 @@
+         // We have to load the bukkit configuration inorder to get the update folder location.
+         io.papermc.paper.plugin.PluginInitializerManager pluginSystem = io.papermc.paper.plugin.PluginInitializerManager.init(optionSet);
+ 
+-        // Register the default plugin directory
+-        io.papermc.paper.plugin.util.EntrypointUtil.registerProvidersFromSource(io.papermc.paper.plugin.provider.source.DirectoryProviderSource.INSTANCE, pluginSystem.pluginDirectoryPath());
++        // Register the addons JAR directory (plugins/ stays reserved for plugin configurations/data)
++        io.papermc.paper.plugin.util.EntrypointUtil.registerProvidersFromSource(io.papermc.paper.plugin.provider.source.DirectoryProviderSource.INSTANCE, pluginSystem.addonsDirectoryPath()); // Apis
+ 
+         // Register plugins from the flag
+         @SuppressWarnings("unchecked")

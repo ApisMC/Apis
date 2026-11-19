@@ -32,7 +32,7 @@
 +    }
 +
 +    private PaperSparkModule createSparkModule(final Server server) { // Apis
-+        return PaperSparkModule.create(Compatibility.VERSION_1_0, sparkServerProxy(server), this.logger, new PaperScheduler() { // Apis - Store bundled spark data in <configs-dir>/spark
++        return PaperSparkModule.create(Compatibility.VERSION_1_0, server, this.logger, new PaperScheduler() {
              @Override
              public void executeAsync(final Runnable runnable) {
                  MCUtil.scheduleAsyncTask(this.catching(runnable, "asynchronous"));
@@ -52,7 +52,7 @@
          if (!this.enabled) {
              if (GlobalConfiguration.get().spark.enabled) {
                  this.enabled = true;
-@@ -132,43 +_,67 @@
+@@ -132,41 +_,48 @@
      }
  
      public void disable() {
@@ -101,23 +101,4 @@
 +        if (this.spark == null) return List.of(); // Apis
          return this.spark.tabComplete(sender, args);
      }
-+
-+    private static Server sparkServerProxy(final Server delegate) { // Apis
-+        return (Server) java.lang.reflect.Proxy.newProxyInstance(
-+            Server.class.getClassLoader(),
-+            new Class<?>[] { Server.class },
-+            (proxy, method, args) -> {
-+                if ("getPluginsFolder".equals(method.getName()) && method.getParameterCount() == 0) {
-+                    return org.apismc.apis.hooks.ApisHooks.resolvePluginDataRoot().toFile();
-+                }
-+                try {
-+                    return method.invoke(delegate, args);
-+                } catch (final java.lang.reflect.InvocationTargetException ex) {
-+                    throw ex.getTargetException();
-+                }
-+            }
-+        );
-+    } // Apis
  
-     public static boolean isPluginPreferred() {
-         return Boolean.getBoolean(PREFER_SPARK_PLUGIN_PROPERTY);

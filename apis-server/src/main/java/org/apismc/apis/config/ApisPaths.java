@@ -12,13 +12,15 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * Resolves organized paths for server configs and plugin data ({@code configs/}, or {@code --configs-dir}),
- * worlds ({@code worlds/}, or {@code --worlds-dir}), player files ({@code users/}), and default {@code .gitignore}.
+ * Resolves organized paths for server configs ({@code configs/}, or {@code --configs-dir}),
+ * worlds ({@code worlds/}, or {@code --worlds-dir}), plugin/addon JARs ({@code addons/}, or {@code --addons-dir}),
+ * player files ({@code users/}), and default {@code .gitignore}.
  */
 public final class ApisPaths {
 
     public static final String DEFAULT_CONFIGS_DIR = "configs";
     public static final String DEFAULT_WORLDS_DIR = "worlds";
+    public static final String DEFAULT_ADDONS_DIR = "addons";
     public static final String USERS_DIR = "users";
     private static final Logger LOGGER = LoggerFactory.getLogger("Minecraft");
 
@@ -41,13 +43,14 @@ public final class ApisPaths {
 
     private static volatile Path configsDir = Path.of(DEFAULT_CONFIGS_DIR).toAbsolutePath().normalize();
     private static volatile Path worldsDir = Path.of(DEFAULT_WORLDS_DIR).toAbsolutePath().normalize();
+    private static volatile Path addonsDir = Path.of(DEFAULT_ADDONS_DIR).toAbsolutePath().normalize();
 
     private ApisPaths() {
     }
 
     /**
-     * Applies CLI {@code --configs-dir} and {@code --worlds-dir} overrides (or defaults) and ensures
-     * both directories exist on disk.
+     * Applies CLI {@code --configs-dir}, {@code --worlds-dir}, and {@code --addons-dir} overrides (or defaults)
+     * and ensures all directories exist on disk.
      *
      * @param options parsed server CLI options
      */
@@ -58,11 +61,14 @@ public final class ApisPaths {
         final @Nullable Path explicitWorlds = options.has("worlds-dir")
             ? (Path) options.valueOf("worlds-dir")
             : null;
-        configureDirectories(explicitConfigs, explicitWorlds);
+        final @Nullable Path explicitAddons = options.has("addons-dir")
+            ? (Path) options.valueOf("addons-dir")
+            : null;
+        configureDirectories(explicitConfigs, explicitWorlds, explicitAddons);
     }
 
     /**
-     * Sets normalized base directories for configs/plugin data and worlds, creating them if absent.
+     * Sets normalized base directories for configs and worlds, creating them if absent.
      *
      * @param explicitConfigs custom configs directory (nullable -> {@code ./configs})
      * @param explicitWorlds  custom worlds directory (nullable -> {@code ./worlds})
@@ -71,16 +77,36 @@ public final class ApisPaths {
         final @Nullable Path explicitConfigs,
         final @Nullable Path explicitWorlds
     ) {
+        configureDirectories(explicitConfigs, explicitWorlds, null);
+    }
+
+    /**
+     * Sets normalized base directories for configs, worlds, and addons, creating them if absent.
+     *
+     * @param explicitConfigs custom configs directory (nullable -> {@code ./configs})
+     * @param explicitWorlds  custom worlds directory (nullable -> {@code ./worlds})
+     * @param explicitAddons  custom addons directory (nullable -> {@code ./addons})
+     */
+    public static synchronized void configureDirectories(
+        final @Nullable Path explicitConfigs,
+        final @Nullable Path explicitWorlds,
+        final @Nullable Path explicitAddons
+    ) {
         final Path resolvedConfigs = (explicitConfigs != null ? explicitConfigs : Path.of(DEFAULT_CONFIGS_DIR))
             .toAbsolutePath()
             .normalize();
         final Path resolvedWorlds = (explicitWorlds != null ? explicitWorlds : Path.of(DEFAULT_WORLDS_DIR))
             .toAbsolutePath()
             .normalize();
+        final Path resolvedAddons = (explicitAddons != null ? explicitAddons : Path.of(DEFAULT_ADDONS_DIR))
+            .toAbsolutePath()
+            .normalize();
         ensureDirectory(resolvedConfigs);
         ensureDirectory(resolvedWorlds);
+        ensureDirectory(resolvedAddons);
         configsDir = resolvedConfigs;
         worldsDir = resolvedWorlds;
+        addonsDir = resolvedAddons;
     }
 
     public static Path configsDir() {
@@ -89,6 +115,26 @@ public final class ApisPaths {
 
     public static Path worldsDir() {
         return worldsDir;
+    }
+
+    public static Path addonsDir() {
+        return addonsDir;
+    }
+
+    /**
+     * Resolves the addon JAR scanning directory, honoring {@code --addons-dir} if provided.
+     *
+     * @param options parsed CLI options
+     * @return normalized addons directory path
+     */
+    public static Path resolveAddonsDir(final OptionSet options) {
+        if (options.has("addons-dir")) {
+            final Path resolved = ((Path) options.valueOf("addons-dir")).toAbsolutePath().normalize();
+            ensureDirectory(resolved);
+            return resolved;
+        }
+        ensureDirectory(addonsDir);
+        return addonsDir;
     }
 
     /**
@@ -170,17 +216,6 @@ public final class ApisPaths {
     }
 
     /**
-     * Resolves a plugin's dedicated data directory inside {@code <configs-dir>/<pluginName>}.
-     *
-     * @param pluginName Bukkit/Paper plugin name
-     * @return resolved data folder {@link Path}
-     */
-    public static Path resolvePluginDataFolder(final String pluginName) {
-        ensureDirectory(configsDir);
-        return configsDir.resolve(pluginName).toAbsolutePath().normalize();
-    }
-
-    /**
      * Resolves a relative config path (such as {@code settings.permissions-file} or {@code help.yml}) inside
      * the active configs directory while keeping explicit absolute paths untouched.
      *
@@ -248,6 +283,7 @@ public final class ApisPaths {
     public static synchronized void resetForTesting() {
         configsDir = Path.of(DEFAULT_CONFIGS_DIR).toAbsolutePath().normalize();
         worldsDir = Path.of(DEFAULT_WORLDS_DIR).toAbsolutePath().normalize();
+        addonsDir = Path.of(DEFAULT_ADDONS_DIR).toAbsolutePath().normalize();
     }
 
     private static Path resolveWithRootFallback(final Path baseDir, final String subDir, final String fileName) {

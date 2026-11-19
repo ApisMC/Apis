@@ -61,24 +61,29 @@ class ApisPathsAndSyncTest {
     void configuresCustomDirsPluginDataAndWorldsContainerPriority(final @TempDir Path tempDir) throws IOException {
         final Path customConfigs = tempDir.resolve("arena-1").resolve("configs");
         final Path customWorlds = tempDir.resolve("arena-1").resolve("worlds");
+        final Path customAddons = tempDir.resolve("arena-1").resolve("addons");
         final OptionParser parser = new OptionParser();
         parser.accepts("configs-dir").withRequiredArg().withValuesConvertedBy(new PathConverter());
         parser.accepts("worlds-dir").withRequiredArg().withValuesConvertedBy(new PathConverter());
+        parser.accepts("addons-dir").withRequiredArg().withValuesConvertedBy(new PathConverter());
         parser.accepts("bukkit-settings").withRequiredArg().ofType(File.class);
         parser.accepts("paper-settings-directory").withRequiredArg().ofType(File.class);
         parser.accepts("universe").withRequiredArg().ofType(File.class);
 
         final OptionSet opts = parser.parse(
             "--configs-dir=" + customConfigs,
-            "--worlds-dir=" + customWorlds
+            "--worlds-dir=" + customWorlds,
+            "--addons-dir=" + customAddons
         );
         ApisPaths.configureFromOptions(opts);
 
         assertTrue(Files.isDirectory(customConfigs));
         assertTrue(Files.isDirectory(customWorlds));
+        assertTrue(Files.isDirectory(customAddons));
         assertEquals(customConfigs.toAbsolutePath().normalize(), ApisPaths.configsDir());
         assertEquals(customWorlds.toAbsolutePath().normalize(), ApisPaths.worldsDir());
-        assertEquals(customConfigs.resolve("ExamplePlugin").normalize(), ApisPaths.resolvePluginDataFolder("ExamplePlugin"));
+        assertEquals(customAddons.toAbsolutePath().normalize(), ApisPaths.addonsDir());
+        assertEquals(customAddons.toAbsolutePath().normalize(), ApisPaths.resolveAddonsDir(opts));
         assertEquals(customConfigs.resolve("bukkit.yml").toFile(), ApisPaths.resolveOptionConfigFile(opts, "bukkit-settings", "bukkit.yml"));
         assertEquals(customConfigs, ApisPaths.resolvePaperDir(opts));
         assertEquals(customConfigs.resolve("permissions.yml").toFile(), ApisPaths.resolveConfigRelativeFile("permissions.yml", "permissions.yml"));
