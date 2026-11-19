@@ -14,6 +14,8 @@ import com.mojang.serialization.Decoder;
 import io.papermc.paper.adventure.PaperAdventure;
 import java.io.File;
 import java.io.IOException;
+import java.nio.ByteBuffer;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Locale;
@@ -829,5 +831,73 @@ public final class ApisHooks {
 
     public static void applyStandaloneWorldGameMode(final ServerPlayer player) {
         StandaloneWorldManager.applyWorldGameMode(player, true);
+    }
+
+    public static ByteBuffer sessionLockPayload(final ByteBuffer marker) {
+        final ByteBuffer dup = marker.duplicate();
+        final byte[] markerBytes = new byte[dup.remaining()];
+        dup.get(markerBytes);
+        final byte[] pidSuffix = ("\n" + ProcessHandle.current().pid() + "\n").getBytes(StandardCharsets.UTF_8);
+        final byte[] combined = new byte[markerBytes.length + pidSuffix.length];
+        System.arraycopy(markerBytes, 0, combined, 0, markerBytes.length);
+        System.arraycopy(pidSuffix, 0, combined, markerBytes.length, pidSuffix.length);
+        return ByteBuffer.wrap(combined);
+    }
+
+    public static void cleanupStaleSessionLockSilently(final Path lockPath) {
+        try {
+            Files.deleteIfExists(lockPath);
+        } catch (final IOException ex) {
+            LOGGER.debug("Failed to delete stale session.lock at '{}': {}", lockPath, ex.getMessage());
+        }
+    }
+
+    public static boolean isSessionLockOwnerAlive(final Path lockPath) {
+        try {
+            if (!Files.isRegularFile(lockPath) || Files.size(lockPath) > 1024L) {
+                return false;
+            }
+            final String content = Files.readString(lockPath, StandardCharsets.UTF_8);
+            final long currentPid = ProcessHandle.current().pid();
+            for (final String rawLine : content.split("\\R")) {
+                final String line = rawLine.trim();
+                if (line.isEmpty()) {
+                    continue;
+                }
+                final long pid;
+                try {
+                    pid = Long.parseLong(line);
+                } catch (NumberFormatException _) {
+                    continue;
+                }
+                if (pid > 0L && pid != currentPid) {
+                    return ProcessHandle.of(pid).filter(ProcessHandle::isAlive).isPresent();
+                }
+            }
+            return false;
+        } catch (IOException _) {
+            return false;
+        }
+    }
+
+    public static boolean tryBreakStaleSessionLock(final Path worldDir, final Path lockPath) {
+        if (isSessionLockOwnerAlive(lockPath)) {
+            return false;
+        }
+        final Path fileName = worldDir.getFileName();
+        final String worldName = fileName != null ? fileName.toString() : worldDir.toString();
+        final Path lockName = lockPath.getFileName();
+        LOGGER.warn(
+            "Stale {} detected for world '{}'. Forcibly breaking lock...",
+            lockName != null ? lockName.toString() : "session.lock",
+            worldName
+        );
+        try {
+            Files.deleteIfExists(lockPath);
+            return true;
+        } catch (final IOException ex) {
+            LOGGER.warn("Failed to delete stale session.lock at '{}': {}", lockPath, ex.getMessage());
+            return false;
+        }
     }
 }
