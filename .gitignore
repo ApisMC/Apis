@@ -15,7 +15,6 @@ out/
 .settings/
 
 # Gradle
-!gradle-wrapper.jar
 .gradle/
 build/
 */build/
@@ -32,6 +31,7 @@ build/
 /run
 /logs
 *.jar
+!gradle/wrapper/gradle-wrapper.jar
 test-plugin.settings.gradle.kts
 
 # Generated upstream/fork outputs
