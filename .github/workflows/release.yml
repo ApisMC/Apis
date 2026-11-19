@@ -43,6 +43,9 @@ jobs:
       - name: Apply patches
         run: ./gradlew applyAllPatches --stacktrace
 
+      - name: Run quickCheck
+        run: ./gradlew quickCheck --stacktrace
+
       - name: Build release Paperclip JAR
         run: ./gradlew :apis-server:createPaperclipJar -Prelease=true --stacktrace
 
@@ -60,4 +63,5 @@ jobs:
           files: |
             release-assets/apis-paperclip-*.jar
             release-assets/SHA256SUMS.txt
+          draft: true
           generate_release_notes: true
