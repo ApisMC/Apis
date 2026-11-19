@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-only
+
 package org.apismc.apis.hooks;
 
 import io.papermc.paper.util.StackWalkerUtil;

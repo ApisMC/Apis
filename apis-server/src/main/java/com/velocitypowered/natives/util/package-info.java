@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-only
+
 /**
  * Velocity native code loading with persistent cache directory support.
  */

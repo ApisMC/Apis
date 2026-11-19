@@ -1,3 +1,7 @@
+// Copyright (c) Velocity Contributors / PaperMC
+// Modifications Copyright (c) 2026 ApisMC contributors
+// SPDX-License-Identifier: GPL-3.0-only
+
 package com.velocitypowered.natives.util;
 
 import com.google.common.collect.ImmutableList;

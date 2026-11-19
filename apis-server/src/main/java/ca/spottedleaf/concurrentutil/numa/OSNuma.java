@@ -1,3 +1,7 @@
+// Copyright (c) Spottedleaf / Tuinity LeafPile contributors
+// Modifications Copyright (c) 2026 ApisMC contributors
+// SPDX-License-Identifier: GPL-3.0-only
+
 package ca.spottedleaf.concurrentutil.numa;
 
 import ca.spottedleaf.common.util.FlatBitsetUtil;

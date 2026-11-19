@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-only
+
 /**
  * Unit tests for Apis console logging and ANSI badge isolation.
  */

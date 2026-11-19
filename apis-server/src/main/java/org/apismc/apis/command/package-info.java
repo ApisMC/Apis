@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-only
+
 /**
  * Administrative commands for Apis diagnostics and runtime reload.
  */

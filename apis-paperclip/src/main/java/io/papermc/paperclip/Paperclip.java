@@ -1,3 +1,7 @@
+// Copyright (c) PaperMC contributors
+// Modifications Copyright (c) 2026 ApisMC contributors
+// SPDX-License-Identifier: MIT
+
 package io.papermc.paperclip;
 
 import java.io.BufferedReader;

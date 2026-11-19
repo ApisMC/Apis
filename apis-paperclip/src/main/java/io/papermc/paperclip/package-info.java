@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: MIT
+
 /**
  * Customized Paperclip bootstrapper for Apis with fast stamp verification.
  */

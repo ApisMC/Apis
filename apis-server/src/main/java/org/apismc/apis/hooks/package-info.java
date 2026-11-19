@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-only
+
 /**
  * Minimal static guard hooks invoked from patched Vanilla and Paper methods.
  */

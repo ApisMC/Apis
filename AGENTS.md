@@ -123,3 +123,15 @@ When assembling the server JAR (`apis-<mcVersion>.jar`, packed inside bundler `M
 - **Standalone worlds (`worlds.yml`):** World behavior, spawns, `force-spawn`, and `default-game-mode` are configured per world; messages use MiniMessage format stored in `apis.yml`.
 - **Checkstyle compliance:** Follow upstream Paper Checkstyle rules (4-space indent, Javadoc requirements where enforced, imports order, `package-info.java` in new packages). Run `checkstyleMain` / `checkstyleTest` before committing.
 - **Test hygiene:** Keep unit tests deterministic and self-contained using `@TempDir` and reset static state cleanly (`ApisPaths.resetForTesting()` etc.). Always clean up any temporary smoke-test folders outside the repo after verification.
+
+---
+
+## 5. License & Distribution Invariants
+
+- **SPDX Header Required:** Every new `.java` file under `org/apismc/apis/**` (main, `log4jPlugins`, and tests) must start on line 1 with:
+  ```java
+  // SPDX-License-Identifier: GPL-3.0-only
+  ```
+- **Shadowed Upstream Classes:** Any class overriding an upstream library (`ca.spottedleaf.concurrentutil.*`, `com.velocitypowered.natives.*`, `io.papermc.paperclip.*`) must preserve the upstream copyright holder notice, include `Modifications Copyright (c) 2026 ApisMC contributors`, and declare the matching upstream `SPDX-License-Identifier` (`GPL-3.0-only` or `MIT`).
+- **Public Releases (Paperclip Only):** Public releases must distribute strictly `apis-paperclip-*.jar` produced by `:apis-server:createPaperclipJar`. Never publish vanilla Mojang classes, `apis-server-*.jar`, or `apis-bundler-*.jar` (`createBundlerJar` is for local development/testing only).
+- **No Personal Data:** Never commit personal names, personal emails, usernames, or absolute machine paths into code, headers, `LICENSE.md`, `README.md`, or `AGENTS.md`. Use `ApisMC contributors` / `ApisMC Team` and repository-relative paths.
