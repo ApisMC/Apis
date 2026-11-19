@@ -156,46 +156,53 @@ public final class Paperclip {
         final FileEntry @Nullable [] libraryEntries = findLibraryEntries();
         final String manifestHash = PaperclipStamp.computeManifestHash();
         final Path stampPath = PaperclipStamp.resolveStampPath(repoDir);
-        final PaperclipStamp stamp = patches.length == 0
-            ? PaperclipStamp.tryLoad(stampPath, manifestHash)
-            : null;
+        final PaperclipStamp stamp = PaperclipStamp.tryLoad(stampPath, manifestHash);
 
-        final ExtractionResult extracted = extractFiles(patches, originalJar, repoDir, versionEntries, libraryEntries, stamp);
-        if (patches.length > 0) {
-            applyPatches(extracted.urls(), patches, originalJar, repoDir);
-        }
-
-        if (stamp == null || extracted.needsStampWrite() || patches.length > 0) {
-            final Map<String, byte[]> expectedHashes = collectExpectedHashes(versionEntries, libraryEntries, patches);
-            PaperclipStamp.writeAtomic(stampPath, manifestHash, expectedHashes, extracted.urls());
-        }
-        return extracted.urls();
-    }
-
-    private static ExtractionResult extractFiles(
-        final PatchEntry[] patches,
-        final @Nullable Path originalJar,
-        final Path repoDir,
-        final FileEntry @Nullable [] versionEntries,
-        final FileEntry @Nullable [] libraryEntries,
-        final @Nullable PaperclipStamp stamp
-    ) {
         final Map<String, Map<String, URL>> urls = new HashMap<>();
         boolean needsStampWrite = false;
 
         try (FileSystem originalFs = originalJar == null ? null : FileSystems.newFileSystem(originalJar)) {
             final Path originalRoot = originalFs == null ? null : originalFs.getPath("/");
+            final ExtractionResult extracted = extractFiles(patches, originalRoot, repoDir, versionEntries, libraryEntries, stamp);
+            urls.putAll(extracted.urls());
+            needsStampWrite |= extracted.needsStampWrite();
 
-            final Map<String, URL> versionsMap = new HashMap<>();
-            urls.put("versions", versionsMap);
-            needsStampWrite |= extractEntries(versionsMap, patches, originalRoot, repoDir, versionEntries, "versions", stamp);
-
-            final Map<String, URL> librariesMap = new HashMap<>();
-            urls.put("libraries", librariesMap);
-            needsStampWrite |= extractEntries(librariesMap, patches, originalRoot, repoDir, libraryEntries, "libraries", stamp);
+            if (patches.length > 0) {
+                if (originalRoot == null) {
+                    throw new IllegalStateException("patches.list requires an original jar");
+                }
+                needsStampWrite |= applyPatches(urls, patches, originalRoot, repoDir, stamp);
+            }
         } catch (final IOException ex) {
-            throw Util.fail("Failed to extract jar files", ex);
+            throw Util.fail("Failed to extract or patch jar files", ex);
         }
+
+        if (stamp == null || needsStampWrite) {
+            final Map<String, byte[]> expectedHashes = collectExpectedHashes(versionEntries, libraryEntries, patches);
+            final Map<String, Map<String, URL>> stampUrls = buildStampUrls(urls, patches, repoDir);
+            PaperclipStamp.writeAtomic(stampPath, manifestHash, expectedHashes, stampUrls);
+        }
+        return urls;
+    }
+
+    private static ExtractionResult extractFiles(
+        final PatchEntry[] patches,
+        final @Nullable Path originalRoot,
+        final Path repoDir,
+        final FileEntry @Nullable [] versionEntries,
+        final FileEntry @Nullable [] libraryEntries,
+        final @Nullable PaperclipStamp stamp
+    ) throws IOException {
+        final Map<String, Map<String, URL>> urls = new HashMap<>();
+        boolean needsStampWrite = false;
+
+        final Map<String, URL> versionsMap = new HashMap<>();
+        urls.put("versions", versionsMap);
+        needsStampWrite |= extractEntries(versionsMap, patches, originalRoot, repoDir, versionEntries, "versions", stamp);
+
+        final Map<String, URL> librariesMap = new HashMap<>();
+        urls.put("libraries", librariesMap);
+        needsStampWrite |= extractEntries(librariesMap, patches, originalRoot, repoDir, libraryEntries, "libraries", stamp);
 
         return new ExtractionResult(urls, needsStampWrite);
     }
@@ -221,12 +228,14 @@ public final class Paperclip {
         return anyRevalidated;
     }
 
-    private static void applyPatches(
+    private static boolean applyPatches(
         final Map<String, Map<String, URL>> urls,
         final PatchEntry[] patches,
-        final @Nullable Path originalJar,
-        final Path repoDir
+        final Path originalRoot,
+        final Path repoDir,
+        final @Nullable PaperclipStamp stamp
     ) {
+        boolean anyPatched = false;
         try {
             final Method applyMethod = PatchEntry.class.getDeclaredMethod(
                 "applyPatch",
@@ -236,11 +245,43 @@ public final class Paperclip {
             );
             applyMethod.setAccessible(true);
             for (final PatchEntry patch : patches) {
-                applyMethod.invoke(patch, urls, originalJar, repoDir);
+                final Path outputFile = repoDir.resolve(patch.location()).resolve(patch.outputPath());
+                if (stamp != null && stamp.matches(patch.location(), patch.outputPath(), patch.outputHash(), outputFile)) {
+                    urls.computeIfAbsent(patch.location(), _ -> new HashMap<>())
+                        .put(patch.originalPath(), outputFile.toUri().toURL());
+                    continue;
+                }
+                applyMethod.invoke(patch, urls, originalRoot, repoDir);
+                anyPatched = true;
             }
         } catch (final Exception ex) {
             throw Util.fail("Failed to apply patches", ex);
         }
+        return anyPatched;
+    }
+
+    private static Map<String, Map<String, URL>> buildStampUrls(
+        final Map<String, Map<String, URL>> urls,
+        final PatchEntry[] patches,
+        final Path repoDir
+    ) {
+        if (patches.length == 0) {
+            return urls;
+        }
+        final Map<String, Map<String, URL>> stampUrls = new HashMap<>();
+        for (final Map.Entry<String, Map<String, URL>> entry : urls.entrySet()) {
+            stampUrls.put(entry.getKey(), new HashMap<>(entry.getValue()));
+        }
+        for (final PatchEntry patch : patches) {
+            final Path outputFile = repoDir.resolve(patch.location()).resolve(patch.outputPath());
+            try {
+                stampUrls.computeIfAbsent(patch.location(), _ -> new HashMap<>())
+                    .put(patch.outputPath(), outputFile.toUri().toURL());
+            } catch (IOException _) {
+                // Non-fatal: next startup falls back to SHA-256 verification
+            }
+        }
+        return stampUrls;
     }
 
     private static Map<String, byte[]> collectExpectedHashes(
