@@ -45,51 +45,75 @@ Apis separates server configs, worlds, plugin JARs, and plugin data/configs:
 1. **Before running builds**, complete all planned source edits first rather than rebuilding after every small edit.
 2. **After editing `paper-server/`**, sync tracked changes back into `apis-server/paper-patches/`:
    ```bash
-   ./gradlew fixupPaperServerFilePatches --no-configuration-cache
+   ./gradlew fixupPaperServerFilePatches
    ```
 3. **After editing `apis-server/src/minecraft/`**, sync Minecraft patches:
    ```bash
-   ./gradlew fixupMinecraftSourcePatches --no-configuration-cache
+   ./gradlew fixupMinecraftSourcePatches
    ```
    (Use `fixupMinecraftResourcePatches` if resources under `apis-server/src/minecraft/resources/` were edited.)
 4. **Full server patch rebuild** (syncs/normalizes both Minecraft & Paper file patches cleanly):
    ```bash
-   ./gradlew fixupPaperServerFilePatches rebuildAllServerFilePatches --no-configuration-cache
+   ./gradlew fixupPaperServerFilePatches rebuildAllServerFilePatches
    ```
 5. **After editing `paper-api/`**, sync API patches:
    ```bash
-   ./gradlew fixupPaperApiFilePatches rebuildPaperApiFilePatches --no-configuration-cache
+   ./gradlew fixupPaperApiFilePatches rebuildPaperApiFilePatches
    ```
 6. **After editing generated `*/build.gradle.kts`**, regenerate `*/build.gradle.kts.patch`:
    ```bash
-   ./gradlew rebuildPaperSingleFilePatches --no-configuration-cache
+   ./gradlew rebuildPaperSingleFilePatches
    ```
-7. Always verify `git status` shows the updated `.patch` files (or deleted `.patch` files if an upstream patch was completely reverted) before committing.
+7. Always verify `git status` shows the updated `.patch` files (or deleted `.patch` files if an upstream patch was completely reverted) before committing. (If any third-party/Paperweight internal task hits a configuration-cache issue, add `--no-configuration-cache` for that invocation.)
 
 ---
 
 ## 3. Build, Run & Test Modes (Speed Guide)
 
 - **Toolchain:** Requires **Java 25** (`JavaLanguageVersion.of(25)`).
-- **Mandatory flag:** Always pass `--no-configuration-cache`. Although `gradle.properties` enables `org.gradle.configuration-cache=true`, `:apis-paperclip:jar` currently fails configuration-cache serialization due to `zipTree(...)` capture.
+- **Configuration Cache (Fixed):** Enabled globally in `gradle.properties` (`org.gradle.configuration-cache=true`). `:apis-paperclip:jar` now uses injected `ArchiveOperations` (`PaperclipServices`) and local variable capture instead of `Project.zipTree(...)`, and `:apis-server:jar` avoids top-level script `this$0` captures. Commands such as `quickCheck`, `:apis-server:createBundlerJar`, `:apis-server:createPaperclipJar`, and `rebuildPaperSingleFilePatches` run cleanly **without** `--no-configuration-cache`.
 
-### Why Builds Can Feel Slow & How to Keep Them Fast
-1. **`check` runs ~10,700+ tests:** Full `./gradlew check` executes Checkstyle across all modules, `scanJarForBadCalls`, and the entire upstream Paper/Bukkit + Apis test suite (~2.5–3 minutes). Do **not** attach `check` to routine bundler builds; run targeted tests while iterating and save `check` for final verification.
-2. **Don't flip `-Prelease=true` <-> dev mode unnecessarily:** `build.gradle.kts` switches `JavaCompile` debug flags (`-g:lines,source` for release vs `-g` for dev). Switching between the two invalidates Gradle's compilation cache and forces a full `:apis-server:compileJava` / `compileTestJava` rebuild (~35–50s). Stick to one mode during an iteration cycle.
-3. **`-Prelease=true` disables JAR manifest caching:** Without `BUILD_STARTED_AT`, `-Prelease=true` embeds `Instant.now()` into `Build-Time` in `:apis-server:jar` manifest, forcing `:apis-server:jar` + `:apis-server:createBundlerJar` (~12s) to repackage even when zero files changed. Dev mode uses `Instant.EPOCH`, allowing `UP-TO-DATE` (~2s).
+### Why Builds Can Stay Fast
+1. **Use `./gradlew quickCheck` instead of `./gradlew check` during iteration:** Full `./gradlew check` executes Checkstyle across all modules, `scanJarForBadCalls`, and all ~10,779 upstream Paper/Bukkit + Apis tests (~2.5–3 minutes). Root task `quickCheck` runs only `org.apismc.apis.ApisTestSuite` (`:apis-server:apisTest`), `:apis-server:checkstyleMain`, and `:apis-server:checkstyleTest`.
+2. **Deterministic release `Build-Time`:** With `-Prelease=true` (when `BUILD_STARTED_AT` is unset), `:apis-server:jar` uses `git log -1 --format=%cI` instead of `Instant.now()`, so repeated release bundler builds hit `UP-TO-DATE` (~1s with configuration cache) rather than repackaging every time.
+3. **Don't flip `-Prelease=true` <-> dev mode unnecessarily:** `build.gradle.kts` switches `JavaCompile` debug flags (`-g:lines,source` for release vs `-g` for dev). Switching between the two invalidates Gradle's compilation cache and forces a full `:apis-server:compileJava` / `compileTestJava` rebuild (~35–50s). Stick to one mode during an iteration cycle.
 4. **Use `--offline` when dependencies are cached:** Skips remote checks such as `:apis-server:downloadMcManifest`.
 
-### Recommended Commands
+### Recommended Build & Test Commands
 
 | Purpose | Command | Output / Notes |
 |---|---|---|
-| **Fastest live server test (no JAR repack)** | `./gradlew :apis-server:runDevServer --no-configuration-cache` | Runs directly from `sourceSets.main.runtimeClasspath` in `run/`. |
-| **Run Mojang-mapped server JAR** | `./gradlew :apis-server:runServer --no-configuration-cache` | Assembles server JAR without bundling dependencies. |
-| **Fast Dev Bundler JAR** | `./gradlew :apis-server:createBundlerJar --no-configuration-cache` | Outputs `apis-server/build/libs/apis-bundler-<mcVersion>.local-SNAPSHOT.jar`. Add `--offline` to skip manifest network checks. |
-| **Release Bundler JAR** | `./gradlew :apis-server:createBundlerJar -Prelease=true --no-configuration-cache` | Outputs `apis-server/build/libs/apis-bundler-<mcVersion>-release.jar` (optionally set `BUILD_STARTED_AT` ISO-8601 UTC to keep builds deterministic). |
-| **Paperclip JAR** | `./gradlew :apis-server:createPaperclipJar [-Prelease=true] --no-configuration-cache` | Outputs `apis-server/build/libs/apis-paperclip-*.jar` (compressed Paperclip wrapper; slower than `createBundlerJar`). |
-| **Fast Apis unit tests + Checkstyle** | `./gradlew :apis-server:test --tests org.apismc.apis.ApisTestSuite :apis-server:checkstyleMain :apis-server:checkstyleTest --no-configuration-cache` | Note: `apis-server` test task uses `include("**/**TestSuite.class")`, so filter via `ApisTestSuite`. |
-| **Full pre-commit / release verification** | `./gradlew check createBundlerJar -Prelease=true --no-configuration-cache` | Runs all Checkstyle checks, `scanJarForBadCalls`, all upstream + Apis test suites, and produces release bundler JAR. |
+| **Fast Apis unit tests + Checkstyle** | `./gradlew quickCheck` | Runs `ApisTestSuite` + `:apis-server:checkstyleMain` + `:apis-server:checkstyleTest` (~10s cold, <1s `UP-TO-DATE` with CC). |
+| **Fastest live server test (no JAR repack)** | `./gradlew :apis-server:runDevServer` | Runs directly from `sourceSets.main.runtimeClasspath` in `run/`. |
+| **Run Mojang-mapped server JAR** | `./gradlew :apis-server:runServer` | Assembles server JAR without bundling dependencies. |
+| **Dev Bundler JAR** | `./gradlew :apis-server:createBundlerJar` | Outputs `apis-server/build/libs/apis-bundler-<mcVersion>.local-SNAPSHOT.jar`. Add `--offline` to skip manifest network checks. |
+| **Release Bundler JAR (deterministic)** | `./gradlew :apis-server:createBundlerJar -Prelease=true` | Outputs `apis-server/build/libs/apis-bundler-<mcVersion>-release.jar`; `Build-Time` is pinned to `HEAD` commit timestamp (`UP-TO-DATE` <1s on repeat runs). |
+| **Paperclip JAR** | `./gradlew :apis-server:createPaperclipJar [-Prelease=true]` | Outputs `apis-server/build/libs/apis-paperclip-*.jar` (compressed Paperclip wrapper). |
+| **Full pre-commit / release verification** | `./gradlew check createBundlerJar -Prelease=true` | Runs all Checkstyle checks, `scanJarForBadCalls`, all upstream + Apis test suites, and produces release bundler JAR. |
+
+### Server JAR `Class-Path` & Runtime Launch Modes
+
+When assembling the server JAR (`apis-<mcVersion>.jar`, packed inside bundler `META-INF/versions/<mcVersion>/`), `:apis-server:jar` writes `Main-Class: org.bukkit.craftbukkit.Main` and automatically populates `META-INF/MANIFEST.MF` `Class-Path` with relative `../../libraries/<groupPath>/<artifact>/<version>/<jar>` paths matching every runtime dependency in `libraries/` (1-to-1 with `META-INF/libraries.list`).
+
+1. **Standard Paperclip Launch** (unpacks `versions/<mcVersion>/apis-<mcVersion>.jar` & `libraries/`, validates via `cache/.paperclip-stamp`):
+   ```bash
+   java --enable-native-access=ALL-UNNAMED -jar apis-bundler-<mcVersion>-release.jar --nogui
+   ```
+   (Same for `apis-paperclip-*.jar`.)
+2. **Direct Compact / Turbo AOT Launch** (no `find libraries` shell classpath assembly required):
+   ```bash
+   # 1) Record AOT profile (after initial Paperclip unpack of versions/ & libraries/)
+   java -XX:AOTMode=record -XX:AOTConfiguration=cache/apis-cp.aotconf --enable-native-access=ALL-UNNAMED \
+     -cp versions/<mcVersion>/apis-<mcVersion>.jar org.bukkit.craftbukkit.Main --nogui
+
+   # 2) Build AOT cache
+   java -XX:AOTMode=create -XX:AOTConfiguration=cache/apis-cp.aotconf -XX:AOTCache=cache/apis-cp.aot \
+     -cp versions/<mcVersion>/apis-<mcVersion>.jar
+
+   # 3) Fast production startup
+   java -XX:AOTCache=cache/apis-cp.aot --enable-native-access=ALL-UNNAMED \
+     -cp versions/<mcVersion>/apis-<mcVersion>.jar org.bukkit.craftbukkit.Main --nogui
+   ```
 
 ---
 

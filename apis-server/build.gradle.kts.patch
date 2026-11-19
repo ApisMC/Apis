@@ -1,5 +1,16 @@
 --- a/paper-server/build.gradle.kts
 +++ b/paper-server/build.gradle.kts
+@@ -1,7 +_,10 @@
+ import io.papermc.fill.model.BuildChannel
+ import io.papermc.paperweight.attribute.DevBundleOutput
+ import io.papermc.paperweight.util.*
++import org.gradle.api.artifacts.component.ModuleComponentIdentifier
++import org.gradle.api.artifacts.component.ProjectComponentIdentifier
+ import java.time.Instant
++import java.time.OffsetDateTime
+ 
+ plugins {
+     `java-library`
 @@ -16,20 +_,36 @@
  
  dependencies {
@@ -73,23 +84,71 @@
      implementation(platform("ca.spottedleaf.leafpile:bom:1.3.2"))
      implementation("ca.spottedleaf.leafpile:common")
      implementation("ca.spottedleaf.leafpile:concurrentutil")
-@@ -165,28 +_,32 @@
+@@ -165,28 +_,80 @@
      // Spark
      implementation("me.lucko:spark-api:0.1-20240720.200737-2")
      implementation("me.lucko:spark-paper:1.10.191")
 +
 +    checkstyle(project(":apis-checkstyle"))
++}
++
++fun buildLibraryClassPath(
++    resolvedArtifacts: Provider<Set<ResolvedArtifactResult>>,
++    apiGroup: String,
++    apiName: String,
++    apiVersion: String,
++): Provider<String> = resolvedArtifacts.map { artifacts ->
++    artifacts.asSequence()
++        .filter { it.file.extension == "jar" }
++        .mapNotNull { artifact ->
++            val fileName = artifact.file.name
++            when (val owner = artifact.variant.owner) {
++                is ModuleComponentIdentifier -> {
++                    "../../libraries/${owner.group.replace('.', '/')}/${owner.module}/${owner.version}/$fileName"
++                }
++                is ProjectComponentIdentifier -> {
++                    if (owner.projectPath == ":apis-api") {
++                        "../../libraries/${apiGroup.replace('.', '/')}/$apiName/$apiVersion/$fileName"
++                    } else {
++                        null
++                    }
++                }
++                else -> null
++            }
++        }
++        .distinct()
++        .sorted()
++        .joinToString(" ")
  }
  
  tasks.jar {
-     manifest {
+-    manifest {
++    val apiProj = project(":apis-api")
++    val cpProvider = buildLibraryClassPath(
++        configurations.runtimeClasspath.get().incoming.artifacts.resolvedArtifacts,
++        apiProj.group.toString(),
++        apiProj.name,
++        apiProj.version.toString(),
++    )
++    inputs.property("libraryClassPath", cpProvider)
++    val jarManifest = manifest
++    jarManifest.apply {
          val git = Git(rootProject.layout.projectDirectory.path)
          val mcVersion = rootProject.providers.gradleProperty("mcVersion").get()
 +        val isRelease = providers.gradleProperty("release").map { it.toBoolean() }.getOrElse(false)
          val build = System.getenv("BUILD_NUMBER") ?: null
 -        val buildTime = providers.environmentVariable("BUILD_STARTED_AT").map(Instant::parse).orElse(Instant.EPOCH).get()
-+        val buildTime = providers.environmentVariable("BUILD_STARTED_AT").map(Instant::parse)
-+            .orElse(if (isRelease) Instant.now() else Instant.EPOCH).get()
++        val buildTime = providers.environmentVariable("BUILD_STARTED_AT")
++            .map { OffsetDateTime.parse(it.trim()).toInstant() }
++            .orElse(
++                if (isRelease) {
++                    git.exec(providers, "log", "-1", "--format=%cI")
++                        .map { OffsetDateTime.parse(it.trim()).toInstant() }
++                } else {
++                    providers.provider { Instant.EPOCH }
++                }
++            )
++            .get()
          val gitHash = git.exec(providers, "rev-parse", "--short=7", "HEAD").get().trim()
 -        val implementationVersion = "$mcVersion-${build ?: "DEV"}-$gitHash"
 +        val implementationVersion = if (isRelease) "$mcVersion-RELEASE-$gitHash" else "$mcVersion-${build ?: "DEV"}-$gitHash"
@@ -98,6 +157,7 @@
          attributes(
              "Main-Class" to "org.bukkit.craftbukkit.Main",
 -            "Implementation-Title" to "Paper",
++            "Multi-Release" to "true",
 +            "Implementation-Title" to "Apis",
              "Implementation-Version" to implementationVersion,
              "Implementation-Vendor" to date,
@@ -113,7 +173,60 @@
              "Build-Number" to (build ?: ""),
              "Build-Time" to buildTime.toString(),
              "Git-Branch" to gitBranch,
-@@ -264,7 +_,7 @@
+@@ -196,6 +_,9 @@
+             attributes("$tld/bukkit", "Sealed" to true)
+         }
+     }
++    doFirst {
++        jarManifest.attributes("Class-Path" to cpProvider.get())
++    }
+ }
+ 
+ // Compile tests with -parameters for better junit parameterized test names
+@@ -240,14 +_,8 @@
+     })
+ }
+ 
+-tasks.test {
+-    include("**/**TestSuite.class")
++fun Test.configureServerTestDefaults() {
+     workingDir = temporaryDir
+-    useJUnitPlatform {
+-        forkEvery = 1
+-        excludeTags("Slow")
+-    }
+-
+     // Configure mockito agent that is needed in newer java versions
+     val provider = objects.newInstance<MockitoAgentProvider>()
+     provider.fileCollection.from(mockitoAgent)
+@@ -258,13 +_,34 @@
+     systemProperty("joml.nounsafe", true)
+ }
+ 
++tasks.test {
++    configureServerTestDefaults()
++    include("**/**TestSuite.class")
++    useJUnitPlatform {
++        forkEvery = 1
++        excludeTags("Slow")
++    }
++}
++
++tasks.register<Test>("apisTest") {
++    group = LifecycleBasePlugin.VERIFICATION_GROUP
++    description = "Runs only Apis unit tests (org.apismc.apis.ApisTestSuite)."
++    configureServerTestDefaults()
++    testClassesDirs = tasks.test.get().testClassesDirs
++    classpath = tasks.test.get().classpath
++    include("org/apismc/apis/ApisTestSuite.class")
++    useJUnitPlatform {
++        excludeTags("Slow")
++    }
++}
++
+ tasks.withType<io.papermc.paperweight.tasks.CreateBundlerJar>().configureEach {
+     extraManifestMainAttributes = mapOf(
+         "Enable-Native-Access" to "ALL-UNNAMED",
      )
  }
  

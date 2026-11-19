@@ -65,6 +65,11 @@ subprojects {
         "checkstyle"(project(":apis-checkstyle"))
     }
 
+    tasks.withType<AbstractArchiveTask>().configureEach {
+        isPreserveFileTimestamps = false
+        isReproducibleFileOrder = true
+    }
+
     val isRelease = providers.gradleProperty("release").map { it.toBoolean() }.getOrElse(false)
     tasks.withType<JavaCompile> {
         options.encoding = Charsets.UTF_8.name()
@@ -111,4 +116,10 @@ tasks.register("printMinecraftVersion") {
     doLast {
         println(providers.gradleProperty("mcVersion").get().trim())
     }
+}
+
+tasks.register("quickCheck") {
+    group = LifecycleBasePlugin.VERIFICATION_GROUP
+    description = "Runs Apis unit tests (ApisTestSuite) and apis-server Checkstyle without upstream Paper tests."
+    dependsOn(":apis-server:apisTest", ":apis-server:checkstyleMain", ":apis-server:checkstyleTest")
 }
