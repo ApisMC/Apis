@@ -1,0 +1,71 @@
+--- a/src/main/java/org/bukkit/craftbukkit/entity/CraftPlayer.java
++++ b/src/main/java/org/bukkit/craftbukkit/entity/CraftPlayer.java
+@@ -242,6 +_,7 @@
+     private boolean hasPlayedBefore = false;
+     private final ConversationTracker conversationTracker = new ConversationTracker();
+     private final Map<UUID, Set<WeakReference<Plugin>>> invertedVisibilityEntities = new HashMap<>();
++    private boolean hasHiddenEntities = false; // Apis - Fast path for canSee() when no entities are hidden
+     private final Set<UUID> unlistedEntities = new HashSet<>(); // Paper - Add Listing API for Player
+     private static final WeakHashMap<Plugin, WeakReference<Plugin>> pluginWeakReferences = new WeakHashMap<>();
+     private int hash = 0;
+@@ -1873,6 +_,7 @@
+         invertedPlugins = new HashSet<>();
+         invertedPlugins.add(CraftPlayer.getPluginWeakReference(plugin));
+         this.invertedVisibilityEntities.put(entity.getUniqueId(), invertedPlugins);
++        this.hasHiddenEntities = true; // Apis
+ 
+         return true;
+     }
+@@ -1910,6 +_,8 @@
+ 
+         if (this.invertedVisibilityEntities.remove(entity.getUniqueId()) == null) {
+             this.untrackAndHideEntity(entity);
++        } else {
++            this.hasHiddenEntities = !this.invertedVisibilityEntities.isEmpty(); // Apis
+         }
+     }
+ 
+@@ -1954,6 +_,7 @@
+             return false; // Some other plugins still want the entity inverted
+         }
+         this.invertedVisibilityEntities.remove(entity.getUniqueId());
++        this.hasHiddenEntities = !this.invertedVisibilityEntities.isEmpty(); // Apis
+ 
+         return true;
+     }
+@@ -2026,6 +_,8 @@
+ 
+         if (this.invertedVisibilityEntities.remove(entity.getUniqueId()) == null) {
+             this.trackAndShowEntity(entity);
++        } else {
++            this.hasHiddenEntities = !this.invertedVisibilityEntities.isEmpty(); // Apis
+         }
+     }
+     // Paper start
+@@ -2058,7 +_,9 @@
+     // Paper end
+ 
+     public void onEntityRemove(Entity entity) {
+-        this.invertedVisibilityEntities.remove(entity.getUUID());
++        if (this.invertedVisibilityEntities.remove(entity.getUUID()) != null) {
++            this.hasHiddenEntities = !this.invertedVisibilityEntities.isEmpty(); // Apis
++        }
+     }
+ 
+     @Override
+@@ -2068,7 +_,14 @@
+ 
+     @Override
+     public boolean canSee(org.bukkit.entity.Entity entity) {
+-        return this.equals(entity) || entity.isVisibleByDefault() ^ this.invertedVisibilityEntities.containsKey(entity.getUniqueId()); // SPIGOT-7312: Can always see self
++        if (this.equals(entity)) {
++            return true; // SPIGOT-7312: Can always see self
++        }
++        final boolean visibleByDefault = entity.isVisibleByDefault();
++        if (!this.hasHiddenEntities) { // Apis - Skip HashMap lookup and UUID allocation on fast path
++            return visibleByDefault;
++        }
++        return visibleByDefault ^ this.invertedVisibilityEntities.containsKey(entity.getUniqueId());
+     }
+ 
+     public boolean canSeePlayer(UUID uuid) {

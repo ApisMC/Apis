@@ -1,0 +1,36 @@
+--- a/net/minecraft/server/network/ServerGamePacketListenerImpl.java
++++ b/net/minecraft/server/network/ServerGamePacketListenerImpl.java
+@@ -1619,18 +_,22 @@
+                 boolean movedUpwards = yDist > 0.0;
+                 if (this.player.onGround() && !isOnGround && movedUpwards) {
+                     // Paper start - Add PlayerJumpEvent
+-                    org.bukkit.entity.Player player = this.getCraftPlayer();
+-                    Location from = new Location(player.getWorld(), this.lastPosX, this.lastPosY, this.lastPosZ, this.lastYRot, this.lastXRot); // Get the Players previous Event location.
+-                    Location to = new Location(player.getWorld(), targetX, targetY, targetZ, targetYRot, targetXRot);
+-
+-                    com.destroystokyo.paper.event.player.PlayerJumpEvent event = new com.destroystokyo.paper.event.player.PlayerJumpEvent(player, from, to);
+-
+-                    if (event.callEvent()) {
+-                        this.player.jumpFromGround();
++                    if (com.destroystokyo.paper.event.player.PlayerJumpEvent.getHandlerList().hasListeners()) { // Apis - Skip event/Location allocations when unlistened
++                        org.bukkit.entity.Player player = this.getCraftPlayer();
++                        Location from = new Location(player.getWorld(), this.lastPosX, this.lastPosY, this.lastPosZ, this.lastYRot, this.lastXRot); // Get the Players previous Event location.
++                        Location to = new Location(player.getWorld(), targetX, targetY, targetZ, targetYRot, targetXRot);
++
++                        com.destroystokyo.paper.event.player.PlayerJumpEvent event = new com.destroystokyo.paper.event.player.PlayerJumpEvent(player, from, to);
++
++                        if (event.callEvent()) {
++                            this.player.jumpFromGround();
++                        } else {
++                            from = event.getFrom();
++                            this.internalTeleport(new PositionMoveRotation(org.bukkit.craftbukkit.util.CraftLocation.toVec3(from), Vec3.ZERO, from.getYaw(), from.getPitch()), Collections.emptySet());
++                            return;
++                        }
+                     } else {
+-                        from = event.getFrom();
+-                        this.internalTeleport(new PositionMoveRotation(org.bukkit.craftbukkit.util.CraftLocation.toVec3(from), Vec3.ZERO, from.getYaw(), from.getPitch()), Collections.emptySet());
+-                        return;
++                        this.player.jumpFromGround();
+                     }
+                     // Paper end - Add PlayerJumpEvent
+                 }

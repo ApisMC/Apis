@@ -1,0 +1,211 @@
+--- /dev/null
++++ b/src/main/java/io/papermc/paper/plugin/provider/classloader/PluginPackageIndex.java
+@@ -1,0 +_,208 @@
++package io.papermc.paper.plugin.provider.classloader;
++
++import java.io.File;
++import java.io.IOException;
++import java.net.URISyntaxException;
++import java.net.URL;
++import java.net.URLClassLoader;
++import java.util.Enumeration;
++import java.util.Set;
++import java.util.concurrent.ConcurrentHashMap;
++import java.util.concurrent.atomic.AtomicInteger;
++import java.util.jar.JarEntry;
++import java.util.jar.JarFile;
++import java.util.zip.ZipError;
++import java.util.zip.ZipFile;
++import org.jetbrains.annotations.ApiStatus;
++import org.jspecify.annotations.NullMarked;
++import org.jspecify.annotations.Nullable;
++
++/**
++ * Indexes all Java package names contained within a plugin JAR and its attached library JARs
++ * so cross-plugin class resolution skips unrelated {@link JarFile} scans in O(1).
++ */
++@NullMarked
++@ApiStatus.Internal
++public final class PluginPackageIndex {
++
++    private static final String META_INF_VERSIONS = "META-INF/versions/";
++
++    private final Set<String> ownPackages = ConcurrentHashMap.newKeySet();
++    private final Set<String> libraryPackages = ConcurrentHashMap.newKeySet();
++    private final @Nullable ClassLoader libraryLoader;
++    private final AtomicInteger activeOwnIndexing = new AtomicInteger();
++    private volatile boolean hasUnindexedOwnUrls;
++    private volatile boolean hasUnindexedLibraries;
++    private volatile int indexedLibraryUrlCount;
++
++    private PluginPackageIndex(final @Nullable JarFile primaryJar, final @Nullable ClassLoader libraryLoader) {
++        if (primaryJar == null || !indexJarInto(primaryJar, this.ownPackages)) {
++            this.hasUnindexedOwnUrls = true;
++        }
++        this.libraryLoader = libraryLoader;
++        if (libraryLoader != null && !(libraryLoader instanceof URLClassLoader)) {
++            this.hasUnindexedLibraries = true;
++        } else {
++            syncLibraryLoader();
++        }
++    }
++
++    /**
++     * Builds a package index from a plugin's primary {@link JarFile} and optional library classloader.
++     *
++     * @param primaryJar    plugin JAR file
++     * @param libraryLoader optional dependency library classloader
++     * @return initialized package index
++     */
++    public static PluginPackageIndex fromJar(final @Nullable JarFile primaryJar, final @Nullable ClassLoader libraryLoader) {
++        return new PluginPackageIndex(primaryJar, libraryLoader);
++    }
++
++    /**
++     * Indexes a dynamically added URL (e.g., runtime {@code URLClassLoader.addURL}) into own packages.
++     * Falls back conservatively if the URL cannot be indexed as a local JAR file or while indexing is in flight.
++     *
++     * @param url newly appended classpath URL
++     */
++    public void indexAddedUrl(final @Nullable URL url) {
++        this.activeOwnIndexing.incrementAndGet();
++        try {
++            if (url == null || !indexUrlInto(url, this.ownPackages)) {
++                this.hasUnindexedOwnUrls = true;
++            }
++        } finally {
++            this.activeOwnIndexing.decrementAndGet();
++        }
++    }
++
++    /**
++     * Records a dynamically loaded class's package (e.g., runtime {@code defineClass} / ByteBuddy / ASM)
++     * so subsequent lookups in that package hit the fast indexed path.
++     *
++     * @param packageName         dot-separated Java package name
++     * @param resolvedClassLoader classloader that defined the class (may be {@code null})
++     */
++    public void recordPackage(final String packageName, final @Nullable ClassLoader resolvedClassLoader) {
++        if (this.libraryLoader != null && resolvedClassLoader == this.libraryLoader) {
++            this.libraryPackages.add(packageName);
++        } else {
++            this.ownPackages.add(packageName);
++        }
++    }
++
++    /**
++     * Checks whether this plugin (or optionally its attached libraries) may contain a class in {@code packageName}.
++     *
++     * @param packageName    dot-separated Java package name (empty string for default package)
++     * @param checkLibraries whether library classloader packages should also be checked
++     * @return {@code true} if the package is indexed or an unindexed fallback source exists
++     */
++    public boolean mayContainPackage(final String packageName, final boolean checkLibraries) {
++        if (this.hasUnindexedOwnUrls || this.activeOwnIndexing.get() > 0 || this.ownPackages.contains(packageName)) {
++            return true;
++        }
++        if (!checkLibraries || this.libraryLoader == null) {
++            return false;
++        }
++        if (this.hasUnindexedLibraries) {
++            return true;
++        }
++        if (this.libraryLoader instanceof URLClassLoader ucl) {
++            final @Nullable URL @Nullable [] urls = safeGetUrls(ucl);
++            if (urls == null) {
++                this.hasUnindexedLibraries = true;
++                return true;
++            }
++            if (urls.length != this.indexedLibraryUrlCount) {
++                syncLibraryLoader();
++            }
++            return this.hasUnindexedLibraries || this.libraryPackages.contains(packageName);
++        }
++        return true;
++    }
++
++    private synchronized void syncLibraryLoader() {
++        if (!(this.libraryLoader instanceof URLClassLoader ucl) || this.hasUnindexedLibraries) {
++            return;
++        }
++        final @Nullable URL @Nullable [] urls = safeGetUrls(ucl);
++        if (urls == null || urls.length < this.indexedLibraryUrlCount) {
++            this.hasUnindexedLibraries = true;
++            return;
++        }
++        for (int i = this.indexedLibraryUrlCount; i < urls.length; i++) {
++            final @Nullable URL url = urls[i];
++            if (url == null || !indexUrlInto(url, this.libraryPackages)) {
++                this.hasUnindexedLibraries = true;
++                break;
++            }
++        }
++        this.indexedLibraryUrlCount = urls.length;
++    }
++
++    private static @Nullable URL @Nullable [] safeGetUrls(final URLClassLoader ucl) {
++        try {
++            return ucl.getURLs();
++        } catch (final RuntimeException _) {
++            return null;
++        }
++    }
++
++    private static boolean indexUrlInto(final URL url, final Set<String> target) {
++        if (!"file".equalsIgnoreCase(url.getProtocol())) {
++            return false;
++        }
++        final File file;
++        try {
++            file = new File(url.toURI());
++        } catch (final URISyntaxException | IllegalArgumentException _) {
++            return false;
++        }
++        if (!file.isFile()) {
++            return false;
++        }
++        try (JarFile jar = new JarFile(file, true, ZipFile.OPEN_READ, JarFile.runtimeVersion())) {
++            return indexJarInto(jar, target);
++        } catch (final IOException | IllegalStateException | SecurityException | ZipError _) {
++            return false;
++        }
++    }
++
++    private static boolean indexJarInto(final JarFile jar, final Set<String> target) {
++        try {
++            final Enumeration<JarEntry> entries = jar.entries();
++            while (entries.hasMoreElements()) {
++                final JarEntry entry = entries.nextElement();
++                if (entry.isDirectory()) {
++                    continue;
++                }
++                final @Nullable String pkg = extractPackageName(entry.getName());
++                if (pkg != null) {
++                    target.add(pkg);
++                }
++            }
++            return true;
++        } catch (final IllegalStateException | SecurityException | ZipError _) {
++            return false;
++        }
++    }
++
++    static @Nullable String extractPackageName(final String rawEntryName) {
++        String entryName = rawEntryName;
++        if (entryName.startsWith(META_INF_VERSIONS)) {
++            final int nextSlash = entryName.indexOf('/', META_INF_VERSIONS.length());
++            if (nextSlash == -1) {
++                return null;
++            }
++            entryName = entryName.substring(nextSlash + 1);
++        } else if (entryName.startsWith("META-INF/")) {
++            return null;
++        }
++
++        if (!entryName.endsWith(".class")) {
++            return null;
++        }
++        final int lastSlash = entryName.lastIndexOf('/');
++        return lastSlash <= 0 ? "" : entryName.substring(0, lastSlash).replace('/', '.');
++    }
++}

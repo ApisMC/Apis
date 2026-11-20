@@ -1,0 +1,28 @@
+--- a/src/main/java/io/papermc/paper/plugin/entrypoint/classloader/PaperPluginClassLoader.java
++++ b/src/main/java/io/papermc/paper/plugin/entrypoint/classloader/PaperPluginClassLoader.java
+@@ -49,7 +_,7 @@
+     private PluginClassLoaderGroup group;
+ 
+     public PaperPluginClassLoader(Logger logger, Path source, JarFile file, PaperPluginMeta configuration, ClassLoader parentLoader, URLClassLoader libraryLoader) throws IOException {
+-        super(source, file, configuration, parentLoader);
++        super(source, file, configuration, parentLoader, libraryLoader); // Apis
+         this.libraryLoader = libraryLoader;
+ 
+         this.logger = logger;
+@@ -200,6 +_,16 @@
+         try (this.jar; this.libraryLoader) {
+             super.close();
+         }
++    }
++
++    @Override
++    public boolean mayContainClassInPackage(@NotNull String packageName, boolean checkLibraries) {
++        return this.packageIndex.mayContainPackage(packageName, checkLibraries);
++    }
++
++    @Override
++    public void recordDynamicPackage(@NotNull String packageName, @Nullable ClassLoader resolvedClassLoader) {
++        this.packageIndex.recordPackage(packageName, resolvedClassLoader);
+     }
+ 
+     @Override

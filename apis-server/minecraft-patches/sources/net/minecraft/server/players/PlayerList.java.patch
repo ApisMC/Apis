@@ -15,6 +15,32 @@
      public static final Component CHAT_FILTERED_FULL = Component.translatable("chat.filtered_full");
      public static final Component DUPLICATE_LOGIN_DISCONNECT_MESSAGE = Component.translatable("multiplayer.disconnect.duplicate_login");
      private static final Logger LOGGER = LogUtils.getLogger();
+@@ -198,13 +_,19 @@
+         playerConnection.send(new ClientboundChangeDifficultyPacket(levelData.getDifficulty(), levelData.isDifficultyLocked()));
+         playerConnection.send(new ClientboundPlayerAbilitiesPacket(player.getAbilities()));
+         playerConnection.send(new ClientboundSetHeldSlotPacket(player.getInventory().getSelectedSlot()));
+-        RecipeManager recipeManager = this.server.getRecipeManager();
+-        playerConnection.send(
+-            new ClientboundUpdateRecipesPacket(recipeManager.getSynchronizedItemProperties(), recipeManager.getSynchronizedStonecutterRecipes())
+-        );
++        if (!org.apismc.apis.hooks.ApisHooks.isRecipesDisabled()) { // Apis - Skip recipe sync when gameplay.recipes=false
++            RecipeManager recipeManager = this.server.getRecipeManager();
++            playerConnection.send(
++                new ClientboundUpdateRecipesPacket(recipeManager.getSynchronizedItemProperties(), recipeManager.getSynchronizedStonecutterRecipes())
++            );
++        } // Apis
+         this.sendPlayerPermissionLevel(player);
+-        player.getStats().markAllDirty();
+-        player.getRecipeBook().sendInitialRecipeBook(player);
++        if (org.apismc.apis.hooks.ApisHooks.isStatisticsEnabled()) { // Apis - Skip marking stats dirty when players.statistics=false
++            player.getStats().markAllDirty();
++        } // Apis
++        if (!org.apismc.apis.hooks.ApisHooks.isRecipesDisabled()) { // Apis - Skip initial recipe book sync when gameplay.recipes=false
++            player.getRecipeBook().sendInitialRecipeBook(player);
++        } // Apis
+         this.updateEntireScoreboard(level.getScoreboard(), player);
+         this.server.invalidateStatus();
+         MutableComponent component;
 @@ -697,6 +_,7 @@
  
          // It's possible for respawn to be in a diff dimension

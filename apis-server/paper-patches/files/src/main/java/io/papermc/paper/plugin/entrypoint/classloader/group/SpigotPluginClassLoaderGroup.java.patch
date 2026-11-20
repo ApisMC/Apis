@@ -1,0 +1,14 @@
+--- a/src/main/java/io/papermc/paper/plugin/entrypoint/classloader/group/SpigotPluginClassLoaderGroup.java
++++ b/src/main/java/io/papermc/paper/plugin/entrypoint/classloader/group/SpigotPluginClassLoaderGroup.java
+@@ -39,6 +_,11 @@
+     }
+ 
+     @Override
++    protected boolean mayContainPackage(ConfiguredPluginClassLoader current, String packageName) { // Apis
++        return current.mayContainClassInPackage(packageName, this.libraryClassloaderPredicate.test(current));
++    }
++
++    @Override
+     protected Class<?> lookupClass(String name, boolean resolve, ConfiguredPluginClassLoader current) throws ClassNotFoundException {
+         return current.loadClass(name, resolve, false, this.libraryClassloaderPredicate.test(current));
+     }

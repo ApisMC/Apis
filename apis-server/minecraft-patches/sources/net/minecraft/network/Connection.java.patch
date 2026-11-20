@@ -1,0 +1,279 @@
+--- a/net/minecraft/network/Connection.java
++++ b/net/minecraft/network/Connection.java
+@@ -126,6 +_,17 @@
+     public boolean isPending = true;
+     public boolean queueImmunity;
+     // Paper end - Optimize network
++    // Apis start - Per-tick outbound packet batching
++    private static final int INITIAL_BATCH_CAPACITY = 16;
++    private static final int MAX_BATCH_SIZE_BEFORE_DRAIN = 256;
++    private final Object outboundBatchLock = new Object();
++    private Packet<?> @Nullable [] batchPackets;
++    private @Nullable ChannelFutureListener @Nullable [] batchListeners;
++    private Packet<?> @Nullable [] spareBatchPackets;
++    private @Nullable ChannelFutureListener @Nullable [] spareBatchListeners;
++    private int batchCount;
++    private volatile boolean mayHaveUnflushedEventLoopWrites;
++    // Apis end - Per-tick outbound packet batching
+ 
+     public Connection(final PacketFlow receiving) {
+         this.receiving = receiving;
+@@ -468,9 +_,13 @@
+         }
+ 
+         if (connected && this.pendingActions.isEmpty()) {
++            this.flushOutboundBatch(false); // Apis - Preserve FIFO order before scheduled Netty task
+             this.channel.eventLoop().execute(task);
+         } else {
+-            this.pendingActions.add(new WrappedConsumer(connection -> connection.channel.eventLoop().execute(task)));
++            this.pendingActions.add(new WrappedConsumer(connection -> {
++                connection.flushOutboundBatch(false); // Apis - Preserve FIFO order before scheduled Netty task
++                connection.channel.eventLoop().execute(task);
++            }));
+             this.flushQueue();
+         }
+     }
+@@ -496,11 +_,181 @@
+     private void sendPacket(final Packet<?> packet, final @Nullable ChannelFutureListener listener, final boolean flush) {
+         this.sentPackets++;
+         if (this.channel.eventLoop().inEventLoop()) {
++            this.drainBatchOnEventLoop();
+             this.doSendPacket(packet, listener, flush);
+-        } else {
+-            this.channel.eventLoop().execute(() -> this.doSendPacket(packet, listener, flush));
+-        }
+-    }
++        } else if (!flush) {
++            this.enqueueBatchPacket(packet, listener);
++        } else {
++            this.sendImmediateOrFlushBatch(packet, listener);
++        }
++    }
++
++    // Apis start - Per-tick outbound packet batching
++    private void appendToBatchLocked(final Packet<?> packet, final @Nullable ChannelFutureListener listener) {
++        if (this.batchPackets == null) {
++            this.batchPackets = this.spareBatchPackets != null ? this.spareBatchPackets : new Packet<?>[INITIAL_BATCH_CAPACITY];
++            this.spareBatchPackets = null;
++            if (listener != null && this.spareBatchListeners != null && this.spareBatchListeners.length >= this.batchPackets.length) {
++                this.batchListeners = this.spareBatchListeners;
++            }
++            this.spareBatchListeners = null;
++        } else if (this.batchCount == this.batchPackets.length) {
++            final int newLen = this.batchPackets.length << 1;
++            this.batchPackets = java.util.Arrays.copyOf(this.batchPackets, newLen);
++            if (this.batchListeners != null) {
++                this.batchListeners = java.util.Arrays.copyOf(this.batchListeners, newLen);
++            }
++        }
++        final int idx = this.batchCount++;
++        this.batchPackets[idx] = packet;
++        if (listener != null) {
++            if (this.batchListeners == null) {
++                this.batchListeners = new ChannelFutureListener[this.batchPackets.length];
++            }
++            this.batchListeners[idx] = listener;
++        }
++    }
++
++    private void enqueueBatchPacket(final Packet<?> packet, final @Nullable ChannelFutureListener listener) {
++        Packet<?>[] overflowPackets = null;
++        @Nullable ChannelFutureListener[] overflowListeners = null;
++        int overflowCount = 0;
++        synchronized (this.outboundBatchLock) {
++            this.appendToBatchLocked(packet, listener);
++            if (this.batchCount >= MAX_BATCH_SIZE_BEFORE_DRAIN) {
++                overflowPackets = this.batchPackets;
++                overflowListeners = this.batchListeners;
++                overflowCount = this.batchCount;
++                this.batchPackets = this.spareBatchPackets;
++                this.spareBatchPackets = null;
++                this.batchListeners = null;
++                this.batchCount = 0;
++            }
++        }
++        if (overflowCount > 0) {
++            final Packet<?>[] packets = overflowPackets;
++            final @Nullable ChannelFutureListener[] listeners = overflowListeners;
++            final int count = overflowCount;
++            this.channel.eventLoop().execute(() -> this.doSendBatch(packets, listeners, count, false));
++        }
++    }
++
++    private void sendImmediateOrFlushBatch(final Packet<?> packet, final @Nullable ChannelFutureListener listener) {
++        final Packet<?>[] packets;
++        final @Nullable ChannelFutureListener[] listeners;
++        final int count;
++        synchronized (this.outboundBatchLock) {
++            if (this.batchCount == 0) {
++                packets = null;
++                listeners = null;
++                count = 0;
++            } else {
++                this.appendToBatchLocked(packet, listener);
++                packets = this.batchPackets;
++                listeners = this.batchListeners;
++                count = this.batchCount;
++                this.batchPackets = this.spareBatchPackets;
++                this.spareBatchPackets = null;
++                this.batchListeners = null;
++                this.batchCount = 0;
++            }
++        }
++        if (count == 0) {
++            this.channel.eventLoop().execute(() -> this.doSendPacket(packet, listener, true));
++        } else {
++            this.channel.eventLoop().execute(() -> this.doSendBatch(packets, listeners, count, true));
++        }
++    }
++
++    private boolean flushOutboundBatch(final boolean flushAfter) {
++        if (this.channel == null) {
++            return false;
++        }
++        if (this.channel.eventLoop().inEventLoop()) {
++            final boolean drained = this.drainBatchOnEventLoop();
++            if (flushAfter && (drained || this.mayHaveUnflushedEventLoopWrites) && this.isConnected()) {
++                this.channel.flush();
++                this.mayHaveUnflushedEventLoopWrites = false;
++            }
++            return drained;
++        }
++        final Packet<?>[] packets;
++        final @Nullable ChannelFutureListener[] listeners;
++        final int count;
++        synchronized (this.outboundBatchLock) {
++            if (this.batchCount == 0) {
++                return false;
++            }
++            packets = this.batchPackets;
++            listeners = this.batchListeners;
++            count = this.batchCount;
++            this.batchPackets = this.spareBatchPackets;
++            this.spareBatchPackets = null;
++            this.batchListeners = null;
++            this.batchCount = 0;
++        }
++        this.channel.eventLoop().execute(() -> this.doSendBatch(packets, listeners, count, flushAfter));
++        return true;
++    }
++
++    private boolean drainBatchOnEventLoop() {
++        final Packet<?>[] packets;
++        final @Nullable ChannelFutureListener[] listeners;
++        final int count;
++        synchronized (this.outboundBatchLock) {
++            if (this.batchCount == 0) {
++                return false;
++            }
++            packets = this.batchPackets;
++            listeners = this.batchListeners;
++            count = this.batchCount;
++            this.batchPackets = this.spareBatchPackets;
++            this.spareBatchPackets = null;
++            this.batchListeners = null;
++            this.batchCount = 0;
++        }
++        this.doSendBatch(packets, listeners, count, false);
++        return true;
++    }
++
++    private void doSendBatch(
++        final Packet<?>[] packets,
++        final @Nullable ChannelFutureListener @Nullable [] listeners,
++        final int count,
++        final boolean flushAfter
++    ) {
++        try {
++            for (int i = 0; i < count; i++) {
++                final Packet<?> pkt = packets[i];
++                final @Nullable ChannelFutureListener listener = listeners != null ? listeners[i] : null;
++                packets[i] = null;
++                if (listeners != null) {
++                    listeners[i] = null;
++                }
++                if (pkt != null) {
++                    this.doSendPacket(pkt, listener, false);
++                }
++            }
++            if (flushAfter && this.isConnected()) {
++                this.channel.flush();
++                this.mayHaveUnflushedEventLoopWrites = false;
++            } else {
++                this.mayHaveUnflushedEventLoopWrites = true;
++            }
++        } finally {
++            if (packets.length <= MAX_BATCH_SIZE_BEFORE_DRAIN) {
++                synchronized (this.outboundBatchLock) {
++                    if (this.spareBatchPackets == null) {
++                        this.spareBatchPackets = packets;
++                        if (listeners != null) {
++                            this.spareBatchListeners = listeners;
++                        }
++                    }
++                }
++            }
++        }
++    }
++    // Apis end - Per-tick outbound packet batching
+ 
+     private void doSendPacket(final Packet<?> packet, final @Nullable ChannelFutureListener listener, final boolean flush) {
+         // Paper start - Optimize network
+@@ -520,6 +_,7 @@
+         } else {
+             future = this.channel.write(packet, this.channel.voidPromise()); // Paper - Optimize network
+         }
++        this.mayHaveUnflushedEventLoopWrites = !flush; // Apis
+ 
+         // Paper start - Optimize network
+         if (packet.hasFinishListener()) {
+@@ -544,8 +_,13 @@
+ 
+     private void flush() {
+         if (this.channel.eventLoop().inEventLoop()) {
+-            this.channel.flush();
+-        } else {
++            this.drainBatchOnEventLoop();
++            if (this.isConnected()) {
++                this.channel.flush();
++            }
++            this.mayHaveUnflushedEventLoopWrites = false;
++        } else if (!this.flushOutboundBatch(true) && this.mayHaveUnflushedEventLoopWrites) {
++            this.mayHaveUnflushedEventLoopWrites = false;
+             this.channel.eventLoop().execute(() -> this.channel.flush());
+         }
+     }
+@@ -925,6 +_,33 @@
+     // Paper start - Optimize network
+     public void clearPacketQueue() {
+         final net.minecraft.server.level.ServerPlayer player = getPlayer();
++        // Apis start - Clear batched outbound packets on disconnect
++        final Packet<?>[] packets;
++        final @Nullable ChannelFutureListener[] listeners;
++        final int count;
++        synchronized (this.outboundBatchLock) {
++            packets = this.batchPackets;
++            listeners = this.batchListeners;
++            count = this.batchCount;
++            this.batchPackets = null;
++            this.batchListeners = null;
++            this.spareBatchPackets = null;
++            this.spareBatchListeners = null;
++            this.batchCount = 0;
++        }
++        if (packets != null) {
++            for (int i = 0; i < count; i++) {
++                final Packet<?> pkt = packets[i];
++                packets[i] = null;
++                if (listeners != null) {
++                    listeners[i] = null;
++                }
++                if (pkt != null && pkt.hasFinishListener()) {
++                    pkt.onPacketDispatchFinish(player, null);
++                }
++            }
++        }
++        // Apis end - Clear batched outbound packets on disconnect
+         for (final Consumer<Connection> queuedAction : this.pendingActions) {
+             if (queuedAction instanceof PacketSendAction packetSendAction) {
+                 final Packet<?> packet = packetSendAction.packet;

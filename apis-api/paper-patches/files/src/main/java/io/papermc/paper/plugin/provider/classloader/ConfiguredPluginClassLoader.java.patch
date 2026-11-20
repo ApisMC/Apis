@@ -1,0 +1,31 @@
+--- a/src/main/java/io/papermc/paper/plugin/provider/classloader/ConfiguredPluginClassLoader.java
++++ b/src/main/java/io/papermc/paper/plugin/provider/classloader/ConfiguredPluginClassLoader.java
+@@ -62,6 +_,28 @@
+     @Nullable JavaPlugin getPlugin();
+ 
+     /**
++     * Checks whether this classloader (or optionally its libraries) might contain a class
++     * in the given Java package, allowing cross-plugin lookups to skip unrelated JARs.
++     *
++     * @param packageName    dot-separated package name ({@code ""} for default package)
++     * @param checkLibraries whether attached library classloaders should be considered
++     * @return {@code true} if the package may exist in this classloader
++     */
++    default boolean mayContainClassInPackage(String packageName, boolean checkLibraries) {
++        return true;
++    }
++
++    /**
++     * Records a package dynamically introduced at runtime (e.g., via ByteBuddy, ASM, or {@code defineClass})
++     * so subsequent cross-plugin resolutions stay on the fast indexed path.
++     *
++     * @param packageName         dot-separated package name
++     * @param resolvedClassLoader classloader that defined the resolved class (may be {@code null})
++     */
++    default void recordDynamicPackage(String packageName, @Nullable ClassLoader resolvedClassLoader) {
++    }
++
++    /**
+      * Get the plugin classloader group
+      * that is used by the underlying classloader
+      * @return classloader

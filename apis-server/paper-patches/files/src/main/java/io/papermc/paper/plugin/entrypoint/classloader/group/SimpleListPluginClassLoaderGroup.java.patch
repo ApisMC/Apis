@@ -1,0 +1,44 @@
+--- a/src/main/java/io/papermc/paper/plugin/entrypoint/classloader/group/SimpleListPluginClassLoaderGroup.java
++++ b/src/main/java/io/papermc/paper/plugin/entrypoint/classloader/group/SimpleListPluginClassLoaderGroup.java
+@@ -32,14 +_,41 @@
+             }
+         }
+ 
++        final int lastDot = name.lastIndexOf('.');
++        final String packageName = lastDot == -1 ? "" : name.substring(0, lastDot); // Apis - Skip unrelated plugin JARs via package index
++        boolean anySkipped = false;
+         for (ConfiguredPluginClassLoader loader : this.classloaders) {
++            if (!this.mayContainPackage(loader, packageName)) {
++                anySkipped = true;
++                continue;
++            }
+             try {
+                 return this.lookupClass(name, resolve, loader);
+             } catch (ClassNotFoundException ignored) {
+             }
+         }
+ 
++        // Apis start - Safe fallback to legacy scan for runtime-defined classes (ByteBuddy/ASM/defineClass)
++        if (anySkipped) {
++            for (ConfiguredPluginClassLoader loader : this.classloaders) {
++                if (this.mayContainPackage(loader, packageName)) {
++                    continue;
++                }
++                try {
++                    final Class<?> resolved = this.lookupClass(name, resolve, loader);
++                    loader.recordDynamicPackage(packageName, resolved.getClassLoader());
++                    return resolved;
++                } catch (ClassNotFoundException ignored) {
++                }
++            }
++        }
++        // Apis end - Safe fallback
++
+         return null;
++    }
++
++    protected boolean mayContainPackage(ConfiguredPluginClassLoader current, String packageName) { // Apis
++        return current.mayContainClassInPackage(packageName, true);
+     }
+ 
+     protected Class<?> lookupClass(String name, boolean resolve, ConfiguredPluginClassLoader current) throws ClassNotFoundException {

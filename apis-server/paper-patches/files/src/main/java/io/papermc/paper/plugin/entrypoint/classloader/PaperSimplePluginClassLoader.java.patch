@@ -1,0 +1,40 @@
+--- a/src/main/java/io/papermc/paper/plugin/entrypoint/classloader/PaperSimplePluginClassLoader.java
++++ b/src/main/java/io/papermc/paper/plugin/entrypoint/classloader/PaperSimplePluginClassLoader.java
+@@ -1,6 +_,7 @@
+ package io.papermc.paper.plugin.entrypoint.classloader;
+ 
+ import io.papermc.paper.plugin.configuration.PluginMeta;
++import io.papermc.paper.plugin.provider.classloader.PluginPackageIndex;
+ import io.papermc.paper.plugin.util.NamespaceChecker;
+ import org.jetbrains.annotations.ApiStatus;
+ 
+@@ -32,8 +_,13 @@
+     protected final Manifest jarManifest;
+     protected final URL jarUrl;
+     protected final JarFile jar;
++    protected final PluginPackageIndex packageIndex; // Apis
+ 
+     public PaperSimplePluginClassLoader(Path source, JarFile file, PluginMeta configuration, ClassLoader parentLoader) throws IOException {
++        this(source, file, configuration, parentLoader, null);
++    }
++
++    protected PaperSimplePluginClassLoader(Path source, JarFile file, PluginMeta configuration, ClassLoader parentLoader, ClassLoader libraryLoader) throws IOException { // Apis
+         super(source.getFileName().toString(), new URL[]{source.toUri().toURL()}, parentLoader);
+ 
+         this.source = source;
+@@ -41,6 +_,15 @@
+         this.jarUrl = source.toUri().toURL();
+         this.configuration = configuration;
+         this.jar = file;
++        this.packageIndex = PluginPackageIndex.fromJar(file, libraryLoader); // Apis
++    }
++
++    @Override
++    protected void addURL(URL url) { // Apis
++        if (this.packageIndex != null) {
++            this.packageIndex.indexAddedUrl(url);
++        }
++        super.addURL(url);
+     }
+ 
+     @Override

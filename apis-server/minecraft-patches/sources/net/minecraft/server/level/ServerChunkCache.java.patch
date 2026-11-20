@@ -1,5 +1,168 @@
 --- a/net/minecraft/server/level/ServerChunkCache.java
 +++ b/net/minecraft/server/level/ServerChunkCache.java
+@@ -67,9 +_,11 @@
+     public boolean spawnEnemies = true;
+     public boolean spawnFriendlies = true; // Paper - add back spawnFriendlies field
+     private static final int CACHE_SIZE = 4;
+-    private final long[] lastChunkPos = new long[4];
+-    private final @Nullable ChunkStatus[] lastChunkStatus = new ChunkStatus[4];
+-    private final @Nullable ChunkAccess[] lastChunk = new ChunkAccess[4];
++    private static final int CACHE_MASK = CACHE_SIZE - 1;
++    private final long[] lastChunkPos = new long[CACHE_SIZE];
++    private final @Nullable ChunkStatus[] lastChunkStatus = new ChunkStatus[CACHE_SIZE];
++    private final @Nullable ChunkAccess[] lastChunk = new ChunkAccess[CACHE_SIZE];
++    private volatile boolean offThreadCacheInvalidated = false; // Apis - Guard off-thread chunk unloads against stale main-thread cache hits
+     private final List<LevelChunk> spawningChunks = new ObjectArrayList<>();
+     private final Set<ChunkHolder> chunkHoldersToBroadcast = new ReferenceOpenHashSet<>();
+     @VisibleForDebug
+@@ -88,6 +_,16 @@
+         final long key = ca.spottedleaf.moonrise.common.util.CoordinateUtils.getChunkKey(chunkX, chunkZ);
+         if (chunk == null) {
+             this.fullChunks.remove(key);
++            if (Thread.currentThread() == this.mainThread) {
++                final int slot = cacheSlot(chunkX, chunkZ);
++                if (this.lastChunkPos[slot] == key) {
++                    this.lastChunkPos[slot] = ChunkPos.INVALID_CHUNK_POS;
++                    this.lastChunkStatus[slot] = null;
++                    this.lastChunk[slot] = null;
++                }
++            } else {
++                this.offThreadCacheInvalidated = true;
++            }
+         } else {
+             this.fullChunks.put(key, chunk);
+         }
+@@ -280,7 +_,7 @@
+ 
+     @Nullable
+     public LevelChunk getChunkAtIfLoadedImmediately(int x, int z) {
+-        return this.fullChunks.get(ChunkPos.pack(x, z));
++        return this.getFullChunkCached(x, z);
+     }
+     // Paper end
+ 
+@@ -293,51 +_,101 @@
+         return this.chunkMap.getVisibleChunkIfPresent(key);
+     }
+ 
+-    private void storeInCache(final long pos, final @Nullable ChunkAccess chunk, final ChunkStatus status) {
+-        for (int i = 3; i > 0; i--) {
+-            this.lastChunkPos[i] = this.lastChunkPos[i - 1];
+-            this.lastChunkStatus[i] = this.lastChunkStatus[i - 1];
+-            this.lastChunk[i] = this.lastChunk[i - 1];
++    private static int cacheSlot(final int x, final int z) {
++        return ((x & 1) | ((z & 1) << 1)) & CACHE_MASK;
++    }
++
++    private @Nullable LevelChunk getFullChunkCached(final int x, final int z) {
++        final long key = ca.spottedleaf.moonrise.common.util.CoordinateUtils.getChunkKey(x, z);
++        if (Thread.currentThread() == this.mainThread) {
++            if (this.offThreadCacheInvalidated) {
++                this.offThreadCacheInvalidated = false;
++                this.clearCache();
++            } else {
++                final int slot = cacheSlot(x, z);
++                if (this.lastChunkPos[slot] == key && this.lastChunkStatus[slot] == ChunkStatus.FULL
++                    && this.lastChunk[slot] instanceof LevelChunk levelChunk) {
++                    return levelChunk;
++                }
++            }
++            final LevelChunk ret = this.fullChunks.get(key);
++            if (ret != null) {
++                this.storeInCache(x, z, key, ret, ChunkStatus.FULL);
++            }
++            return ret;
+         }
++        return this.fullChunks.get(key);
++    }
+ 
+-        this.lastChunkPos[0] = pos;
+-        this.lastChunkStatus[0] = status;
+-        this.lastChunk[0] = chunk;
++    private void storeInCache(final int x, final int z, final long pos, final @Nullable ChunkAccess chunk, final ChunkStatus status) {
++        final int slot = cacheSlot(x, z);
++        this.lastChunkPos[slot] = pos;
++        this.lastChunkStatus[slot] = status;
++        this.lastChunk[slot] = chunk;
+     }
+ 
+     @Override
+     public @Nullable ChunkAccess getChunk(final int x, final int z, final ChunkStatus targetStatus, final boolean loadOrGenerate) {
+         // Paper start - rewrite chunk system
+         if (targetStatus == ChunkStatus.FULL) {
+-            final LevelChunk ret = this.fullChunks.get(ca.spottedleaf.moonrise.common.util.CoordinateUtils.getChunkKey(x, z));
++            final LevelChunk ret = this.getFullChunkCached(x, z);
+ 
+             if (ret != null) {
+                 return ret;
+             }
+ 
+-            return loadOrGenerate ? this.getChunkFallback(x, z, targetStatus, loadOrGenerate) : null;
+-        }
+-
+-        return this.getChunkFallback(x, z, targetStatus, loadOrGenerate);
++            if (!loadOrGenerate) {
++                return null;
++            }
++
++            final ChunkAccess fallback = this.getChunkFallback(x, z, targetStatus, true);
++            if (fallback instanceof LevelChunk levelChunk && Thread.currentThread() == this.mainThread) {
++                final long key = ca.spottedleaf.moonrise.common.util.CoordinateUtils.getChunkKey(x, z);
++                if (this.fullChunks.get(key) == levelChunk) {
++                    this.storeInCache(x, z, key, levelChunk, ChunkStatus.FULL);
++                }
++            }
++            return fallback;
++        }
++
++        final boolean isMain = Thread.currentThread() == this.mainThread;
++        final long key = ca.spottedleaf.moonrise.common.util.CoordinateUtils.getChunkKey(x, z);
++        if (isMain) {
++            if (this.offThreadCacheInvalidated) {
++                this.offThreadCacheInvalidated = false;
++                this.clearCache();
++            } else {
++                final int slot = cacheSlot(x, z);
++                if (this.lastChunkPos[slot] == key && this.lastChunkStatus[slot] == targetStatus) {
++                    final ChunkAccess cached = this.lastChunk[slot];
++                    if (cached != null) {
++                        return cached;
++                    }
++                }
++            }
++        }
++
++        final ChunkAccess ret = this.getChunkFallback(x, z, targetStatus, loadOrGenerate);
++        if (ret != null && isMain && ret.getPersistedStatus().isOrAfter(targetStatus)) {
++            this.storeInCache(x, z, key, ret, targetStatus);
++        }
++        return ret;
+         // Paper end - rewrite chunk system
+     }
+ 
+     @Override
+     public @Nullable LevelChunk getChunkNow(final int x, final int z) {
+         // Paper start - rewrite chunk system
+-        final LevelChunk ret = this.fullChunks.get(ca.spottedleaf.moonrise.common.util.CoordinateUtils.getChunkKey(x, z));
+-        if (!ca.spottedleaf.moonrise.common.PlatformHooks.get().hasCurrentlyLoadingChunk()) {
+-            return ret;
+-        }
+-
+-        if (ret != null || !ca.spottedleaf.moonrise.common.util.TickThread.isTickThread()) {
++        final LevelChunk ret = this.getFullChunkCached(x, z);
++        if (ret != null || !ca.spottedleaf.moonrise.common.PlatformHooks.get().hasCurrentlyLoadingChunk()
++            || !ca.spottedleaf.moonrise.common.util.TickThread.isTickThread()) {
+             return ret;
+         }
+ 
+         final ca.spottedleaf.moonrise.patches.chunk_system.scheduling.NewChunkHolder holder = ((ca.spottedleaf.moonrise.patches.chunk_system.level.ChunkSystemServerLevel)this.level).moonrise$getChunkTaskScheduler()
+             .chunkHolderManager.getChunkHolder(x, z);
+         if (holder == null) {
+-            return ret;
++            return null;
+         }
+ 
+         return ca.spottedleaf.moonrise.common.PlatformHooks.get().getCurrentlyLoadingChunk(holder.vanillaChunkHolder);
 @@ -519,7 +_,7 @@
          if (!this.level.isDebug()) {
              ProfilerFiller profiler = Profiler.get();

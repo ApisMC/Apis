@@ -1,0 +1,43 @@
+--- a/src/main/java/org/bukkit/plugin/java/PluginClassLoader.java
++++ b/src/main/java/org/bukkit/plugin/java/PluginClassLoader.java
+@@ -43,6 +_,7 @@
+     private final Manifest manifest;
+     private final URL url;
+     private final ClassLoader libraryLoader;
++    private final io.papermc.paper.plugin.provider.classloader.PluginPackageIndex packageIndex; // Apis
+     final JavaPlugin plugin;
+     private JavaPlugin pluginInit;
+     private IllegalStateException pluginState;
+@@ -70,6 +_,7 @@
+         this.manifest = jar.getManifest();
+         this.url = file.toURI().toURL();
+         this.libraryLoader = libraryLoader;
++        this.packageIndex = io.papermc.paper.plugin.provider.classloader.PluginPackageIndex.fromJar(jarFile, libraryLoader); // Apis
+ 
+         this.logger = com.destroystokyo.paper.utils.PaperPluginLogger.getLogger(description); // Paper - Register logger early
+         // Paper start
+@@ -330,6 +_,24 @@
+             Class<? extends org.bukkit.configuration.serialization.ConfigurationSerializable> serializable = clazz.asSubclass(org.bukkit.configuration.serialization.ConfigurationSerializable.class);
+             org.bukkit.configuration.serialization.ConfigurationSerialization.unregisterClass(serializable);
+         }
++    }
++
++    @Override
++    protected void addURL(URL url) {
++        if (this.packageIndex != null) {
++            this.packageIndex.indexAddedUrl(url);
++        }
++        super.addURL(url);
++    }
++
++    @Override
++    public boolean mayContainClassInPackage(@NotNull String packageName, boolean checkLibraries) {
++        return this.packageIndex.mayContainPackage(packageName, checkLibraries);
++    }
++
++    @Override
++    public void recordDynamicPackage(@NotNull String packageName, @Nullable ClassLoader resolvedClassLoader) {
++        this.packageIndex.recordPackage(packageName, resolvedClassLoader);
+     }
+ 
+     @Override
