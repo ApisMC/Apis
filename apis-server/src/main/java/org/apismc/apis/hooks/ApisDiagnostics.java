@@ -19,7 +19,7 @@ import org.bukkit.plugin.java.JavaPlugin;
 import org.jspecify.annotations.Nullable;
 
 /**
- * Single-line WARN diagnostics for plugin calls targeting kill-switched subsystems,
+ * Single-line OK diagnostics for plugin calls cleanly blocked by kill-switched subsystems,
  * deduplicated once per (feature, target, caller) per server run and formatted without plugin tag prefixes.
  */
 public final class ApisDiagnostics {
@@ -48,7 +48,8 @@ public final class ApisDiagnostics {
     }
 
     /**
-     * Emits a single-line WARN once per unique (featureKey, target, callerPlugin) combination.
+     * Emits a single-line {@code OK} log once per unique (featureKey, target, callerPlugin) combination
+     * confirming a call was cleanly blocked by an {@code apis.yml} kill-switch.
      *
      * @param featureKey configuration key in apis.yml responsible for disabling the subsystem
      * @param context    method or subsystem invoked by caller
@@ -61,8 +62,9 @@ public final class ApisDiagnostics {
         if (!WARNED_KEYS.add(dedupeKey)) {
             return;
         }
-        ROOT_STYLE_LOGGER.warn(
-            "Blocked {} call {}({}): disabled by {} in apis.yml",
+        ApisLog.ok(
+            ROOT_STYLE_LOGGER,
+            "Blocked {} call {}({}) — disabled by {} in apis.yml",
             plugin != null ? "plugin '" + callerName + "'" : "server",
             context,
             target,

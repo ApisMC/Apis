@@ -1,0 +1,297 @@
+--- a/src/main/java/com/destroystokyo/paper/Metrics.java
++++ b/src/main/java/com/destroystokyo/paper/Metrics.java
+@@ -35,14 +_,20 @@
+ public class Metrics {
+ 
+     // Executor service for requests
+-    // We use an executor service because the Bukkit scheduler is affected by server lags
+-    private final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
++    // We use a daemon executor service because the Bukkit scheduler is affected by server lags
++    private final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1, task -> {
++        final Thread thread = new Thread(task, "bStats-Metrics");
++        thread.setDaemon(true);
++        return thread;
++    });
+ 
+-    // The version of this bStats class
+-    public static final int B_STATS_VERSION = 1;
++    // The version of this bStats client
++    public static final int B_STATS_VERSION = 2;
++    public static final String METRICS_VERSION = "3.2.2";
++    public static final int APIS_SERVICE_ID = 35466;
+ 
+     // The url to which the data is sent
+-    private static final String URL = "https://bstats.org/submitData/server-implementation";
++    public static final String URL = "https://bstats.org/api/v2/data/server-implementation";
+ 
+     // Should failed requests be logged?
+     private static boolean logFailedRequests = false;
+@@ -50,6 +_,9 @@
+     // The logger for the failed requests
+     private static Logger logger = Logger.getLogger("bStats");
+ 
++    // The bStats service identifier
++    private final int serviceId;
++
+     // The name of the server software
+     private final String name;
+ 
+@@ -68,13 +_,51 @@
+      * @param logger            The logger for the failed requests.
+      */
+     public Metrics(String name, String serverUUID, boolean logFailedRequests, Logger logger) {
++        this(APIS_SERVICE_ID, name, serverUUID, logFailedRequests, logger, true);
++    }
++
++    /**
++     * Class constructor for bStats v2 numeric service IDs.
++     *
++     * @param serviceId         The numeric bStats service ID.
++     * @param name              The name of the server software.
++     * @param serverUUID        The uuid of the server.
++     * @param logFailedRequests Whether failed requests should be logged or not.
++     * @param logger            The logger for the failed requests.
++     */
++    public Metrics(int serviceId, String name, String serverUUID, boolean logFailedRequests, Logger logger) {
++        this(serviceId, name, serverUUID, logFailedRequests, logger, true);
++    }
++
++    /**
++     * Creates a detached {@link Metrics} instance with background scheduling disabled (for testing).
++     *
++     * @param serviceId  bStats numeric service identifier
++     * @param serverUUID server instance UUID
++     * @return detached metrics collector instance
++     */
++    public static Metrics createDetached(int serviceId, String serverUUID) {
++        return new Metrics(serviceId, "Apis", serverUUID, false, logger, false);
++    }
++
++    private Metrics(int serviceId, String name, String serverUUID, boolean logFailedRequests, Logger logger, boolean startScheduler) {
++        this.serviceId = serviceId;
+         this.name = name;
+         this.serverUUID = serverUUID;
+         Metrics.logFailedRequests = logFailedRequests;
+         Metrics.logger = logger;
+ 
+         // Start submitting the data
+-        startSubmitting();
++        if (startScheduler) {
++            startSubmitting();
++        }
++    }
++
++    /**
++     * Shuts down the background submission scheduler.
++     */
++    public void shutdown() {
++        this.scheduler.shutdown();
+     }
+ 
+     /**
+@@ -94,6 +_,10 @@
+      */
+     private void startSubmitting() {
+         final Runnable submitTask = () -> {
++            if (org.apismc.apis.hooks.ApisHooks.isBstatsDisabled()) {
++                this.scheduler.shutdown();
++                return;
++            }
+             if (!MinecraftServer.getServer().hasStopped()) {
+                 submitData();
+             }
+@@ -110,14 +_,16 @@
+     }
+ 
+     /**
+-     * Gets the plugin specific data.
++     * Gets the service-specific bStats v2 payload section.
+      *
+-     * @return The plugin specific data.
++     * @return The service-specific payload object.
+      */
+-    private JSONObject getPluginData() {
+-        JSONObject data = new JSONObject();
++    @SuppressWarnings("unchecked")
++    private JSONObject getServiceData() {
++        JSONObject service = new JSONObject();
+ 
+-        data.put("pluginName", name); // Append the name of the server software
++        service.put("id", this.serviceId);
++        service.put("pluginVersion", resolveServerVersion());
+         JSONArray customCharts = new JSONArray();
+         for (CustomChart customChart : charts) {
+             // Add the data of the custom charts
+@@ -127,17 +_,23 @@
+             }
+             customCharts.add(chart);
+         }
+-        data.put("customCharts", customCharts);
+-
+-        return data;
++        service.put("customCharts", customCharts);
++
++        return service;
++    }
++
++    private static String resolveServerVersion() {
++        final String implVersion = org.bukkit.craftbukkit.Main.class.getPackage().getImplementationVersion();
++        return implVersion != null ? implVersion : "unknown";
+     }
+ 
+     /**
+-     * Gets the server specific data.
++     * Builds the complete bStats v2 payload for {@code server-implementation}.
+      *
+-     * @return The server specific data.
++     * @return The serialized JSON payload ready for submission.
+      */
+-    private JSONObject getServerData() {
++    @SuppressWarnings("unchecked")
++    public JSONObject buildPayload() {
+         // OS specific data
+         String osName = System.getProperty("os.name");
+         String osArch = System.getProperty("os.arch");
+@@ -147,11 +_,13 @@
+         JSONObject data = new JSONObject();
+ 
+         data.put("serverUUID", serverUUID);
++        data.put("metricsVersion", METRICS_VERSION);
+ 
+         data.put("osName", osName);
+         data.put("osArch", osArch);
+         data.put("osVersion", osVersion);
+         data.put("coreCount", coreCount);
++        data.put("service", getServiceData());
+ 
+         return data;
+     }
+@@ -160,19 +_,19 @@
+      * Collects the data and sends it afterwards.
+      */
+     private void submitData() {
+-        final JSONObject data = getServerData();
+-
+-        JSONArray pluginData = new JSONArray();
+-        pluginData.add(getPluginData());
+-        data.put("plugins", pluginData);
++        if (org.apismc.apis.hooks.ApisHooks.isBstatsDisabled()) {
++            this.scheduler.shutdown();
++            return;
++        }
++        final JSONObject data = buildPayload();
+ 
+         try {
+-            // We are still in the Thread of the timer, so nothing get blocked :)
++            // We are still in the Thread of the timer, so nothing gets blocked :)
+             sendData(data);
+         } catch (Exception e) {
+             // Something went wrong! :(
+             if (logFailedRequests) {
+-                logger.log(Level.WARNING, "Could not submit stats of " + name, e);
++                logger.log(Level.WARNING, "Could not submit stats of " + name + " (serviceId=" + serviceId + ")", e);
+             }
+         }
+     }
+@@ -188,6 +_,8 @@
+             throw new IllegalArgumentException("Data cannot be null!");
+         }
+         HttpsURLConnection connection = (HttpsURLConnection) new URL(URL).openConnection();
++        connection.setConnectTimeout(5000);
++        connection.setReadTimeout(5000);
+ 
+         // Compress the data to save bandwidth
+         byte[] compressedData = compress(data.toString());
+@@ -199,16 +_,29 @@
+         connection.addRequestProperty("Content-Encoding", "gzip"); // We gzip our request
+         connection.addRequestProperty("Content-Length", String.valueOf(compressedData.length));
+         connection.setRequestProperty("Content-Type", "application/json"); // We send our data in JSON format
+-        connection.setRequestProperty("User-Agent", "MC-Server/" + B_STATS_VERSION);
++        connection.setRequestProperty("User-Agent", "Metrics-Service/1");
+ 
+         // Send data
+         connection.setDoOutput(true);
+-        DataOutputStream outputStream = new DataOutputStream(connection.getOutputStream());
+-        outputStream.write(compressedData);
+-        outputStream.flush();
+-        outputStream.close();
+-
+-        connection.getInputStream().close(); // We don't care about the response - Just send our data :)
++        try (DataOutputStream outputStream = new DataOutputStream(connection.getOutputStream())) {
++            outputStream.write(compressedData);
++            outputStream.flush();
++        }
++
++        final int statusCode = connection.getResponseCode();
++        if (statusCode >= 400) {
++            final String responseBody;
++            try (var errorStream = connection.getErrorStream()) {
++                responseBody = errorStream != null
++                    ? new String(errorStream.readAllBytes(), StandardCharsets.UTF_8)
++                    : "";
++            }
++            throw new IOException("bStats returned HTTP " + statusCode + (responseBody.isEmpty() ? "" : ": " + responseBody));
++        }
++
++        try (var inputStream = connection.getInputStream()) {
++            inputStream.readAllBytes(); // Drain response body cleanly
++        }
+     }
+ 
+     /**
+@@ -591,9 +_,9 @@
+             // Load the data
+             String serverUUID = config.getString("serverUuid");
+             boolean logFailedRequests = config.getBoolean("logFailedRequests", false);
+-            // Only start Metrics, if it's enabled in the config
+-            if (config.getBoolean("enabled", true)) {
+-                Metrics metrics = new Metrics("Paper", serverUUID, logFailedRequests, Bukkit.getLogger());
++            // Only start Metrics, if it's enabled in both apis.yml and bStats config.yml
++            if (!org.apismc.apis.hooks.ApisHooks.isBstatsDisabled() && config.getBoolean("enabled", true)) {
++                Metrics metrics = new Metrics(APIS_SERVICE_ID, "Apis", serverUUID, logFailedRequests, Bukkit.getLogger());
+ 
+                 metrics.addCustomChart(new Metrics.SimplePie("minecraft_version", () -> {
+                     String minecraftVersion = Bukkit.getVersion();
+@@ -603,15 +_,11 @@
+ 
+                 metrics.addCustomChart(new Metrics.SingleLineChart("players", () -> Bukkit.getOnlinePlayers().size()));
+                 metrics.addCustomChart(new Metrics.SimplePie("online_mode", () -> Bukkit.getOnlineMode() ? "online" : "offline"));
+-                final String paperVersion;
+-                final String implVersion = org.bukkit.craftbukkit.Main.class.getPackage().getImplementationVersion();
+-                if (implVersion != null) {
+-                    final String buildOrHash = implVersion.substring(implVersion.lastIndexOf('-') + 1);
+-                    paperVersion = "git-Paper-%s-%s".formatted(Bukkit.getServer().getMinecraftVersion(), buildOrHash);
+-                } else {
+-                    paperVersion = "unknown";
+-                }
+-                metrics.addCustomChart(new Metrics.SimplePie("paper_version", () -> paperVersion));
++                final String apisVersion = formatApisVersion(
++                    Bukkit.getServer().getMinecraftVersion(),
++                    org.bukkit.craftbukkit.Main.class.getPackage().getImplementationVersion()
++                );
++                metrics.addCustomChart(new Metrics.SimplePie("apis_version", () -> apisVersion));
+ 
+                 metrics.addCustomChart(new Metrics.DrilldownPie("java_version", () -> {
+                     Map<String, Map<String, Integer>> map = new HashMap<>();
+@@ -678,6 +_,21 @@
+                 }));
+             }
+ 
++        }
++
++        /**
++         * Formats the {@code apis_version} custom chart string without Paper branding.
++         *
++         * @param minecraftVersion Minecraft release version
++         * @param implVersion      manifest implementation version
++         * @return formatted version identifier or {@code "unknown"}
++         */
++        public static String formatApisVersion(final String minecraftVersion, final String implVersion) {
++            if (implVersion == null || implVersion.isEmpty()) {
++                return "unknown";
++            }
++            final String buildOrHash = implVersion.substring(implVersion.lastIndexOf('-') + 1);
++            return "git-Apis-%s-%s".formatted(minecraftVersion, buildOrHash);
+         }
+     }
+ }

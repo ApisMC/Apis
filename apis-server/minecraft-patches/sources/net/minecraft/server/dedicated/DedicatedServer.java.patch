@@ -70,3 +70,12 @@
          }
  
          // CraftBukkit start
+@@ -339,7 +_,7 @@
+         this.loadLevel(this.storageSource.getLevelId()); // CraftBukkit
+         long elapsed = Util.getNanos() - levelNanoTime;
+         String time = String.format(Locale.ROOT, "%.3fs", elapsed / 1.0E9);
+-        LOGGER.info("Done preparing level \"{}\" ({})", this.getLevelIdName(), time); // Paper - Improve startup message, add total time
++        org.apismc.apis.hooks.ApisLog.ok(LOGGER, "Done preparing level \"{}\" ({})", this.getLevelIdName(), time); // Paper - Improve startup message, add total time // Apis
+         this.initPostWorld(); // Paper - don't include plugins in world preparation time
+         if (properties.announcePlayerAchievements != null) {
+             this.getAllLevels().forEach(l -> l.getGameRules().set(GameRules.SHOW_ADVANCEMENT_MESSAGES, properties.announcePlayerAchievements, this.overworld())); // Paper - per-world game rules

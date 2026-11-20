@@ -18,6 +18,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import org.apismc.apis.feature.FeatureRegistry;
+import org.apismc.apis.hooks.ApisLog;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -149,7 +150,8 @@ public final class ApisConfig {
         loaded.sanitize(LOGGER);
         instance = loaded;
         FeatureRegistry.applyEarly(loaded);
-        LOGGER.info(
+        ApisLog.ok(
+            LOGGER,
             "Loaded {} (active kill-switches: {})",
             path.normalize(),
             FeatureRegistry.activeKillSwitches().size()
@@ -773,7 +775,7 @@ public final class ApisConfig {
     @ConfigSerializable
     public static final class AnalyticsSection {
         @Setting("bstats")
-        @Comment("Start Paper bStats metrics collector on boot; false = disable bStats telemetry completely | Запускати збірник метрик Paper bStats на старті; false = вимкнути bStats")
+        @Comment("Start Apis bStats metrics collector (serviceId 35466) on boot; false = disable bStats telemetry completely | Запускати збірник метрик Apis bStats (serviceId 35466) на старті; false = вимкнути bStats")
         public boolean bstats = true;
 
         @Setting("spark")

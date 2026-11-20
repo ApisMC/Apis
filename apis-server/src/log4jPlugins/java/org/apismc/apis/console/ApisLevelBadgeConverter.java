@@ -19,11 +19,15 @@ import org.apache.logging.log4j.core.pattern.PatternConverter;
 @ConverterKeys("levelBadge")
 public final class ApisLevelBadgeConverter extends LogEventPatternConverter {
 
+    public static final Level OK_LEVEL = Level.forName("OK", 350);
+
     private static final char ESC = 27;
     private static final String ERROR_BADGE_PREFIX = ESC + "[0;1;30;101m ";
     private static final String ERROR_TEXT_RESTORE = " " + ESC + "[0;31;1m";
     private static final String WARN_BADGE_PREFIX = ESC + "[0;1;30;103m ";
     private static final String WARN_TEXT_RESTORE = " " + ESC + "[0;33;1m";
+    private static final String OK_BADGE_PREFIX = ESC + "[0;1;30;102m ";
+    private static final String OK_TEXT_RESTORE = " " + ESC + "[0;32;1m";
 
     private ApisLevelBadgeConverter() {
         super("levelBadge", "levelBadge");
@@ -41,7 +45,33 @@ public final class ApisLevelBadgeConverter extends LogEventPatternConverter {
 
     @Override
     public void format(final LogEvent event, final StringBuilder toAppendTo) {
-        formatLevel(event.getLevel(), TerminalConsoleAppender.isAnsiSupported(), toAppendTo);
+        final boolean ansiSupported = TerminalConsoleAppender.isAnsiSupported();
+        if (isOkMarker(event) && !event.getLevel().isMoreSpecificThan(Level.WARN)) {
+            if (!ansiSupported) {
+                toAppendTo.append("OK");
+            } else {
+                toAppendTo.append(OK_BADGE_PREFIX).append("OK").append(OK_TEXT_RESTORE);
+            }
+            return;
+        }
+        formatLevel(event.getLevel(), ansiSupported, toAppendTo);
+    }
+
+    /**
+     * Returns whether an event should render with the {@code OK} green badge and styling.
+     *
+     * @param event log event
+     * @return {@code true} if the event has level {@code OK} or an {@code OK} marker below {@code WARN}
+     */
+    public static boolean isOkEvent(final LogEvent event) {
+        if (event.getLevel().isMoreSpecificThan(Level.WARN)) {
+            return false;
+        }
+        return "OK".equalsIgnoreCase(event.getLevel().name()) || isOkMarker(event);
+    }
+
+    private static boolean isOkMarker(final LogEvent event) {
+        return event.getMarker() != null && "OK".equalsIgnoreCase(event.getMarker().getName());
     }
 
     /**
@@ -63,6 +93,10 @@ public final class ApisLevelBadgeConverter extends LogEventPatternConverter {
         }
         if (level.isMoreSpecificThan(Level.WARN)) {
             out.append(WARN_BADGE_PREFIX).append(name).append(WARN_TEXT_RESTORE);
+            return;
+        }
+        if ("OK".equalsIgnoreCase(name)) {
+            out.append(OK_BADGE_PREFIX).append("OK").append(OK_TEXT_RESTORE);
             return;
         }
         out.append(name);

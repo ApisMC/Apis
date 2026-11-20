@@ -887,13 +887,15 @@ public final class ApisHooks {
         final Path fileName = worldDir.getFileName();
         final String worldName = fileName != null ? fileName.toString() : worldDir.toString();
         final Path lockName = lockPath.getFileName();
-        LOGGER.warn(
-            "Stale {} detected for world '{}'. Forcibly breaking lock...",
-            lockName != null ? lockName.toString() : "session.lock",
-            worldName
-        );
         try {
-            Files.deleteIfExists(lockPath);
+            if (Files.deleteIfExists(lockPath)) {
+                ApisLog.ok(
+                    LOGGER,
+                    "Cleared stale {} for world '{}' (previous process not running)",
+                    lockName != null ? lockName.toString() : "session.lock",
+                    worldName
+                );
+            }
             return true;
         } catch (final IOException ex) {
             LOGGER.warn("Failed to delete stale session.lock at '{}': {}", lockPath, ex.getMessage());

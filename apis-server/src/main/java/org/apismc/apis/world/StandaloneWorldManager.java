@@ -43,6 +43,7 @@ import org.apismc.apis.config.ApisConfig;
 import org.apismc.apis.config.ApisPaths;
 import org.apismc.apis.feature.Feature;
 import org.apismc.apis.feature.FeatureRegistry;
+import org.apismc.apis.hooks.ApisLog;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.World;
@@ -259,8 +260,9 @@ public final class StandaloneWorldManager {
         if (fallbackWorldNewOnBoot) {
             overworld.setBlock(new BlockPos(0, 60, 0), Blocks.BEDROCK.defaultBlockState(), 3);
             config = StandaloneWorldConfig.loadOrCreate(worldDir, 0.5d, 61.0d, 0.5d, 0.0f, 0.0f, true);
-            LOGGER.info(
-                "Initialized standalone fallback world '{}' at {} with bedrock platform at (0, 60, 0).",
+            ApisLog.ok(
+                LOGGER,
+                "Initialized standalone fallback world '{}' at {} (bedrock platform at 0, 60, 0)",
                 name,
                 worldDir
             );
@@ -307,7 +309,7 @@ public final class StandaloneWorldManager {
                 continue;
             }
             if (loadWorldFromDisk(server, root, folder) != null) {
-                LOGGER.info("Auto-loaded standalone world '{}' from {}.", folder, root.resolve(folder));
+                ApisLog.ok(LOGGER, "Loaded standalone world '{}' from {}", folder, root.resolve(folder));
             }
         }
     }

@@ -2,8 +2,6 @@
 
 High-performance Paper 26.3 fork designed for stripped, ultra-fast lobby and minigame servers with positive O(1) subsystem kill-switches and JVM AOT cache support.
 
-* **Author:** ApisMC Team
-* **GitHub:** https://github.com/kotop21/apis-mc
 * **Website & Docs:** https://kotop21.github.io/apismc/
 
 ## Key Features
