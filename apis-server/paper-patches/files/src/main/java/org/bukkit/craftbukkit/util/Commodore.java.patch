@@ -1,0 +1,197 @@
+--- a/src/main/java/org/bukkit/craftbukkit/util/Commodore.java
++++ b/src/main/java/org/bukkit/craftbukkit/util/Commodore.java
+@@ -5,6 +_,7 @@
+ import java.io.File;
+ import java.io.FileOutputStream;
+ import java.io.InputStream;
++import java.nio.charset.StandardCharsets;
+ import java.util.ArrayList;
+ import java.util.Arrays;
+ import java.util.Collections;
+@@ -83,6 +_,164 @@
+             "org/bukkit/block/data/type/PointedDripstone", "org/bukkit/block/data/type/Speleothem",
+             "org/bukkit/block/data/type/PointedDripstone$Thickness", "org/bukkit/block/data/type/Speleothem$Thickness"
+     );
++    private static final Map<String, String> RENAMES_WITH_COW = withExtraRename(
++            RENAMES, "org/bukkit/entity/Cow", "org/bukkit/entity/AbstractCow"
++    );
++    private static final Map<String, String> RENAMES_WITH_CUBE_MOB = withExtraRename(
++            RENAMES, "org/bukkit/entity/Slime", "org/bukkit/entity/AbstractCubeMob"
++    );
++    private static final Map<String, String> RENAMES_WITH_COW_AND_CUBE_MOB = withExtraRename(
++            RENAMES_WITH_COW, "org/bukkit/entity/Slime", "org/bukkit/entity/AbstractCubeMob"
++    );
++    private static final ApiVersion ENUM_COMPAT_MAX_VERSION = ApiVersion.getOrCreateVersion("1.20.6");
++    private static final byte[][] CONSTANT_POOL_TARGET_PREFIXES = new byte[][] {
++            "org/bukkit/".getBytes(StandardCharsets.US_ASCII),
++            "org/spigotmc/".getBytes(StandardCharsets.US_ASCII),
++            "com/destroystokyo/".getBytes(StandardCharsets.US_ASCII),
++            "io/papermc/".getBytes(StandardCharsets.US_ASCII),
++            "com.mysql.jdbc.Driver".getBytes(StandardCharsets.US_ASCII)
++    };
++    private static final byte[][] CONSTANT_POOL_LEGACY_ENUM_PREFIXES = new byte[][] {
++            "java/lang/Enum".getBytes(StandardCharsets.US_ASCII),
++            "java/util/EnumSet".getBytes(StandardCharsets.US_ASCII),
++            "java/util/EnumMap".getBytes(StandardCharsets.US_ASCII),
++            "com/google/common/".getBytes(StandardCharsets.US_ASCII)
++    };
++
++    private static Map<String, String> withExtraRename(final Map<String, String> base, final String from, final String to) {
++        final Map<String, String> copy = new HashMap<>(base);
++        copy.put(from, to);
++        return Map.copyOf(copy);
++    }
++
++    private static Map<String, String> selectRenames(final ApiVersion pluginVersion) {
++        final boolean olderThanCow = pluginVersion.isOlderThan(ApiVersion.ABSTRACT_COW);
++        final boolean olderThanCubeMob = pluginVersion.isOlderThan(ApiVersion.ABSTRACT_CUBE_MOB);
++        if (olderThanCow && olderThanCubeMob) {
++            return RENAMES_WITH_COW_AND_CUBE_MOB;
++        }
++        if (olderThanCow) {
++            return RENAMES_WITH_COW;
++        }
++        if (olderThanCubeMob) {
++            return RENAMES_WITH_CUBE_MOB;
++        }
++        return RENAMES;
++    }
++
++    /**
++     * Scans the classfile {@code CONSTANT_Utf8} pool with zero object allocations to skip ASM bytecode rewriting
++     * for non-Bukkit shaded classes. Fails safe ({@code true}) on malformed or unrecognized constant pools.
++     *
++     * @param bytecode             raw classfile bytes
++     * @param pluginVersion        plugin declared {@code api-version}
++     * @param activeCompatibilities active server compatibility flags
++     * @return {@code true} if the class references any Commodore rewrite target or cannot be pre-verified cleanly
++     */
++    public static boolean mayNeedConversion(final byte[] bytecode, final ApiVersion pluginVersion, final Set<String> activeCompatibilities) {
++        if (bytecode == null || bytecode.length < 10) {
++            return true;
++        }
++        if ((bytecode[0] & 0xFF) != 0xCA
++                || (bytecode[1] & 0xFF) != 0xFE
++                || (bytecode[2] & 0xFF) != 0xBA
++                || (bytecode[3] & 0xFF) != 0xBE) {
++            return true;
++        }
++
++        final boolean checkLegacyEnums = activeCompatibilities != null
++                && activeCompatibilities.contains("enum-compatibility-mode")
++                && pluginVersion != null
++                && !pluginVersion.isNewerThan(ENUM_COMPAT_MAX_VERSION);
++        final int cpCount = ((bytecode[8] & 0xFF) << 8) | (bytecode[9] & 0xFF);
++        int pos = 10;
++
++        for (int i = 1; i < cpCount; i++) {
++            if (pos >= bytecode.length) {
++                return true;
++            }
++            final int tag = bytecode[pos++] & 0xFF;
++            switch (tag) {
++                case 1: // CONSTANT_Utf8
++                    if (pos + 2 > bytecode.length) {
++                        return true;
++                    }
++                    final int len = ((bytecode[pos] & 0xFF) << 8) | (bytecode[pos + 1] & 0xFF);
++                    pos += 2;
++                    if (pos + len > bytecode.length) {
++                        return true;
++                    }
++                    final int end = pos + len;
++                    if (matchesAnyAscii(bytecode, pos, end, CONSTANT_POOL_TARGET_PREFIXES)) {
++                        return true;
++                    }
++                    if (checkLegacyEnums && matchesAnyAscii(bytecode, pos, end, CONSTANT_POOL_LEGACY_ENUM_PREFIXES)) {
++                        return true;
++                    }
++                    pos = end;
++                    break;
++                case 3: // CONSTANT_Integer
++                case 4: // CONSTANT_Float
++                case 9: // CONSTANT_Fieldref
++                case 10: // CONSTANT_Methodref
++                case 11: // CONSTANT_InterfaceMethodref
++                case 12: // CONSTANT_NameAndType
++                case 17: // CONSTANT_Dynamic
++                case 18: // CONSTANT_InvokeDynamic
++                    pos += 4;
++                    break;
++                case 5: // CONSTANT_Long
++                case 6: // CONSTANT_Double
++                    pos += 8;
++                    i++;
++                    break;
++                case 7: // CONSTANT_Class
++                case 8: // CONSTANT_String
++                case 16: // CONSTANT_MethodType
++                case 19: // CONSTANT_Module
++                case 20: // CONSTANT_Package
++                    pos += 2;
++                    break;
++                case 15: // CONSTANT_MethodHandle
++                    pos += 3;
++                    break;
++                default:
++                    return true;
++            }
++        }
++        return false;
++    }
++
++    private static boolean matchesAnyAscii(final byte[] buf, final int start, final int end, final byte[][] patterns) {
++        final int span = end - start;
++        for (final byte[] pattern : patterns) {
++            if (span >= pattern.length && containsAscii(buf, start, end, pattern)) {
++                return true;
++            }
++        }
++        return false;
++    }
++
++    private static boolean containsAscii(final byte[] buf, final int start, final int end, final byte[] needle) {
++        final byte first = needle[0];
++        final int maxStart = end - needle.length;
++        for (int i = start; i <= maxStart; i++) {
++            if (buf[i] != first) {
++                continue;
++            }
++            boolean matched = true;
++            for (int j = 1; j < needle.length; j++) {
++                if (buf[i + j] != needle[j]) {
++                    matched = false;
++                    break;
++                }
++            }
++            if (matched) {
++                return true;
++            }
++        }
++        return false;
++    }
+ 
+     private static final Map<String, String> CLASS_TO_INTERFACE = Map.ofEntries(
+             Map.entry("org/bukkit/inventory/InventoryView", "org/bukkit/craftbukkit/inventory/CraftAbstractInventoryView"),
+@@ -205,17 +_,14 @@
+     }
+ 
+     public byte[] convert(byte[] b, final String pluginName, final ApiVersion pluginVersion, final Set<String> activeCompatibilities) {
++        if (!Commodore.mayNeedConversion(b, pluginVersion, activeCompatibilities)) {
++            return b;
++        }
+         final boolean modern = pluginVersion.isNewerThanOrSameAs(ApiVersion.FLATTENING);
+         ClassReader cr = new ClassReader(b);
+         ClassWriter cw = new ClassWriter(cr, 0);
+ 
+-        Map<String, String> renames = new HashMap<>(RENAMES);
+-        if (pluginVersion.isOlderThan(ApiVersion.ABSTRACT_COW)) {
+-            renames.put("org/bukkit/entity/Cow", "org/bukkit/entity/AbstractCow");
+-        }
+-        if (pluginVersion.isOlderThan(ApiVersion.ABSTRACT_CUBE_MOB)) {
+-            renames.put("org/bukkit/entity/Slime", "org/bukkit/entity/AbstractCubeMob");
+-        }
++        final Map<String, String> renames = Commodore.selectRenames(pluginVersion);
+ 
+         cr.accept(new ClassRemapper(new ClassVisitor(Opcodes.ASM9, cw) {
+             final Set<RerouteMethodData> rerouteMethodData = new HashSet<>();

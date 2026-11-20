@@ -1,11 +1,12 @@
 --- a/src/main/java/io/papermc/paper/plugin/PluginInitializerManager.java
 +++ b/src/main/java/io/papermc/paper/plugin/PluginInitializerManager.java
-@@ -26,54 +_,57 @@
+@@ -26,54 +_,58 @@
      private static final Logger LOGGER = LogUtils.getClassLogger();
      private static PluginInitializerManager impl;
      private final Path pluginDirectory;
 +    private final Path addonsDirectory; // Apis
      private final Path updateDirectory;
++    private volatile @Nullable Boolean hasPendingUpdates; // Apis - Single-check cache for addons/update/
  
 -    PluginInitializerManager(final Path pluginDirectory, final Path updateDirectory) {
 +    PluginInitializerManager(final Path pluginDirectory, final Path addonsDirectory, final Path updateDirectory) { // Apis
@@ -70,7 +71,7 @@
      }
  
      public static PluginInitializerManager init(final OptionSet optionSet) throws Exception {
-@@ -90,6 +_,11 @@
+@@ -90,18 +_,55 @@
          return pluginDirectory;
      }
  
@@ -82,7 +83,42 @@
      @Nullable
      public Path pluginUpdatePath() {
          return updateDirectory;
-@@ -100,8 +_,8 @@
+     }
+ 
++    /**
++     * Checks once per lifecycle whether {@code addons/update/} contains any regular files
++     * so plugin discovery skips redundant JAR opens when the update directory is empty.
++     *
++     * @return {@code true} if update files may exist or checking fails
++     */
++    public boolean hasPendingUpdateFiles() { // Apis
++        final Boolean cached = this.hasPendingUpdates;
++        if (cached != null) {
++            return cached;
++        }
++        if (this.updateDirectory == null || !Files.isDirectory(this.updateDirectory)) {
++            this.hasPendingUpdates = Boolean.FALSE;
++            return false;
++        }
++        boolean found;
++        try (java.util.stream.Stream<Path> entries = Files.list(this.updateDirectory)) {
++            found = entries.anyMatch(Files::isRegularFile);
++        } catch (final IOException _) {
++            return true;
++        }
++        this.hasPendingUpdates = found;
++        return found;
++    }
++
++    /**
++     * Invalidates the cached update-directory state after an update file has been consumed.
++     */
++    public void invalidatePendingUpdatesCache() { // Apis
++        this.hasPendingUpdates = null;
++    }
++
+     public static void load(OptionSet optionSet) throws Exception {
+         LOGGER.info("Initializing plugins...");
          // We have to load the bukkit configuration inorder to get the update folder location.
          io.papermc.paper.plugin.PluginInitializerManager pluginSystem = io.papermc.paper.plugin.PluginInitializerManager.init(optionSet);
  

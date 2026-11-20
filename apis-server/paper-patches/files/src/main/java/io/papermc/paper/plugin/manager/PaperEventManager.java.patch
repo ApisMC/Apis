@@ -1,0 +1,84 @@
+--- a/src/main/java/io/papermc/paper/plugin/manager/PaperEventManager.java
++++ b/src/main/java/io/papermc/paper/plugin/manager/PaperEventManager.java
+@@ -2,11 +_,12 @@
+ 
+ import com.destroystokyo.paper.event.server.ServerExceptionEvent;
+ import com.destroystokyo.paper.exception.ServerEventException;
+-import com.google.common.collect.Sets;
+ import java.lang.reflect.Method;
++import java.util.ArrayList;
+ import java.util.Arrays;
+ import java.util.HashMap;
+ import java.util.HashSet;
++import java.util.List;
+ import java.util.Map;
+ import java.util.Set;
+ import java.util.logging.Level;
+@@ -107,20 +_,29 @@
+         }
+     }
+ 
++    private static final ClassValue<Class<? extends Event>> EVENT_REGISTRATION_CLASSES = new ClassValue<>() { // Apis
++        @Override
++        protected Class<? extends Event> computeValue(final Class<?> type) {
++            return resolveRegistrationClass(type);
++        }
++    };
++
++    private static Class<? extends Event> resolveRegistrationClass(final Class<?> clazz) {
++        Class<?> current = clazz;
++        while (current != null && !current.equals(Event.class) && Event.class.isAssignableFrom(current)) {
++            for (final Method method : current.getDeclaredMethods()) {
++                if ("getHandlerList".equals(method.getName()) && method.getParameterCount() == 0) {
++                    return current.asSubclass(Event.class);
++                }
++            }
++            current = current.getSuperclass();
++        }
++        throw new IllegalPluginAccessException("Unable to find handler list for event " + clazz.getName() + ". Static getHandlerList method required!");
++    }
++
+     @NotNull
+     private Class<? extends Event> getRegistrationClass(@NotNull Class<? extends Event> clazz) {
+-        try {
+-            clazz.getDeclaredMethod("getHandlerList");
+-            return clazz;
+-        } catch (NoSuchMethodException e) {
+-            if (clazz.getSuperclass() != null
+-                && !clazz.getSuperclass().equals(Event.class)
+-                && Event.class.isAssignableFrom(clazz.getSuperclass())) {
+-                return this.getRegistrationClass(clazz.getSuperclass().asSubclass(Event.class));
+-            } else {
+-                throw new IllegalPluginAccessException("Unable to find handler list for event " + clazz.getName() + ". Static getHandlerList method required!");
+-            }
+-        }
++        return EVENT_REGISTRATION_CLASSES.get(clazz);
+     }
+ 
+     // JavaPluginLoader
+@@ -128,13 +_,20 @@
+     public Map<Class<? extends Event>, Set<RegisteredListener>> createRegisteredListeners(@NotNull Listener listener, @NotNull final Plugin plugin) {
+         Map<Class<? extends Event>, Set<RegisteredListener>> ret = new HashMap<>();
+ 
+-        Set<Method> methods;
++        final List<Method> methods;
+         try {
+             Class<?> listenerClazz = listener.getClass();
+-            methods = Sets.union(
+-                Set.of(listenerClazz.getMethods()),
+-                Set.of(listenerClazz.getDeclaredMethods())
+-            );
++            Method[] publicMethods = listenerClazz.getMethods();
++            Method[] declaredMethods = listenerClazz.getDeclaredMethods();
++            methods = new ArrayList<>(declaredMethods.length + publicMethods.length);
++            for (final Method declared : declaredMethods) {
++                methods.add(declared);
++            }
++            for (final Method pub : publicMethods) {
++                if (pub.getDeclaringClass() != listenerClazz) {
++                    methods.add(pub);
++                }
++            }
+         } catch (NoClassDefFoundError e) {
+             plugin.getLogger().severe("Failed to register events for " + listener.getClass() + " because " + e.getMessage() + " does not exist.");
+             return ret;

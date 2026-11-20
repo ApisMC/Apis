@@ -1,0 +1,20 @@
+--- a/src/main/java/io/papermc/paper/plugin/provider/source/FileProviderSource.java
++++ b/src/main/java/io/papermc/paper/plugin/provider/source/FileProviderSource.java
+@@ -92,7 +_,7 @@
+     private Path checkUpdate(Path file) throws InvalidPluginException {
+         PluginInitializerManager pluginSystem = PluginInitializerManager.instance();
+         Path updateDirectory = pluginSystem.pluginUpdatePath();
+-        if (updateDirectory == null || !Files.isDirectory(updateDirectory)) {
++        if (updateDirectory == null || !pluginSystem.hasPendingUpdateFiles()) { // Apis - Skip reopening every JAR when addons/update/ is empty
+             return file;
+         }
+ 
+@@ -122,6 +_,8 @@
+                     Files.delete(updateLocation);
+                 } catch (IOException exception) {
+                     throw new RuntimeException("Could not delete '" + updateLocation + "' from update folder in update plugin process", exception);
++                } finally {
++                    pluginSystem.invalidatePendingUpdatesCache(); // Apis
+                 }
+ 
+                 return renamedFile;

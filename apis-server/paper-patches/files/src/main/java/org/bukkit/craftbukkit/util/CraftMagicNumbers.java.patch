@@ -30,7 +30,7 @@
              CraftLegacy.init();
          }
  
-@@ -399,12 +_,12 @@
+@@ -399,12 +_,17 @@
      @Override
      public byte[] processClass(PluginDescriptionFile pdf, String path, byte[] clazz) {
          // Paper start
@@ -41,7 +41,12 @@
          // Paper end
          try {
 -            clazz = this.commodore.convert(clazz, pdf.getName(), ApiVersion.getOrCreateVersion(pdf.getAPIVersion()), ((CraftServer) Bukkit.getServer()).activeCompatibilities);
-+            clazz = this.getCommodore().convert(clazz, pdf.getName(), ApiVersion.getOrCreateVersion(pdf.getAPIVersion()), ((CraftServer) Bukkit.getServer()).activeCompatibilities); // Apis
++            final ApiVersion pluginVersion = ApiVersion.getOrCreateVersion(pdf.getAPIVersion());
++            final Set<String> compatibilities = ((CraftServer) Bukkit.getServer()).activeCompatibilities;
++            if (!Commodore.mayNeedConversion(clazz, pluginVersion, compatibilities)) {
++                return clazz;
++            }
++            clazz = this.getCommodore().convert(clazz, pdf.getName(), pluginVersion, compatibilities); // Apis
          } catch (Exception ex) {
              Bukkit.getLogger().log(Level.SEVERE, "Fatal error trying to convert " + pdf.getFullName() + ":" + path, ex);
          }
