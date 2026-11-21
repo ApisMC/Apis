@@ -136,6 +136,33 @@ class DirectoryLockTest {
         assertFalse(ApisHooks.isSessionLockOwnerAlive(lockPath));
         assertTrue(ApisHooks.tryBreakStaleSessionLock(worldDir, lockPath));
         assertFalse(Files.exists(lockPath));
+
+        // Lock payload from a different container/host on shared storage must NEVER be broken even if PID == 1 or currentPid
+        final ByteBuffer foreignPayload = ApisHooks.sessionLockPayload(
+            ByteBuffer.wrap("☃".getBytes(StandardCharsets.UTF_8)),
+            "foreign-container-node-xyz",
+            1L
+        );
+        final byte[] bytes = new byte[foreignPayload.remaining()];
+        foreignPayload.get(bytes);
+        Files.write(lockPath, bytes);
+        assertTrue(ApisHooks.isSessionLockOwnerAlive(lockPath));
+        assertFalse(ApisHooks.tryBreakStaleSessionLock(worldDir, lockPath));
+        assertTrue(Files.exists(lockPath));
+
+        // Same host with current PID (container restart) can safely reclaim stale lock
+        final ByteBuffer localPayload = ApisHooks.sessionLockPayload(
+            ByteBuffer.wrap("☃".getBytes(StandardCharsets.UTF_8)),
+            ApisHooks.currentSessionHostId(),
+            ApisHooks.currentSessionProcessStartMs()
+        );
+        final byte[] localBytes = new byte[localPayload.remaining()];
+        localPayload.get(localBytes);
+        Files.write(lockPath, localBytes);
+        assertTrue(new String(localBytes, StandardCharsets.UTF_8).contains("host=" + ApisHooks.currentSessionHostId()));
+        assertFalse(ApisHooks.isSessionLockOwnerAlive(lockPath));
+        assertTrue(ApisHooks.tryBreakStaleSessionLock(worldDir, lockPath));
+        assertFalse(Files.exists(lockPath));
     }
 
     @Test

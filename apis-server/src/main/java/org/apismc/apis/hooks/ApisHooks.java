@@ -14,10 +14,12 @@ import com.mojang.serialization.Decoder;
 import io.papermc.paper.adventure.PaperAdventure;
 import java.io.File;
 import java.io.IOException;
+import java.net.InetAddress;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.Instant;
 import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -83,6 +85,12 @@ public final class ApisHooks {
     private static final boolean IS_LINUX = System.getProperty("os.name", "")
         .toLowerCase(Locale.ROOT)
         .contains("linux");
+    private static final String CURRENT_HOST_ID = resolveCurrentHostId();
+    private static final long CURRENT_PROCESS_START_MS = ProcessHandle.current()
+        .info()
+        .startInstant()
+        .map(Instant::toEpochMilli)
+        .orElse(-1L);
 
     private ApisHooks() {
     }
@@ -833,14 +841,31 @@ public final class ApisHooks {
         StandaloneWorldManager.applyWorldGameMode(player, true);
     }
 
+    public static void onWorldUnloaded(final ServerLevel handle, final String worldName) {
+        StandaloneWorldManager.onWorldUnloaded(handle, worldName);
+    }
+
+    public static String currentSessionHostId() {
+        return CURRENT_HOST_ID;
+    }
+
+    public static long currentSessionProcessStartMs() {
+        return CURRENT_PROCESS_START_MS;
+    }
+
     public static ByteBuffer sessionLockPayload(final ByteBuffer marker) {
+        return sessionLockPayload(marker, CURRENT_HOST_ID, CURRENT_PROCESS_START_MS);
+    }
+
+    public static ByteBuffer sessionLockPayload(final ByteBuffer marker, final String hostId, final long startMs) {
         final ByteBuffer dup = marker.duplicate();
         final byte[] markerBytes = new byte[dup.remaining()];
         dup.get(markerBytes);
-        final byte[] pidSuffix = ("\n" + ProcessHandle.current().pid() + "\n").getBytes(StandardCharsets.UTF_8);
-        final byte[] combined = new byte[markerBytes.length + pidSuffix.length];
+        final String meta = "\n" + ProcessHandle.current().pid() + "\nhost=" + hostId + "\nstart=" + startMs + "\n";
+        final byte[] metaBytes = meta.getBytes(StandardCharsets.UTF_8);
+        final byte[] combined = new byte[markerBytes.length + metaBytes.length];
         System.arraycopy(markerBytes, 0, combined, 0, markerBytes.length);
-        System.arraycopy(pidSuffix, 0, combined, markerBytes.length, pidSuffix.length);
+        System.arraycopy(metaBytes, 0, combined, markerBytes.length, metaBytes.length);
         return ByteBuffer.wrap(combined);
     }
 
@@ -859,25 +884,72 @@ public final class ApisHooks {
             }
             final String content = Files.readString(lockPath, StandardCharsets.UTF_8);
             final long currentPid = ProcessHandle.current().pid();
+            long pid = -1L;
+            @Nullable String hostId = null;
             for (final String rawLine : content.split("\\R")) {
                 final String line = rawLine.trim();
                 if (line.isEmpty()) {
                     continue;
                 }
-                final long pid;
-                try {
-                    pid = Long.parseLong(line);
-                } catch (NumberFormatException _) {
+                if (line.startsWith("host=")) {
+                    hostId = line.substring("host=".length()).trim();
                     continue;
                 }
-                if (pid > 0L && pid != currentPid) {
-                    return ProcessHandle.of(pid).filter(ProcessHandle::isAlive).isPresent();
+                if (line.startsWith("start=")) {
+                    continue;
                 }
+                if (pid <= 0L) {
+                    try {
+                        final long parsed = Long.parseLong(line);
+                        if (parsed > 0L) {
+                            pid = parsed;
+                        }
+                    } catch (NumberFormatException _) {
+                    }
+                }
+            }
+            if (hostId != null && !hostId.isEmpty() && !hostId.equals(CURRENT_HOST_ID)) {
+                return true;
+            }
+            if (pid > 0L && pid != currentPid) {
+                return ProcessHandle.of(pid).filter(ProcessHandle::isAlive).isPresent();
             }
             return false;
         } catch (IOException _) {
             return false;
         }
+    }
+
+    private static String resolveCurrentHostId() {
+        final @Nullable String envHost = System.getenv("HOSTNAME");
+        @Nullable String host = envHost;
+        String sanitizedHost = host != null && !host.isBlank() ? sanitizeHostToken(host) : "local";
+        if (host == null || host.isBlank()) {
+            try {
+                host = InetAddress.getLocalHost().getHostName();
+                if (host != null && !host.isBlank()) {
+                    sanitizedHost = sanitizeHostToken(host);
+                }
+            } catch (Exception _) {
+            }
+        }
+        if (IS_LINUX) {
+            try {
+                final Path bootIdPath = Path.of("/proc/sys/kernel/random/boot_id");
+                if (Files.isRegularFile(bootIdPath)) {
+                    final String bootId = sanitizeHostToken(Files.readString(bootIdPath, StandardCharsets.UTF_8));
+                    if (!bootId.isEmpty()) {
+                        return sanitizedHost + "@" + bootId;
+                    }
+                }
+            } catch (IOException _) {
+            }
+        }
+        return sanitizedHost;
+    }
+
+    private static String sanitizeHostToken(final String raw) {
+        return raw.trim().replace('\r', '_').replace('\n', '_');
     }
 
     public static boolean tryBreakStaleSessionLock(final Path worldDir, final Path lockPath) {

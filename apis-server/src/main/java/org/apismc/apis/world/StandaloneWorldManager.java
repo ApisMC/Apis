@@ -801,8 +801,16 @@ public final class StandaloneWorldManager {
         return loaded;
     }
 
-    private static void cacheConfig(final String worldName, final Path worldDir, final StandaloneWorldConfig config) {
+    static void cacheConfig(final String worldName, final Path worldDir, final StandaloneWorldConfig config) {
         WORLD_CACHE.put(worldName.toLowerCase(Locale.ROOT), new WorldEntry(worldDir, config));
+    }
+
+    static boolean hasCachedConfig(final String worldName) {
+        return WORLD_CACHE.containsKey(worldName.toLowerCase(Locale.ROOT));
+    }
+
+    static boolean hasDimensionFolder(final ResourceKey<Level> dimension) {
+        return DIMENSION_FOLDERS.containsKey(dimension);
     }
 
     private static Path resolveWorldConfigDir(final ServerLevel level) {
@@ -1036,18 +1044,37 @@ public final class StandaloneWorldManager {
         return moved;
     }
 
+    /**
+     * Evicts cached world configuration and dimension folder mappings when a world is unloaded.
+     *
+     * @param handle    unloaded NMS server level
+     * @param worldName Bukkit world name
+     */
+    public static void onWorldUnloaded(final ServerLevel handle, final String worldName) {
+        onWorldUnloaded(handle.dimension(), worldName);
+    }
+
+    /**
+     * Evicts cached world configuration and dimension folder mappings for an unloaded dimension key.
+     *
+     * @param dimension unloaded dimension resource key
+     * @param worldName Bukkit world name
+     */
+    public static void onWorldUnloaded(final ResourceKey<Level> dimension, final String worldName) {
+        WORLD_CACHE.remove(worldName.toLowerCase(Locale.ROOT));
+        DIMENSION_FOLDERS.remove(dimension);
+    }
+
     private static boolean unloadWorldAndClearCache(
         final MinecraftServer server,
         final World world,
         final boolean save
     ) {
         final ServerLevel handle = ((CraftWorld) world).getHandle();
-        final String key = world.getName().toLowerCase(Locale.ROOT);
         if (!server.server.unloadWorld(world, save)) {
             return false;
         }
-        WORLD_CACHE.remove(key);
-        DIMENSION_FOLDERS.remove(handle.dimension());
+        onWorldUnloaded(handle, world.getName());
         return true;
     }
 

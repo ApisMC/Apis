@@ -217,4 +217,24 @@ class StandaloneWorldTest {
         assertEquals(42.5d, ApisMessageRenderer.parseFiniteDouble("42.5"));
         assertEquals(-90.0f, ApisMessageRenderer.parseFiniteFloat("-90"));
     }
+
+    @Test
+    void onWorldUnloadedEvictsWorldConfigCacheAndDimensionFolderMapping(final @TempDir Path tempDir)
+        throws IOException {
+        final Path arenaDir = tempDir.resolve("worlds").resolve("arena_one");
+        final StandaloneWorldConfig cfg = StandaloneWorldConfig.loadOrCreate(arenaDir);
+        final ResourceKey<Level> arenaKey = ResourceKey.create(
+            Registries.DIMENSION,
+            Identifier.fromNamespaceAndPath("minecraft", "arena_one")
+        );
+
+        StandaloneWorldManager.registerDimensionFolder(arenaKey, "arena_one");
+        StandaloneWorldManager.cacheConfig("Arena_One", arenaDir, cfg);
+        assertTrue(StandaloneWorldManager.hasCachedConfig("arena_one"));
+        assertTrue(StandaloneWorldManager.hasDimensionFolder(arenaKey));
+
+        StandaloneWorldManager.onWorldUnloaded(arenaKey, "Arena_One");
+        assertFalse(StandaloneWorldManager.hasCachedConfig("arena_one"));
+        assertFalse(StandaloneWorldManager.hasDimensionFolder(arenaKey));
+    }
 }

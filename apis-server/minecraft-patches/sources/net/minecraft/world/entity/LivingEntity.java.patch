@@ -11,18 +11,20 @@
          this.lastHurtByPlayer = EntityReference.read(input, "last_hurt_by_player");
          this.lastHurtByPlayerMemoryTime = input.getIntOr("last_hurt_by_player_memory_time", 0);
          this.lastHurtByMob = EntityReference.read(input, "last_hurt_by_mob");
-@@ -3671,7 +_,16 @@
+@@ -3671,7 +_,18 @@
      }
  
      private void updatePlayersWithNewEquipment(final ServerLevel level, final List<Pair<EquipmentSlot, ItemStack>> itemsToSend) {
 -        level.getChunkSource().sendToTrackingPlayers(this, new ClientboundSetEquipmentPacket(this.getId(), itemsToSend, true)); // Paper - data sanitization
 +        final ClientboundSetEquipmentPacket packet = new ClientboundSetEquipmentPacket(this.getId(), itemsToSend, true); // Paper - data sanitization
 +        if (org.apismc.apis.hooks.ApisHooks.isFastPacketFilteringEnabled()) { // Apis
-+            for (final ServerPlayer viewer : level.players()) {
-+                if (!org.apismc.apis.hooks.ApisHooks.shouldFilterEquipmentPacket(this, viewer)) {
-+                    viewer.connection.send(packet);
-+                }
-+            }
++            final org.bukkit.entity.Entity bukkitSelf = this.getBukkitEntity();
++            level.getChunkSource().sendToTrackingPlayersFiltered(
++                this,
++                packet,
++                viewer -> !org.apismc.apis.hooks.ApisHooks.shouldFilterEquipmentPacket(this, viewer)
++                    && viewer.getBukkitEntity().canSee(bukkitSelf)
++            );
 +            return;
 +        }
 +        level.getChunkSource().sendToTrackingPlayers(this, packet);

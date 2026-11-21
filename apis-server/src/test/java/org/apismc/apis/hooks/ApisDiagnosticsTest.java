@@ -42,6 +42,12 @@ class ApisDiagnosticsTest {
         );
         assertEquals("spigot.yml", ApisDiagnostics.detectLegacyRootFile(npeWrapped));
         assertTrue(ApisDiagnostics.handleLegacyPluginFailure("LegacyPlugin", npeWrapped));
+        assertTrue(ApisDiagnostics.hasIoNotFoundCause(fnf));
+        assertTrue(ApisDiagnostics.hasIoNotFoundCause(wrapped));
+        assertFalse(
+            ApisDiagnostics.hasIoNotFoundCause(npeWrapped),
+            "NPE matches must not suppress full stacktrace output"
+        );
     }
 
     @Test

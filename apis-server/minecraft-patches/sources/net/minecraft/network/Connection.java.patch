@@ -33,7 +33,7 @@
              this.flushQueue();
          }
      }
-@@ -496,11 +_,181 @@
+@@ -496,11 +_,192 @@
      private void sendPacket(final Packet<?> packet, final @Nullable ChannelFutureListener listener, final boolean flush) {
          this.sentPackets++;
          if (this.channel.eventLoop().inEventLoop()) {
@@ -80,17 +80,28 @@
 +        Packet<?>[] overflowPackets = null;
 +        @Nullable ChannelFutureListener[] overflowListeners = null;
 +        int overflowCount = 0;
++        boolean droppedDisconnected = false;
 +        synchronized (this.outboundBatchLock) {
-+            this.appendToBatchLocked(packet, listener);
-+            if (this.batchCount >= MAX_BATCH_SIZE_BEFORE_DRAIN) {
-+                overflowPackets = this.batchPackets;
-+                overflowListeners = this.batchListeners;
-+                overflowCount = this.batchCount;
-+                this.batchPackets = this.spareBatchPackets;
-+                this.spareBatchPackets = null;
-+                this.batchListeners = null;
-+                this.batchCount = 0;
++            if (!this.isConnected()) {
++                droppedDisconnected = true;
++            } else {
++                this.appendToBatchLocked(packet, listener);
++                if (this.batchCount >= MAX_BATCH_SIZE_BEFORE_DRAIN) {
++                    overflowPackets = this.batchPackets;
++                    overflowListeners = this.batchListeners;
++                    overflowCount = this.batchCount;
++                    this.batchPackets = this.spareBatchPackets;
++                    this.spareBatchPackets = null;
++                    this.batchListeners = null;
++                    this.batchCount = 0;
++                }
 +            }
++        }
++        if (droppedDisconnected) {
++            if (packet.hasFinishListener()) {
++                packet.onPacketDispatchFinish(this.getPlayer(), null);
++            }
++            return;
 +        }
 +        if (overflowCount > 0) {
 +            final Packet<?>[] packets = overflowPackets;
@@ -227,9 +238,13 @@
  
          // Paper start - Optimize network
          if (packet.hasFinishListener()) {
-@@ -544,8 +_,13 @@
+@@ -543,9 +_,17 @@
+     }
  
      private void flush() {
++        if (this.channel == null) {
++            return;
++        }
          if (this.channel.eventLoop().inEventLoop()) {
 -            this.channel.flush();
 -        } else {
@@ -243,6 +258,24 @@
              this.channel.eventLoop().execute(() -> this.channel.flush());
          }
      }
+@@ -607,6 +_,9 @@
+     private static int currTick; // Paper - Buffer joins to world
+     public void tick() {
+         this.flushQueue();
++        if (this.isConnected()) {
++            this.flush(); // Apis - Ensure non-flushed batch packets drain at least once per tick
++        }
+         // Paper start - Buffer joins to world
+         if (Connection.currTick != net.minecraft.server.MinecraftServer.currentTick) {
+             Connection.currTick = net.minecraft.server.MinecraftServer.currentTick;
+@@ -678,6 +_,7 @@
+         if (this.isConnected()) {
+             this.channel.close().awaitUninterruptibly();
+             this.disconnectionDetails = details;
++            this.clearPacketQueue(); // Apis - Drain any batch packets queued right before channel close
+         }
+     }
+ 
 @@ -925,6 +_,33 @@
      // Paper start - Optimize network
      public void clearPacketQueue() {

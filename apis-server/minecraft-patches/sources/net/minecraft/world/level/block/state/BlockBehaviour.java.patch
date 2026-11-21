@@ -1,7 +1,13 @@
 --- a/net/minecraft/world/level/block/state/BlockBehaviour.java
 +++ b/net/minecraft/world/level/block/state/BlockBehaviour.java
-@@ -470,12 +_,21 @@
-         private VoxelShape[] occlusionShapesByFace;
+@@ -466,16 +_,25 @@
+         private FluidState fluidState = Fluids.EMPTY.defaultFluidState();
+         private boolean isRandomlyTicking;
+         private boolean solidRender;
+-        private VoxelShape occlusionShape;
+-        private VoxelShape[] occlusionShapesByFace;
++        private VoxelShape occlusionShape = Shapes.empty();
++        private VoxelShape[] occlusionShapesByFace = EMPTY_OCCLUSION_SHAPES;
          private boolean propagatesSkylightDown;
          private int lightDampening;
 +        private volatile boolean cacheInitialized; // Apis
@@ -62,8 +68,12 @@
              return this.isSpecialCollidingBlock;
          }
          // Paper end - optimise collisions
-@@ -589,8 +_,12 @@
-         private org.bukkit.craftbukkit.block.data.@Nullable CraftBlockData cachedBlockData;
+@@ -586,11 +_,15 @@
+         }
+ 
+         // Paper start - Perf: impl cached craft block data, lazy load to fix issue with loading at the wrong time
+-        private org.bukkit.craftbukkit.block.data.@Nullable CraftBlockData cachedBlockData;
++        private volatile org.bukkit.craftbukkit.block.data.@Nullable CraftBlockData cachedBlockData;
  
          public org.bukkit.craftbukkit.block.data.CraftBlockData asBlockData() {
 -            if (this.cachedBlockData == null) this.cachedBlockData = org.bukkit.craftbukkit.block.data.CraftBlockData.createData(this.asState());
@@ -91,6 +101,21 @@
              this.fluidState = this.owner.getFluidState(this.asState());
              this.isRandomlyTicking = this.owner.isRandomlyTicking(this.asState());
              if (!this.getBlock().hasDynamicShape()) {
+@@ -635,11 +_,12 @@
+             } else if (this.solidRender) {
+                 this.occlusionShapesByFace = FULL_BLOCK_OCCLUSION_SHAPES;
+             } else {
+-                this.occlusionShapesByFace = new VoxelShape[DIRECTIONS.length];
++                final VoxelShape[] computedFaces = new VoxelShape[DIRECTIONS.length];
+ 
+                 for (Direction direction : DIRECTIONS) {
+-                    this.occlusionShapesByFace[direction.ordinal()] = this.occlusionShape.getFaceShape(direction);
++                    computedFaces[direction.ordinal()] = this.occlusionShape.getFaceShape(direction);
+                 }
++                this.occlusionShapesByFace = computedFaces;
+             }
+ 
+             this.propagatesSkylightDown = this.owner.propagatesSkylightDown(this.asState());
 @@ -680,6 +_,10 @@
                  }
              }

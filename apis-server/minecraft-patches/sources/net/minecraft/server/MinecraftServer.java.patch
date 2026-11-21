@@ -86,7 +86,7 @@
          this.saveGlobalData(flush); // Paper - move to saveGlobalData()
          boolean result = false;
  
-@@ -1005,6 +_,27 @@
+@@ -1005,6 +_,39 @@
  
          LOGGER.info("Stopping server");
          Commands.COMMAND_SENDING_POOL.shutdownNow(); // Paper - Perf: Async command map building; Shutdown and don't bother finishing
@@ -101,6 +101,18 @@
 +                this.getConnection().handleAllDisconnections();
 +            }
 +            this.isSaving = false;
++            if (!org.apismc.apis.hooks.ApisHooks.isMemoryOnlyWorld()) { // Apis - Flush open RegionFile/SavedData I/O if world saving is enabled
++                this.savedDataStorage.close();
++                for (final ServerLevel level : this.getAllLevels()) {
++                    if (level != null) {
++                        try {
++                            level.getChunkSource().close(false);
++                        } catch (final IOException ignored) {
++                        }
++                    }
++                }
++                ca.spottedleaf.moonrise.patches.chunk_system.io.MoonriseRegionFileIO.flush((MinecraftServer)(Object)this);
++            }
 +            this.resources.close();
 +            try { this.storageSource.close(); } catch (IOException ignored) {}
 +            io.papermc.paper.util.MCUtil.ASYNC_EXECUTOR.shutdownNow();

@@ -100,7 +100,30 @@ public final class ApisDiagnostics {
             category,
             targetDir
         );
+        if (!hasIoNotFoundCause(error)) {
+            ROOT_STYLE_LOGGER.error("Failure details for plugin '{}':", pluginName, error);
+        }
         return true;
+    }
+
+    static boolean hasIoNotFoundCause(final Throwable error) {
+        final Set<Throwable> visited = Collections.newSetFromMap(new IdentityHashMap<>());
+        final Deque<Throwable> queue = new ArrayDeque<>();
+        queue.add(error);
+        while (!queue.isEmpty()) {
+            final Throwable current = queue.removeFirst();
+            if (!visited.add(current)) {
+                continue;
+            }
+            if (current instanceof FileNotFoundException || current instanceof NoSuchFileException) {
+                return true;
+            }
+            if (current.getCause() != null) {
+                queue.addLast(current.getCause());
+            }
+            Collections.addAll(queue, current.getSuppressed());
+        }
+        return false;
     }
 
     static @Nullable String detectLegacyRootFile(final Throwable error) {
