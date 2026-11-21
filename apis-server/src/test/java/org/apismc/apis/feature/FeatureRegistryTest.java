@@ -93,20 +93,29 @@ class FeatureRegistryTest {
         cfg.dimensions.portals = false;
         cfg.chunks.structures = false;
         cfg.chunks.biomeDecoration = false;
+        cfg.chunks.ticking.subFeatures.poiTicking = false;
         cfg.blockEntities.ticking.enabled = false;
         cfg.blocksAndPhysics.redstone = false;
         cfg.blocksAndPhysics.blockGravity = false;
         cfg.blocksAndPhysics.leafDecay = false;
         cfg.blocksAndPhysics.fireSpread = false;
         cfg.blocksAndPhysics.itemPhysics = false;
+        cfg.blocksAndPhysics.blockEvents = false;
         cfg.worldEnvironment.daylightCycle = false;
         cfg.worldEnvironment.raids = false;
         cfg.worldEnvironment.sleepCycle = false;
         cfg.worldEnvironment.endDragonFight = false;
+        cfg.worldEnvironment.worldBorderTick = false;
+        cfg.worldEnvironment.environmentAttributes = false;
+        cfg.worldEnvironment.gameEvents = false;
         cfg.spawning.natural.subFeatures.monsters = false;
         cfg.spawning.natural.subFeatures.animals = false;
         cfg.entities.ai.enabled = false;
         cfg.entities.collisions.players = false;
+        cfg.entities.despawnChecks = false;
+        cfg.entities.insideBlockChecks = false;
+        cfg.entities.fluidInteraction = false;
+        cfg.entities.sprintParticles = false;
         cfg.gameplay.advancements = false;
         cfg.gameplay.recipes = false;
         cfg.gameplay.lootTables = false;
@@ -115,6 +124,10 @@ class FeatureRegistryTest {
         cfg.players.hunger = false;
         cfg.players.statistics = false;
         cfg.players.wardenTracker = false;
+        cfg.players.locatorBar = false;
+        cfg.players.inventorySpecialItemUpdates = false;
+        cfg.players.vanillaScoreboardCriteria = false;
+        cfg.players.floatingKick = false;
         cfg.network.generateKeypair = false;
         cfg.network.analytics.bstats = false;
         cfg.network.analytics.spark = false;
@@ -123,6 +136,7 @@ class FeatureRegistryTest {
         cfg.network.playerList.tabLatencyUpdates = false;
         cfg.network.packetRangeClamping.fullPacketBroadcast = false;
         cfg.storage.worldSaving = false;
+        cfg.storage.periodicAutosave = false;
         cfg.system.lifecycle.gracefulShutdown = false;
         cfg.compatibility.legacy.pluginBytecodeRerouting = false;
         cfg.compatibility.legacy.bootstrapDataTables = false;
@@ -151,6 +165,20 @@ class FeatureRegistryTest {
         assertFalse(ApisHooks.isDaylightCycleEnabled());
         assertFalse(ApisHooks.isBlockEntityTickingEnabled());
         assertFalse(ApisHooks.isItemPhysicsEnabled());
+        assertFalse(ApisHooks.isBlockEventsEnabled());
+        assertFalse(ApisHooks.isWorldBorderTickEnabled());
+        assertFalse(ApisHooks.isEnvironmentAttributesTickEnabled());
+        assertFalse(ApisHooks.isGameEventsEnabled());
+        assertTrue(ApisHooks.isPoiTickingDisabled());
+        assertFalse(ApisHooks.isDespawnChecksEnabled());
+        assertFalse(ApisHooks.isInsideBlockChecksEnabled());
+        assertFalse(ApisHooks.isFluidInteractionEnabled());
+        assertFalse(ApisHooks.isSprintParticlesEnabled());
+        assertFalse(ApisHooks.isLocatorBarEnabled());
+        assertFalse(ApisHooks.isInventorySpecialUpdatesEnabled());
+        assertFalse(ApisHooks.isVanillaScoreboardCriteriaEnabled());
+        assertFalse(ApisHooks.isFloatingKickEnabled());
+        assertFalse(ApisHooks.isPeriodicAutosaveEnabled());
         assertFalse(ApisHooks.isPluginBytecodeReroutingEnabled());
         assertFalse(ApisHooks.isBootstrapDataTablesEnabled());
         assertFalse(ApisHooks.isValidateEntityAttributesEnabled());
@@ -179,7 +207,7 @@ class FeatureRegistryTest {
 
         assertTrue(FeatureRegistry.isEnabled(Feature.ENV_WEATHER));
         assertFalse(FeatureRegistry.isDisabled(Feature.ENV_WEATHER));
-        assertEquals(49, FeatureRegistry.activeKillSwitches().size());
+        assertEquals(63, FeatureRegistry.activeKillSwitches().size());
     }
 
     @Test
@@ -190,6 +218,7 @@ class FeatureRegistryTest {
         cfg.spawning.natural.enabled = false;
         cfg.blockEntities.ticking.enabled = false;
         cfg.entities.collisions.entities = false;
+        cfg.storage.worldSaving = false;
 
         FeatureRegistry.applyEarly(cfg);
 
@@ -203,6 +232,8 @@ class FeatureRegistryTest {
         assertTrue(ApisHooks.isRandomTicksDisabled());
         assertTrue(ApisHooks.isBlockTicksDisabled());
         assertTrue(ApisHooks.isFluidTicksDisabled());
+        assertTrue(ApisHooks.isPoiTickingDisabled());
+        assertFalse(ApisHooks.isPeriodicAutosaveEnabled());
 
         assertTrue(ApisHooks.isNaturalSpawningDisabled());
         assertTrue(ApisHooks.isMonstersDisabled());

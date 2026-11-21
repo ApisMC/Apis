@@ -8,15 +8,36 @@
          // Paper start - rewrite chunk system
          ((ca.spottedleaf.moonrise.patches.chunk_system.level.ChunkSystemServerLevel)this.level).moonrise$getChunkTaskScheduler().chunkHolderManager.saveAllChunks(
              flushStorage, false, false, false
-@@ -403,7 +_,7 @@
-         profiler.push("poi");
-         this.poiManager.tick(haveTime);
-         profiler.popPush("chunk_unload");
+@@ -400,10 +_,14 @@
+ 
+     protected void tick(final BooleanSupplier haveTime) {
+         ProfilerFiller profiler = Profiler.get();
+-        profiler.push("poi");
+-        this.poiManager.tick(haveTime);
+-        profiler.popPush("chunk_unload");
 -        if (!this.level.noSave()) {
++        if (!org.apismc.apis.hooks.ApisHooks.isPoiTickingDisabled()) { // Apis
++            profiler.push("poi");
++            this.poiManager.tick(haveTime);
++            profiler.popPush("chunk_unload");
++        } else {
++            profiler.push("chunk_unload");
++        }
 +        if (!this.level.noSave() && !org.apismc.apis.hooks.ApisHooks.isMemoryOnlyWorld()) { // Apis
              this.processUnloads(haveTime);
          }
  
+@@ -416,7 +_,9 @@
+ 
+     private void processUnloads(final BooleanSupplier haveTime) {
+         ((ca.spottedleaf.moonrise.patches.chunk_system.level.ChunkSystemServerLevel)this.level).moonrise$getChunkTaskScheduler().chunkHolderManager.processUnloads(); // Paper - rewrite chunk system
+-        ((ca.spottedleaf.moonrise.patches.chunk_system.level.ChunkSystemServerLevel)this.level).moonrise$getChunkTaskScheduler().chunkHolderManager.autoSave(); // Paper - rewrite chunk system
++        if (org.apismc.apis.hooks.ApisHooks.isPeriodicAutosaveEnabled()) { // Apis
++            ((ca.spottedleaf.moonrise.patches.chunk_system.level.ChunkSystemServerLevel)this.level).moonrise$getChunkTaskScheduler().chunkHolderManager.autoSave(); // Paper - rewrite chunk system
++        } // Apis
+     }
+ 
+     private void saveChunksEagerly(final BooleanSupplier haveTime) {
 @@ -1465,7 +_,7 @@
              int range = this.range;
  

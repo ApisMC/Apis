@@ -553,6 +553,10 @@ public final class ApisConfig {
         @Setting("fluid-ticks")
         @Comment("Tick scheduled water/lava flow updates in ServerLevel; false = freeze all fluid flow | Виконувати тіки рідин (води та лави); false = зупинити розтікання рідин")
         public boolean fluidTicks = true;
+
+        @Setting("poi-ticking")
+        @Comment("Tick Point-of-Interest (POI) spatial index updates in ChunkMap; false = skip PoiManager#tick when villages/bees/portals are unused | Тікати просторовий індекс POI у ChunkMap; false = пропускати PoiManager#tick")
+        public boolean poiTicking = true;
     }
 
     @ConfigSerializable
@@ -601,6 +605,10 @@ public final class ApisConfig {
         @Setting("item-physics")
         @Comment("Run movement, gravity & collision physics on dropped ItemEntity; false = keep pickup/despawn timers without motion physics | Прораховувати рух і колізії викинутих предметів; false = залишити лише таймер підбору/деспавну без фізики")
         public boolean itemPhysics = true;
+
+        @Setting("block-events")
+        @Comment("Queue and execute ServerLevel block events (pistons, note blocks, chest animations); false = skip ServerLevel#runBlockEvents | Обробляти події блоків (поршні, нотні блоки, анімація скринь); false = пропустити runBlockEvents")
+        public boolean blockEvents = true;
     }
 
     @ConfigSerializable
@@ -624,6 +632,18 @@ public final class ApisConfig {
         @Setting("end-dragon-fight")
         @Comment("Run EndDragonFight logic in The End; false = skip Ender Dragon fight bossbar & battle ticks | Виконувати логіку бою з Драконом Края в Енді; false = пропустити тіки EndDragonFight")
         public boolean endDragonFight = true;
+
+        @Setting("world-border-tick")
+        @Comment("Tick world border interpolation in ServerLevel and player client borders; false = skip WorldBorder#tick per tick | Тікати зміну кордонів світу в ServerLevel і гравців; false = пропустити WorldBorder#tick")
+        public boolean worldBorderTick = true;
+
+        @Setting("environment-attributes")
+        @Comment("Invalidate and recompute EnvironmentAttributeSystem tick cache each tick; false = freeze environment attribute updates | Оновлювати кеш атрибутів середовища щотиково; false = заморозити EnvironmentAttributeSystem")
+        public boolean environmentAttributes = true;
+
+        @Setting("game-events")
+        @Comment("Dispatch GameEvent vibrations (sculk sensors, warden, allays) on steps/actions; false = skip GameEventDispatcher#post | Розсилати вібрації GameEvent (скалк, варден, спеї); false = вимкнути GameEventDispatcher#post")
+        public boolean gameEvents = true;
     }
 
     @ConfigSerializable
@@ -668,6 +688,22 @@ public final class ApisConfig {
         @Setting("collisions")
         @Comment("Physical pushing & entity collision controls | Налаштування фізичного зіштовхування сутностей і гравців")
         public CollisionsSection collisions = new CollisionsSection();
+
+        @Setting("despawn-checks")
+        @Comment("Run per-tick Entity#checkDespawn distance checks; false = skip vanilla despawn scans | Перевіряти умови деспавну сутностей щотіку; false = пропустити Entity#checkDespawn")
+        public boolean despawnChecks = true;
+
+        @Setting("inside-block-checks")
+        @Comment("Sweep intersected blocks during entity movement (cobwebs, portals, bushes); false = skip Entity#checkInsideBlocks | Перевіряти перетин із блоками під час руху (павутина, портали, кущі); false = пропустити checkInsideBlocks")
+        public boolean insideBlockChecks = true;
+
+        @Setting("fluid-interaction")
+        @Comment("Evaluate water/lava fluid height and swimming state in Entity#baseTick; false = skip fluid checks | Перевіряти контакт із водою/лавою та плавання в Entity#baseTick; false = вимкнути перевірку рідин")
+        public boolean fluidInteraction = true;
+
+        @Setting("sprint-particles")
+        @Comment("Spawn server-side sprint block particles in Entity#baseTick; false = skip sprint particle broadcasts | Генерувати серверні частинки бігу в Entity#baseTick; false = вимкнути частинки бігу")
+        public boolean sprintParticles = true;
     }
 
     @ConfigSerializable
@@ -745,12 +781,28 @@ public final class ApisConfig {
         public boolean hunger = true;
 
         @Setting("statistics")
-        @Comment("Increment player statistics & per-tick advancement stat triggers; false = skip stats increments | Нараховувати статистику гравцям та тік-тригери статистики; false = пропустити оновлення")
+        @Comment("Increment vanilla player statistics (ServerPlayer#awardStat, tick & movement stats); false = skip all vanilla stat updates | Нараховувати ванільну статистику гравцям (ServerPlayer#awardStat та рух); false = вимкнути статистику")
         public boolean statistics = true;
 
         @Setting("warden-tracker")
         @Comment("Tick WardenSpawnTracker per player; false = disable Warden shriek warning escalation | Тікати WardenSpawnTracker для кожного гравця; false = вимкнути накопичення попереджень Вардена")
         public boolean wardenTracker = true;
+
+        @Setting("locator-bar")
+        @Comment("Track player waypoints and WAYPOINT_TRANSMIT_RANGE crouch attributes for the 26.3 Locator Bar; false = disable Locator Bar tracking | Відстежувати вейпоїнти та атрибут WAYPOINT_TRANSMIT_RANGE для Locator Bar; false = вимкнути Locator Bar")
+        public boolean locatorBar = true;
+
+        @Setting("inventory-special-item-updates")
+        @Comment("Scan all player inventory slots each tick for special items (maps, compasses); false = skip per-tick slot scan | Сканувати всі слоти інвентаря щотіку для спецпредметів (мапи); false = пропустити перевірку слотів")
+        public boolean inventorySpecialItemUpdates = true;
+
+        @Setting("vanilla-scoreboard-criteria")
+        @Comment("Sync vanilla ObjectiveCriteria (health, food, air, armor, exp, level) in ServerPlayer#doTick; false = skip criteria checks (safe for TAB/custom scoreboards) | Оновлювати ванільні критерії скорборду (здоров'я, їжа, броня, рівень); false = пропустити")
+        public boolean vanillaScoreboardCriteria = true;
+
+        @Setting("floating-kick")
+        @Comment("Kick players for hovering/floating too long without allowFlight; false = disable vanilla floating kick (recommended with anti-cheats or lobbies) | Кікати гравців за тривале зависання в повітрі; false = вимкнути ванільний кік за політ")
+        public boolean floatingKick = true;
     }
 
     @ConfigSerializable
@@ -826,6 +878,10 @@ public final class ApisConfig {
         @Setting("world-saving")
         @Comment("Persist chunks, region files, level.dat, SavedData & advancements to disk; false = ephemeral RAM-only worlds with 0 disk writes (also disables players.data-saving) | Зберігати чанки, регіони, level.dat і дані на диск; false = ефемерний режим лише в RAM (0 I/O, також вимикає players.data-saving)")
         public boolean worldSaving = true;
+
+        @Setting("periodic-autosave")
+        @Comment("Run periodic background chunk & player autosaves during ticks when storage.world-saving=true; false = save only on unload, /save-all or graceful shutdown | Періодичне фонове автозбереження чанків і гравців під час тіків; false = зберігати лише при вивантаженні/стопі")
+        public boolean periodicAutosave = true;
     }
 
     @ConfigSerializable

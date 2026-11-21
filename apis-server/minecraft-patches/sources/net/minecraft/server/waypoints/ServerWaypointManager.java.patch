@@ -1,0 +1,36 @@
+--- a/net/minecraft/server/waypoints/ServerWaypointManager.java
++++ b/net/minecraft/server/waypoints/ServerWaypointManager.java
+@@ -29,6 +_,7 @@
+ 
+     @Override
+     public void trackWaypoint(final WaypointTransmitter waypoint) {
++        if (!org.apismc.apis.hooks.ApisHooks.isLocatorBarEnabled()) return; // Apis
+         this.waypoints.add(waypoint);
+ 
+         if (!this.locatorBarEnabled) return; // Paper - optimize ServerWaypointManager with locator bar disabled
+@@ -39,7 +_,7 @@
+ 
+     @Override
+     public void updateWaypoint(final WaypointTransmitter waypoint) {
+-        if (!this.locatorBarEnabled) return; // Paper - optimize ServerWaypointManager with locator bar disabled
++        if (!org.apismc.apis.hooks.ApisHooks.isLocatorBarEnabled() || !this.locatorBarEnabled) return; // Paper - optimize ServerWaypointManager with locator bar disabled // Apis
+         if (this.waypoints.contains(waypoint)) {
+             Map<ServerPlayer, WaypointTransmitter.Connection> playerConnection = Tables.transpose(this.connections).row(waypoint);
+             SetView<ServerPlayer> potentialPlayers = Sets.difference(this.players, playerConnection.keySet());
+@@ -62,6 +_,7 @@
+     }
+ 
+     public void addPlayer(final ServerPlayer player) {
++        if (!org.apismc.apis.hooks.ApisHooks.isLocatorBarEnabled()) return; // Apis
+         this.players.add(player);
+ 
+         if (this.locatorBarEnabled) { // Paper - optimize ServerWaypointManager with locator bar disabled
+@@ -76,7 +_,7 @@
+     }
+ 
+     public void updatePlayer(final ServerPlayer player) {
+-        if (!this.locatorBarEnabled) return; // Paper - optimize ServerWaypointManager with locator bar disabled
++        if (!org.apismc.apis.hooks.ApisHooks.isLocatorBarEnabled() || !this.locatorBarEnabled) return; // Paper - optimize ServerWaypointManager with locator bar disabled // Apis
+         Map<WaypointTransmitter, WaypointTransmitter.Connection> waypointConnections = this.connections.row(player);
+         SetView<WaypointTransmitter> potentialWaypoints = Sets.difference(this.waypoints, waypointConnections.keySet());
+ 

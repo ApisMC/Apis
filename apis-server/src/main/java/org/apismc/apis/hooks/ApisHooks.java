@@ -502,6 +502,27 @@ public final class ApisHooks {
             || FeatureRegistry.isDisabled(Feature.CHUNKS_FLUID_TICKS);
     }
 
+    public static boolean isPoiTickingDisabled() {
+        return FeatureRegistry.isDisabled(Feature.CHUNKS_TICKING)
+            || FeatureRegistry.isDisabled(Feature.CHUNKS_POI_TICKING);
+    }
+
+    public static boolean isDespawnChecksEnabled() {
+        return FeatureRegistry.isEnabled(Feature.ENTITIES_DESPAWN_CHECKS);
+    }
+
+    public static boolean isInsideBlockChecksEnabled() {
+        return FeatureRegistry.isEnabled(Feature.ENTITIES_INSIDE_BLOCK_CHECKS);
+    }
+
+    public static boolean isFluidInteractionEnabled() {
+        return FeatureRegistry.isEnabled(Feature.ENTITIES_FLUID_INTERACTION);
+    }
+
+    public static boolean isSprintParticlesEnabled() {
+        return FeatureRegistry.isEnabled(Feature.ENTITIES_SPRINT_PARTICLES);
+    }
+
     // 5. World Environment, Spawning, Physics & Gameplay
     public static boolean isWeatherDisabled() {
         return FeatureRegistry.isDisabled(Feature.ENV_WEATHER);
@@ -559,6 +580,18 @@ public final class ApisHooks {
 
     public static boolean isEndDragonFightEnabled() {
         return FeatureRegistry.isEnabled(Feature.ENV_END_DRAGON_FIGHT);
+    }
+
+    public static boolean isWorldBorderTickEnabled() {
+        return FeatureRegistry.isEnabled(Feature.ENV_WORLD_BORDER_TICK);
+    }
+
+    public static boolean isEnvironmentAttributesTickEnabled() {
+        return FeatureRegistry.isEnabled(Feature.ENV_ENVIRONMENT_ATTRIBUTES);
+    }
+
+    public static boolean isGameEventsEnabled() {
+        return FeatureRegistry.isEnabled(Feature.ENV_GAME_EVENTS);
     }
 
     public static boolean isCommandFunctionsEnabled() {
@@ -629,6 +662,11 @@ public final class ApisHooks {
         return FeatureRegistry.isDisabled(Feature.STORAGE_WORLD_SAVING);
     }
 
+    public static boolean isPeriodicAutosaveEnabled() {
+        return FeatureRegistry.isEnabled(Feature.STORAGE_WORLD_SAVING)
+            && FeatureRegistry.isEnabled(Feature.STORAGE_PERIODIC_AUTOSAVE);
+    }
+
     public static boolean isFastShutdown() {
         return FeatureRegistry.isDisabled(Feature.SYSTEM_GRACEFUL_SHUTDOWN);
     }
@@ -645,6 +683,22 @@ public final class ApisHooks {
 
     public static boolean isStatisticsEnabled() {
         return FeatureRegistry.isEnabled(Feature.PLAYERS_STATISTICS);
+    }
+
+    public static boolean isLocatorBarEnabled() {
+        return FeatureRegistry.isEnabled(Feature.PLAYERS_LOCATOR_BAR);
+    }
+
+    public static boolean isInventorySpecialUpdatesEnabled() {
+        return FeatureRegistry.isEnabled(Feature.PLAYERS_INVENTORY_SPECIAL_UPDATES);
+    }
+
+    public static boolean isVanillaScoreboardCriteriaEnabled() {
+        return FeatureRegistry.isEnabled(Feature.PLAYERS_VANILLA_SCOREBOARD_CRITERIA);
+    }
+
+    public static boolean isFloatingKickEnabled() {
+        return FeatureRegistry.isEnabled(Feature.PLAYERS_FLOATING_KICK);
     }
 
     // 9. World Time, Block Entities & Physics
@@ -675,6 +729,10 @@ public final class ApisHooks {
 
     public static boolean isFireSpreadDisabled() {
         return FeatureRegistry.isDisabled(Feature.PHYSICS_FIRE_SPREAD);
+    }
+
+    public static boolean isBlockEventsEnabled() {
+        return FeatureRegistry.isEnabled(Feature.PHYSICS_BLOCK_EVENTS);
     }
 
     // 10. Standalone Worlds & Organized Directories Architecture

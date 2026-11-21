@@ -33,6 +33,7 @@ public enum Feature {
     CHUNKS_RANDOM_TICKS("chunks.ticking.sub-features.random-ticks"),
     CHUNKS_BLOCK_TICKS("chunks.ticking.sub-features.block-ticks"),
     CHUNKS_FLUID_TICKS("chunks.ticking.sub-features.fluid-ticks"),
+    CHUNKS_POI_TICKING("chunks.ticking.sub-features.poi-ticking"),
 
     // 5. Block Entities & Physics
     BLOCK_ENTITIES_TICKING("block-entities.ticking.enabled"),
@@ -42,6 +43,7 @@ public enum Feature {
     PHYSICS_LEAF_DECAY("blocks-and-physics.leaf-decay"),
     PHYSICS_FIRE_SPREAD("blocks-and-physics.fire-spread"),
     PHYSICS_ITEM_PHYSICS("blocks-and-physics.item-physics"),
+    PHYSICS_BLOCK_EVENTS("blocks-and-physics.block-events"),
 
     // 6. World Environment
     ENV_DAYLIGHT_CYCLE("world-environment.daylight-cycle"),
@@ -49,6 +51,9 @@ public enum Feature {
     ENV_RAIDS("world-environment.raids"),
     ENV_SLEEP_CYCLE("world-environment.sleep-cycle"),
     ENV_END_DRAGON_FIGHT("world-environment.end-dragon-fight"),
+    ENV_WORLD_BORDER_TICK("world-environment.world-border-tick"),
+    ENV_ENVIRONMENT_ATTRIBUTES("world-environment.environment-attributes"),
+    ENV_GAME_EVENTS("world-environment.game-events"),
 
     // 7. Spawning
     SPAWNING_NATURAL("spawning.natural.enabled"),
@@ -64,6 +69,10 @@ public enum Feature {
     ENTITIES_AI_SENSORS("entities.ai.sub-features.sensors"),
     ENTITIES_COLLISIONS("entities.collisions.entities"),
     ENTITIES_PLAYER_COLLISIONS("entities.collisions.players"),
+    ENTITIES_DESPAWN_CHECKS("entities.despawn-checks"),
+    ENTITIES_INSIDE_BLOCK_CHECKS("entities.inside-block-checks"),
+    ENTITIES_FLUID_INTERACTION("entities.fluid-interaction"),
+    ENTITIES_SPRINT_PARTICLES("entities.sprint-particles"),
 
     // 9. Gameplay & Datapacks
     GAMEPLAY_ADVANCEMENTS("gameplay.advancements"),
@@ -76,6 +85,10 @@ public enum Feature {
     PLAYERS_HUNGER("players.hunger"),
     PLAYERS_STATISTICS("players.statistics"),
     PLAYERS_WARDEN_TRACKER("players.warden-tracker"),
+    PLAYERS_LOCATOR_BAR("players.locator-bar"),
+    PLAYERS_INVENTORY_SPECIAL_UPDATES("players.inventory-special-item-updates"),
+    PLAYERS_VANILLA_SCOREBOARD_CRITERIA("players.vanilla-scoreboard-criteria"),
+    PLAYERS_FLOATING_KICK("players.floating-kick"),
 
     // 11. Network, Analytics & Status
     NETWORK_GENERATE_KEYPAIR("network.generate-keypair"),
@@ -89,6 +102,7 @@ public enum Feature {
 
     // 12. Storage & System Lifecycle
     STORAGE_WORLD_SAVING("storage.world-saving"),
+    STORAGE_PERIODIC_AUTOSAVE("storage.periodic-autosave"),
     SYSTEM_GRACEFUL_SHUTDOWN("system.lifecycle.graceful-shutdown"),
 
     // 13. Compatibility & Legacy

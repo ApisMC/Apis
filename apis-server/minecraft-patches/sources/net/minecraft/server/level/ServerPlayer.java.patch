@@ -17,7 +17,7 @@
 -        if (this.levitationStartPos != null) {
 -            CriteriaTriggers.LEVITATION.trigger(this, this.levitationStartPos, this.tickCount - this.levitationStartTime);
 -        }
-+        if (org.apismc.apis.hooks.ApisHooks.isStatisticsEnabled()) { // Apis
++        if (!org.apismc.apis.hooks.ApisHooks.isAdvancementsDisabled()) { // Apis
 +            CriteriaTriggers.TICK.trigger(this);
 +            if (this.levitationStartPos != null) {
 +                CriteriaTriggers.LEVITATION.trigger(this, this.levitationStartPos, this.tickCount - this.levitationStartTime);
@@ -26,7 +26,31 @@
  
          this.trackStartFallingPosition();
          this.trackEnteredOrExitedLavaOnVehicle();
-@@ -816,20 +_,22 @@
+@@ -797,14 +_,16 @@
+             }
+         }
+ 
+-        AttributeInstance waypointTransmitRange = this.getAttribute(Attributes.WAYPOINT_TRANSMIT_RANGE);
+-        if (waypointTransmitRange != null) {
+-            if (this.isCrouching()) {
+-                waypointTransmitRange.addOrUpdateTransientModifier(WAYPOINT_TRANSMIT_RANGE_CROUCH_MODIFIER);
+-            } else {
+-                waypointTransmitRange.removeModifier(WAYPOINT_TRANSMIT_RANGE_CROUCH_MODIFIER);
++        if (org.apismc.apis.hooks.ApisHooks.isLocatorBarEnabled()) { // Apis
++            AttributeInstance waypointTransmitRange = this.getAttribute(Attributes.WAYPOINT_TRANSMIT_RANGE);
++            if (waypointTransmitRange != null) {
++                if (this.isCrouching()) {
++                    waypointTransmitRange.addOrUpdateTransientModifier(WAYPOINT_TRANSMIT_RANGE_CROUCH_MODIFIER);
++                } else {
++                    waypointTransmitRange.removeModifier(WAYPOINT_TRANSMIT_RANGE_CROUCH_MODIFIER);
++                }
+             }
+-        }
++        } // Apis
+     }
+ 
+     public void doTick() {
+@@ -816,28 +_,32 @@
                      this.containerMenu = this.inventoryMenu;
                  }
  
@@ -44,6 +68,14 @@
 -                if (!this.isSleeping()) {
 -                    this.awardStat(Stats.TIME_SINCE_REST);
 -                }
+-            }
+-
+-            for (int i = 0; i < this.getInventory().getContainerSize(); i++) {
+-                ItemStack itemStack = this.getInventory().getItem(i);
+-                if (!itemStack.isEmpty()) {
+-                    this.synchronizeSpecialItemUpdates(itemStack);
+-                }
+-            }
 +                if (org.apismc.apis.hooks.ApisHooks.isHungerEnabled()) this.foodData.tick(this); // Apis
 +                if (org.apismc.apis.hooks.ApisHooks.isStatisticsEnabled()) { // Apis
 +                    this.awardStat(Stats.PLAY_TIME);
@@ -60,9 +92,103 @@
 +                        this.awardStat(Stats.TIME_SINCE_REST);
 +                    }
 +                } // Apis
++            }
++
++            if (org.apismc.apis.hooks.ApisHooks.isInventorySpecialUpdatesEnabled()) { // Apis
++                for (int i = 0; i < this.getInventory().getContainerSize(); i++) {
++                    ItemStack itemStack = this.getInventory().getItem(i);
++                    if (!itemStack.isEmpty()) {
++                        this.synchronizeSpecialItemUpdates(itemStack);
++                    }
++                }
++            } // Apis
+ 
+             if (this.getHealth() != this.lastSentHealth
+                 || this.lastSentFood != this.foodData.getFoodLevel()
+@@ -848,30 +_,32 @@
+                 this.lastFoodSaturationZero = this.foodData.getSaturationLevel() == 0.0F;
              }
  
-             for (int i = 0; i < this.getInventory().getContainerSize(); i++) {
+-            if (this.getHealth() + this.getAbsorptionAmount() != this.lastRecordedHealthAndAbsorption) {
+-                this.lastRecordedHealthAndAbsorption = this.getHealth() + this.getAbsorptionAmount();
+-                this.updateScoreForCriteria(ObjectiveCriteria.HEALTH, Mth.ceil(this.lastRecordedHealthAndAbsorption));
+-            }
+-
+-            if (this.foodData.getFoodLevel() != this.lastRecordedFoodLevel) {
+-                this.lastRecordedFoodLevel = this.foodData.getFoodLevel();
+-                this.updateScoreForCriteria(ObjectiveCriteria.FOOD, Mth.ceil(this.lastRecordedFoodLevel));
+-            }
+-
+-            if (this.getAirSupply() != this.lastRecordedAirLevel) {
+-                this.lastRecordedAirLevel = this.getAirSupply();
+-                this.updateScoreForCriteria(ObjectiveCriteria.AIR, Mth.ceil(this.lastRecordedAirLevel));
+-            }
+-
+-            if (this.getArmorValue() != this.lastRecordedArmor) {
+-                this.lastRecordedArmor = this.getArmorValue();
+-                this.updateScoreForCriteria(ObjectiveCriteria.ARMOR, Mth.ceil(this.lastRecordedArmor));
+-            }
+-
+-            if (this.totalExperience != this.lastRecordedExperience) {
+-                this.lastRecordedExperience = this.totalExperience;
+-                this.updateScoreForCriteria(ObjectiveCriteria.EXPERIENCE, Mth.ceil(this.lastRecordedExperience));
+-            }
++            if (org.apismc.apis.hooks.ApisHooks.isVanillaScoreboardCriteriaEnabled()) { // Apis
++                if (this.getHealth() + this.getAbsorptionAmount() != this.lastRecordedHealthAndAbsorption) {
++                    this.lastRecordedHealthAndAbsorption = this.getHealth() + this.getAbsorptionAmount();
++                    this.updateScoreForCriteria(ObjectiveCriteria.HEALTH, Mth.ceil(this.lastRecordedHealthAndAbsorption));
++                }
++
++                if (this.foodData.getFoodLevel() != this.lastRecordedFoodLevel) {
++                    this.lastRecordedFoodLevel = this.foodData.getFoodLevel();
++                    this.updateScoreForCriteria(ObjectiveCriteria.FOOD, Mth.ceil(this.lastRecordedFoodLevel));
++                }
++
++                if (this.getAirSupply() != this.lastRecordedAirLevel) {
++                    this.lastRecordedAirLevel = this.getAirSupply();
++                    this.updateScoreForCriteria(ObjectiveCriteria.AIR, Mth.ceil(this.lastRecordedAirLevel));
++                }
++
++                if (this.getArmorValue() != this.lastRecordedArmor) {
++                    this.lastRecordedArmor = this.getArmorValue();
++                    this.updateScoreForCriteria(ObjectiveCriteria.ARMOR, Mth.ceil(this.lastRecordedArmor));
++                }
++
++                if (this.totalExperience != this.lastRecordedExperience) {
++                    this.lastRecordedExperience = this.totalExperience;
++                    this.updateScoreForCriteria(ObjectiveCriteria.EXPERIENCE, Mth.ceil(this.lastRecordedExperience));
++                }
++            } // Apis
+ 
+             // CraftBukkit start - Force max health updates
+             if (this.maxHealthCache != this.getMaxHealth()) {
+@@ -879,7 +_,7 @@
+             }
+             // CraftBukkit end
+ 
+-            if (this.experienceLevel != this.lastRecordedLevel) {
++            if (org.apismc.apis.hooks.ApisHooks.isVanillaScoreboardCriteriaEnabled() && this.experienceLevel != this.lastRecordedLevel) { // Apis
+                 this.lastRecordedLevel = this.experienceLevel;
+                 this.updateScoreForCriteria(ObjectiveCriteria.LEVEL, Mth.ceil(this.lastRecordedLevel));
+             }
+@@ -889,7 +_,7 @@
+                 this.connection.send(new ClientboundSetExperiencePacket(this.experienceProgress, this.totalExperience, this.experienceLevel));
+             }
+ 
+-            if (this.tickCount % 20 == 0) {
++            if (this.tickCount % 20 == 0 && !org.apismc.apis.hooks.ApisHooks.isAdvancementsDisabled()) { // Apis
+                 CriteriaTriggers.LOCATION.trigger(this);
+             }
+             // CraftBukkit start - initialize oldLevel, fire PlayerLevelChangeEvent, and tick client-sided world border
+@@ -902,7 +_,7 @@
+                 this.oldLevel = this.experienceLevel;
+             }
+ 
+-            if (this.getBukkitEntity().hasClientWorldBorder()) {
++            if (org.apismc.apis.hooks.ApisHooks.isWorldBorderTickEnabled() && this.getBukkitEntity().hasClientWorldBorder()) { // Apis
+                 ((org.bukkit.craftbukkit.CraftWorldBorder) this.getBukkitEntity().getWorldBorder()).getHandle().tick();
+             }
+             // CraftBukkit end
 @@ -1371,7 +_,9 @@
              }
          } else {
@@ -74,6 +200,23 @@
          }
  
          org.bukkit.entity.Player respawnPlayer = this.getBukkitEntity();
+@@ -1415,14 +_,14 @@
+     }
+ 
+     public boolean isReceivingWaypoints() {
+-        return this.getAttributeValue(Attributes.WAYPOINT_RECEIVE_RANGE) > 0.0;
++        return org.apismc.apis.hooks.ApisHooks.isLocatorBarEnabled() && this.getAttributeValue(Attributes.WAYPOINT_RECEIVE_RANGE) > 0.0; // Apis
+     }
+ 
+     @Override
+     protected void onAttributeUpdated(final Holder<Attribute> attribute) {
+         if (attribute.is(Attributes.WAYPOINT_RECEIVE_RANGE)) {
+             ServerWaypointManager waypointManager = this.level().getWaypointManager();
+-            if (this.getAttributes().getValue(attribute) > 0.0) {
++            if (org.apismc.apis.hooks.ApisHooks.isLocatorBarEnabled() && this.getAttributes().getValue(attribute) > 0.0) { // Apis
+                 waypointManager.addPlayer(this);
+             } else {
+                 waypointManager.removePlayer(this);
 @@ -1615,6 +_,7 @@
          this.lastSentHealth = -1.0F;
          this.lastSentFood = -1;
@@ -82,6 +225,37 @@
          // CraftBukkit start
          org.bukkit.event.player.PlayerChangedWorldEvent changeEvent = new org.bukkit.event.player.PlayerChangedWorldEvent(this.getBukkitEntity(), oldLevel.getWorld());
          this.level().getCraftServer().getPluginManager().callEvent(changeEvent);
+@@ -2042,6 +_,7 @@
+     }
+ 
+     public void checkMovementStatistics(final double dx, final double dy, final double dz) {
++        if (!org.apismc.apis.hooks.ApisHooks.isStatisticsEnabled() && !org.apismc.apis.hooks.ApisHooks.isHungerEnabled()) return; // Apis
+         if (!this.isPassenger() && !didNotMove(dx, dy, dz)) {
+             if (this.isSwimming()) {
+                 int distance = Math.round((float)Math.sqrt(dx * dx + dy * dy + dz * dz) * 100.0F);
+@@ -2092,6 +_,7 @@
+     }
+ 
+     private void checkRidingStatistics(final double dx, final double dy, final double dz) {
++        if (!org.apismc.apis.hooks.ApisHooks.isStatisticsEnabled()) return; // Apis
+         if (this.isPassenger() && !didNotMove(dx, dy, dz)) {
+             int distance = Math.round((float)Math.sqrt(dx * dx + dy * dy + dz * dz) * 100.0F);
+             Entity vehicle = this.getVehicle();
+@@ -2119,12 +_,14 @@
+ 
+     @Override
+     public void awardStat(final Stat<?> stat, final int count) {
++        if (!org.apismc.apis.hooks.ApisHooks.isStatisticsEnabled()) return; // Apis
+         this.stats.increment(this, stat, count);
+         this.level().getCraftServer().getScoreboardManager().forAllObjectives(stat, this, score -> score.add(count)); // CraftBukkit - Get our scores instead
+     }
+ 
+     @Override
+     public void resetStat(final Stat<?> stat) {
++        if (!org.apismc.apis.hooks.ApisHooks.isStatisticsEnabled()) return; // Apis
+         this.stats.setValue(this, stat, 0);
+         this.level().getCraftServer().getScoreboardManager().forAllObjectives(stat, this, ScoreAccess::reset); // CraftBukkit - Get our scores instead
+     }
 @@ -2376,6 +_,10 @@
      @Override
      public ServerLevel level() {

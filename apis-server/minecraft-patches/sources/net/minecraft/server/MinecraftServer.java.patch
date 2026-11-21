@@ -153,6 +153,72 @@
                  CompletableFuture.runAsync(com.destroystokyo.paper.PaperVersionFetcher::getUpdateStatusStartupMessage, io.papermc.paper.util.MCUtil.ASYNC_EXECUTOR);
              }
              // Paper end - Improve outdated version checking
+@@ -1576,7 +_,9 @@
+                 this.server.spark.tickStart(); // Paper - spark
+                 if (this.emptyTicks == emptyTickThreshold) {
+                     LOGGER.info("Server empty for {} seconds, pausing", this.pauseWhenEmptySeconds());
+-                    this.autoSave();
++                    if (org.apismc.apis.hooks.ApisHooks.isPeriodicAutosaveEnabled()) { // Apis
++                        this.autoSave();
++                    } // Apis
+                 }
+ 
+                 this.server.getScheduler().mainThreadHeartbeat(); // CraftBukkit
+@@ -1609,29 +_,31 @@
+ 
+         this.ticksUntilAutosave--;
+         // Paper start - Incremental chunk and player saving
+-        int playerSaveInterval = io.papermc.paper.configuration.GlobalConfiguration.get().playerAutoSave.rate;
+-        if (playerSaveInterval < 0) {
+-            playerSaveInterval = this.autosavePeriod;
+-        }
+-        Profiler.get().push("save");
+-        final boolean fullSave = this.autosavePeriod > 0 && this.tickCount % this.autosavePeriod == 0;
+-        try {
+-            this.isSaving = true;
+-            if (playerSaveInterval > 0) {
+-                this.playerList.saveAll(playerSaveInterval);
+-            }
+-            if (fullSave) {
+-                this.saveGlobalData(false);
+-            }
+-            for (final ServerLevel level : this.getAllLevels()) {
+-                if (level.paperConfig().chunks.autoSaveInterval.value() > 0) {
+-                    level.saveIncrementally(fullSave);
+-                }
+-            }
+-        } finally {
+-            this.isSaving = false;
+-        }
+-        Profiler.get().pop();
++        if (org.apismc.apis.hooks.ApisHooks.isPeriodicAutosaveEnabled()) { // Apis
++            int playerSaveInterval = io.papermc.paper.configuration.GlobalConfiguration.get().playerAutoSave.rate;
++            if (playerSaveInterval < 0) {
++                playerSaveInterval = this.autosavePeriod;
++            }
++            Profiler.get().push("save");
++            final boolean fullSave = this.autosavePeriod > 0 && this.tickCount % this.autosavePeriod == 0;
++            try {
++                this.isSaving = true;
++                if (playerSaveInterval > 0) {
++                    this.playerList.saveAll(playerSaveInterval);
++                }
++                if (fullSave) {
++                    this.saveGlobalData(false);
++                }
++                for (final ServerLevel level : this.getAllLevels()) {
++                    if (level.paperConfig().chunks.autoSaveInterval.value() > 0) {
++                        level.saveIncrementally(fullSave);
++                    }
++                }
++            } finally {
++                this.isSaving = false;
++            }
++            Profiler.get().pop();
++        } // Apis
+         // Paper end - Incremental chunk and player saving
+ 
+         ProfilerFiller profiler = Profiler.get();
 @@ -1726,7 +_,7 @@
      private ServerStatus.Players buildPlayerStatus() {
          List<ServerPlayer> players = this.playerList.getPlayers();

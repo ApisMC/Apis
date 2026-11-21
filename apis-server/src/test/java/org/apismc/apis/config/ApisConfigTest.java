@@ -39,8 +39,22 @@ class ApisConfigTest {
         assertTrue(initial.compatibility.legacy.bootstrapDataTables);
         assertTrue(initial.compatibility.legacy.validateEntityAttributes);
         assertTrue(initial.storage.worldSaving);
+        assertTrue(initial.storage.periodicAutosave);
         assertTrue(initial.system.lifecycle.gracefulShutdown);
         assertTrue(initial.blockEntities.ticking.enabled);
+        assertTrue(initial.chunks.ticking.subFeatures.poiTicking);
+        assertTrue(initial.blocksAndPhysics.blockEvents);
+        assertTrue(initial.worldEnvironment.worldBorderTick);
+        assertTrue(initial.worldEnvironment.environmentAttributes);
+        assertTrue(initial.worldEnvironment.gameEvents);
+        assertTrue(initial.entities.despawnChecks);
+        assertTrue(initial.entities.insideBlockChecks);
+        assertTrue(initial.entities.fluidInteraction);
+        assertTrue(initial.entities.sprintParticles);
+        assertTrue(initial.players.locatorBar);
+        assertTrue(initial.players.inventorySpecialItemUpdates);
+        assertTrue(initial.players.vanillaScoreboardCriteria);
+        assertTrue(initial.players.floatingKick);
         assertEquals(ApisConfig.MODE_STANDALONE, initial.dimensions.mode);
         assertEquals(ApisConfig.DEFAULT_FALLBACK_WORLD, initial.dimensions.fallbackWorld);
         assertTrue(Files.exists(cfgFile));
@@ -69,6 +83,20 @@ class ApisConfigTest {
         assertTrue(yamlText.contains("bootstrap-data-tables: true"));
         assertTrue(yamlText.contains("validate-entity-attributes: true"));
         assertTrue(yamlText.contains("world-saving: true"));
+        assertTrue(yamlText.contains("periodic-autosave: true"));
+        assertTrue(yamlText.contains("poi-ticking: true"));
+        assertTrue(yamlText.contains("block-events: true"));
+        assertTrue(yamlText.contains("world-border-tick: true"));
+        assertTrue(yamlText.contains("environment-attributes: true"));
+        assertTrue(yamlText.contains("game-events: true"));
+        assertTrue(yamlText.contains("despawn-checks: true"));
+        assertTrue(yamlText.contains("inside-block-checks: true"));
+        assertTrue(yamlText.contains("fluid-interaction: true"));
+        assertTrue(yamlText.contains("sprint-particles: true"));
+        assertTrue(yamlText.contains("locator-bar: true"));
+        assertTrue(yamlText.contains("inventory-special-item-updates: true"));
+        assertTrue(yamlText.contains("vanilla-scoreboard-criteria: true"));
+        assertTrue(yamlText.contains("floating-kick: true"));
         assertTrue(yamlText.contains("warden-tracker: true"));
         assertTrue(yamlText.contains("sleep-cycle: true"));
         assertTrue(yamlText.contains("end-dragon-fight: true"));
@@ -98,6 +126,20 @@ class ApisConfigTest {
             .replace("world-saving: true", "world-saving: false")
             .replace("graceful-shutdown: true", "graceful-shutdown: false")
             .replace("players: true", "players: false")
+            .replace("poi-ticking: true", "poi-ticking: false")
+            .replace("block-events: true", "block-events: false")
+            .replace("world-border-tick: true", "world-border-tick: false")
+            .replace("environment-attributes: true", "environment-attributes: false")
+            .replace("game-events: true", "game-events: false")
+            .replace("despawn-checks: true", "despawn-checks: false")
+            .replace("inside-block-checks: true", "inside-block-checks: false")
+            .replace("fluid-interaction: true", "fluid-interaction: false")
+            .replace("sprint-particles: true", "sprint-particles: false")
+            .replace("locator-bar: true", "locator-bar: false")
+            .replace("inventory-special-item-updates: true", "inventory-special-item-updates: false")
+            .replace("vanilla-scoreboard-criteria: true", "vanilla-scoreboard-criteria: false")
+            .replace("floating-kick: true", "floating-kick: false")
+            .replace("periodic-autosave: true", "periodic-autosave: false")
             .replace("projectile-tracking-range: 32", "projectile-tracking-range: 9999");
         Files.writeString(cfgFile, updated);
 
@@ -106,8 +148,22 @@ class ApisConfigTest {
         assertFalse(reloaded.caches.eagerBlockstateCache);
         assertFalse(reloaded.compatibility.legacy.pluginBytecodeRerouting);
         assertFalse(reloaded.storage.worldSaving);
+        assertFalse(reloaded.storage.periodicAutosave);
         assertFalse(reloaded.system.lifecycle.gracefulShutdown);
         assertFalse(reloaded.entities.collisions.players);
+        assertFalse(reloaded.chunks.ticking.subFeatures.poiTicking);
+        assertFalse(reloaded.blocksAndPhysics.blockEvents);
+        assertFalse(reloaded.worldEnvironment.worldBorderTick);
+        assertFalse(reloaded.worldEnvironment.environmentAttributes);
+        assertFalse(reloaded.worldEnvironment.gameEvents);
+        assertFalse(reloaded.entities.despawnChecks);
+        assertFalse(reloaded.entities.insideBlockChecks);
+        assertFalse(reloaded.entities.fluidInteraction);
+        assertFalse(reloaded.entities.sprintParticles);
+        assertFalse(reloaded.players.locatorBar);
+        assertFalse(reloaded.players.inventorySpecialItemUpdates);
+        assertFalse(reloaded.players.vanillaScoreboardCriteria);
+        assertFalse(reloaded.players.floatingKick);
         assertEquals(
             256,
             reloaded.network.packetRangeClamping.projectileTrackingRange,
@@ -117,9 +173,23 @@ class ApisConfigTest {
         assertTrue(FeatureRegistry.isDisabled(Feature.CACHES_EAGER_BLOCKSTATE));
         assertTrue(FeatureRegistry.isDisabled(Feature.LEGACY_PLUGIN_BYTECODE_REROUTING));
         assertTrue(FeatureRegistry.isDisabled(Feature.STORAGE_WORLD_SAVING));
+        assertTrue(FeatureRegistry.isDisabled(Feature.STORAGE_PERIODIC_AUTOSAVE));
         assertTrue(FeatureRegistry.isDisabled(Feature.SYSTEM_GRACEFUL_SHUTDOWN));
         assertTrue(FeatureRegistry.isDisabled(Feature.ENTITIES_PLAYER_COLLISIONS));
-        assertEquals(6, FeatureRegistry.activeKillSwitches().size());
+        assertTrue(FeatureRegistry.isDisabled(Feature.CHUNKS_POI_TICKING));
+        assertTrue(FeatureRegistry.isDisabled(Feature.PHYSICS_BLOCK_EVENTS));
+        assertTrue(FeatureRegistry.isDisabled(Feature.ENV_WORLD_BORDER_TICK));
+        assertTrue(FeatureRegistry.isDisabled(Feature.ENV_ENVIRONMENT_ATTRIBUTES));
+        assertTrue(FeatureRegistry.isDisabled(Feature.ENV_GAME_EVENTS));
+        assertTrue(FeatureRegistry.isDisabled(Feature.ENTITIES_DESPAWN_CHECKS));
+        assertTrue(FeatureRegistry.isDisabled(Feature.ENTITIES_INSIDE_BLOCK_CHECKS));
+        assertTrue(FeatureRegistry.isDisabled(Feature.ENTITIES_FLUID_INTERACTION));
+        assertTrue(FeatureRegistry.isDisabled(Feature.ENTITIES_SPRINT_PARTICLES));
+        assertTrue(FeatureRegistry.isDisabled(Feature.PLAYERS_LOCATOR_BAR));
+        assertTrue(FeatureRegistry.isDisabled(Feature.PLAYERS_INVENTORY_SPECIAL_UPDATES));
+        assertTrue(FeatureRegistry.isDisabled(Feature.PLAYERS_VANILLA_SCOREBOARD_CRITERIA));
+        assertTrue(FeatureRegistry.isDisabled(Feature.PLAYERS_FLOATING_KICK));
+        assertEquals(20, FeatureRegistry.activeKillSwitches().size());
     }
 
     @Test

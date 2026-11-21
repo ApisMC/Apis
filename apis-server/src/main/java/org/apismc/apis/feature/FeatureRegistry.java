@@ -181,6 +181,7 @@ public final class FeatureRegistry {
         markIfDisabled(masks, Feature.CHUNKS_RANDOM_TICKS, config.chunks.ticking.subFeatures.randomTicks);
         markIfDisabled(masks, Feature.CHUNKS_BLOCK_TICKS, config.chunks.ticking.subFeatures.blockTicks);
         markIfDisabled(masks, Feature.CHUNKS_FLUID_TICKS, config.chunks.ticking.subFeatures.fluidTicks);
+        markIfDisabled(masks, Feature.CHUNKS_POI_TICKING, config.chunks.ticking.subFeatures.poiTicking);
 
         // 5. Block Entities & Blocks/Physics
         markIfDisabled(masks, Feature.BLOCK_ENTITIES_TICKING, config.blockEntities.ticking.enabled);
@@ -190,6 +191,7 @@ public final class FeatureRegistry {
         markIfDisabled(masks, Feature.PHYSICS_LEAF_DECAY, config.blocksAndPhysics.leafDecay);
         markIfDisabled(masks, Feature.PHYSICS_FIRE_SPREAD, config.blocksAndPhysics.fireSpread);
         markIfDisabled(masks, Feature.PHYSICS_ITEM_PHYSICS, config.blocksAndPhysics.itemPhysics);
+        markIfDisabled(masks, Feature.PHYSICS_BLOCK_EVENTS, config.blocksAndPhysics.blockEvents);
 
         // 6. World Environment
         markIfDisabled(masks, Feature.ENV_DAYLIGHT_CYCLE, config.worldEnvironment.daylightCycle);
@@ -197,6 +199,9 @@ public final class FeatureRegistry {
         markIfDisabled(masks, Feature.ENV_RAIDS, config.worldEnvironment.raids);
         markIfDisabled(masks, Feature.ENV_SLEEP_CYCLE, config.worldEnvironment.sleepCycle);
         markIfDisabled(masks, Feature.ENV_END_DRAGON_FIGHT, config.worldEnvironment.endDragonFight);
+        markIfDisabled(masks, Feature.ENV_WORLD_BORDER_TICK, config.worldEnvironment.worldBorderTick);
+        markIfDisabled(masks, Feature.ENV_ENVIRONMENT_ATTRIBUTES, config.worldEnvironment.environmentAttributes);
+        markIfDisabled(masks, Feature.ENV_GAME_EVENTS, config.worldEnvironment.gameEvents);
 
         // 7. Spawning
         markIfDisabled(masks, Feature.SPAWNING_NATURAL, config.spawning.natural.enabled);
@@ -212,6 +217,10 @@ public final class FeatureRegistry {
         markIfDisabled(masks, Feature.ENTITIES_AI_SENSORS, config.entities.ai.subFeatures.sensors);
         markIfDisabled(masks, Feature.ENTITIES_COLLISIONS, config.entities.collisions.entities);
         markIfDisabled(masks, Feature.ENTITIES_PLAYER_COLLISIONS, config.entities.collisions.players);
+        markIfDisabled(masks, Feature.ENTITIES_DESPAWN_CHECKS, config.entities.despawnChecks);
+        markIfDisabled(masks, Feature.ENTITIES_INSIDE_BLOCK_CHECKS, config.entities.insideBlockChecks);
+        markIfDisabled(masks, Feature.ENTITIES_FLUID_INTERACTION, config.entities.fluidInteraction);
+        markIfDisabled(masks, Feature.ENTITIES_SPRINT_PARTICLES, config.entities.sprintParticles);
 
         // 9. Gameplay
         markIfDisabled(masks, Feature.GAMEPLAY_ADVANCEMENTS, config.gameplay.advancements);
@@ -224,6 +233,18 @@ public final class FeatureRegistry {
         markIfDisabled(masks, Feature.PLAYERS_HUNGER, config.players.hunger);
         markIfDisabled(masks, Feature.PLAYERS_STATISTICS, config.players.statistics);
         markIfDisabled(masks, Feature.PLAYERS_WARDEN_TRACKER, config.players.wardenTracker);
+        markIfDisabled(masks, Feature.PLAYERS_LOCATOR_BAR, config.players.locatorBar);
+        markIfDisabled(
+            masks,
+            Feature.PLAYERS_INVENTORY_SPECIAL_UPDATES,
+            config.players.inventorySpecialItemUpdates
+        );
+        markIfDisabled(
+            masks,
+            Feature.PLAYERS_VANILLA_SCOREBOARD_CRITERIA,
+            config.players.vanillaScoreboardCriteria
+        );
+        markIfDisabled(masks, Feature.PLAYERS_FLOATING_KICK, config.players.floatingKick);
 
         // 11. Network
         markIfDisabled(masks, Feature.NETWORK_GENERATE_KEYPAIR, config.network.generateKeypair);
@@ -241,6 +262,7 @@ public final class FeatureRegistry {
 
         // 12. Storage & System
         markIfDisabled(masks, Feature.STORAGE_WORLD_SAVING, config.storage.worldSaving);
+        markIfDisabled(masks, Feature.STORAGE_PERIODIC_AUTOSAVE, config.storage.periodicAutosave);
         markIfDisabled(masks, Feature.SYSTEM_GRACEFUL_SHUTDOWN, config.system.lifecycle.gracefulShutdown);
 
         // 13. Compatibility

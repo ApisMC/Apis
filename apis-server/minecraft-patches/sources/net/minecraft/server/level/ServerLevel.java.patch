@@ -23,17 +23,32 @@
              if (generator instanceof net.minecraft.world.level.levelgen.NoiseBasedChunkGenerator noiseBased) {
                  generator = new net.minecraft.world.level.levelgen.NoiseBasedChunkGenerator(biomeSource, noiseBased.generatorSettings());
              } else if (generator instanceof net.minecraft.world.level.levelgen.FlatLevelSource flatLevel) {
-@@ -810,13 +_,15 @@
+@@ -804,19 +_,26 @@
+     public void tick(final BooleanSupplier haveTime) {
+         ProfilerFiller profiler = Profiler.get();
+         this.handlingTick = true;
+-        this.environmentAttributes().invalidateTickCache();
++        if (org.apismc.apis.hooks.ApisHooks.isEnvironmentAttributesTickEnabled()) { // Apis
++            this.environmentAttributes().invalidateTickCache();
++        } // Apis
+         TickRateManager tickRateManager = this.tickRateManager();
+         boolean runs = tickRateManager.runsNormally();
          if (runs) {
-             profiler.push("world border");
-             this.getWorldBorder().tick();
+-            profiler.push("world border");
+-            this.getWorldBorder().tick();
 -            profiler.popPush("weather");
 -            this.advanceWeatherCycle();
+-            profiler.pop();
++            if (org.apismc.apis.hooks.ApisHooks.isWorldBorderTickEnabled()) { // Apis
++                profiler.push("world border");
++                this.getWorldBorder().tick();
++                profiler.pop();
++            } // Apis
 +            if (!org.apismc.apis.hooks.ApisHooks.isWeatherDisabled()) { // Apis
-+                profiler.popPush("weather");
++                profiler.push("weather");
 +                this.advanceWeatherCycle();
++                profiler.pop();
 +            }
-             profiler.pop();
          }
  
          int percentage = this.getGameRules().get(GameRules.PLAYERS_SLEEPING_PERCENTAGE);
@@ -51,7 +66,7 @@
          if (runs) {
              this.tickTime();
          }
-@@ -851,15 +_,20 @@
+@@ -851,23 +_,30 @@
          profiler.push("tickPending");
          if (!this.isDebug() && runs) {
              long tick = this.getGameTime();
@@ -79,6 +94,18 @@
              this.raids.tick(this);
          }
  
+         profiler.popPush("chunkSource");
+         this.getChunkSource().tick(haveTime, true);
+-        profiler.popPush("blockEvents");
+-        if (runs) {
++        if (runs && !this.blockEvents.isEmpty() && org.apismc.apis.hooks.ApisHooks.isBlockEventsEnabled()) { // Apis
++            profiler.popPush("blockEvents");
+             this.runBlockEvents();
++        } else if (!this.blockEvents.isEmpty() && !org.apismc.apis.hooks.ApisHooks.isBlockEventsEnabled()) {
++            this.blockEvents.clear();
+         }
+ 
+         this.handlingTick = false;
 @@ -883,7 +_,7 @@
  
          if (this.emptyTime < 300) {
@@ -88,6 +115,21 @@
                  profiler.push("dragonFight");
                  this.dragonFight.tick();
                  profiler.pop();
+@@ -895,9 +_,11 @@
+                     entity -> {
+                         if (!entity.isRemoved()) {
+                             if (!tickRateManager.isEntityFrozen(entity)) {
+-                                profiler.push("checkDespawn");
+-                                entity.checkDespawn();
+-                                profiler.pop();
++                                if (org.apismc.apis.hooks.ApisHooks.isDespawnChecksEnabled()) { // Apis
++                                    profiler.push("checkDespawn");
++                                    entity.checkDespawn();
++                                    profiler.pop();
++                                } // Apis
+                                 if (true) { // Paper - rewrite chunk system
+                                     Entity vehicle = entity.getVehicle();
+                                     if (vehicle != null) {
 @@ -927,16 +_,18 @@
          profiler.push("entityManagement");
          // Paper - rewrite chunk system
@@ -170,6 +212,26 @@
              } catch (IOException never) {
                  throw new RuntimeException(never);
              }
+@@ -1848,6 +_,9 @@
+ 
+     @Override
+     public void gameEvent(final Holder<GameEvent> gameEvent, final Vec3 position, final GameEvent.Context context) {
++        if (!org.apismc.apis.hooks.ApisHooks.isGameEventsEnabled()) { // Apis
++            return;
++        } // Apis
+         // Paper start - Prevent GameEvents being fired from unloaded chunks
+         if (this.getChunkIfLoadedImmediately((Mth.floor(position.x) >> 4), (Mth.floor(position.z) >> 4)) == null) {
+             return;
+@@ -2048,6 +_,9 @@
+ 
+     @Override
+     public void blockEvent(final BlockPos pos, final Block block, final int b0, final int b1) {
++        if (!org.apismc.apis.hooks.ApisHooks.isBlockEventsEnabled()) { // Apis
++            return;
++        } // Apis
+         this.blockEvents.add(new BlockEventData(pos, block, b0, b1));
+     }
+ 
 @@ -2466,6 +_,9 @@
              return false;
          } else {
