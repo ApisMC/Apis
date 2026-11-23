@@ -1,6 +1,6 @@
 --- a/net/minecraft/world/level/Level.java
 +++ b/net/minecraft/world/level/Level.java
-@@ -1486,6 +_,7 @@
+@@ -1391,6 +_,7 @@
      }
  
      public void tickBlockEntities() {

@@ -1,7 +1,7 @@
 --- a/net/minecraft/world/level/NaturalSpawner.java
 +++ b/net/minecraft/world/level/NaturalSpawner.java
-@@ -128,6 +_,9 @@
-         List<MobCategory> spawningCategories = new ArrayList<>(SPAWNING_CATEGORIES.length);
+@@ -129,6 +_,9 @@
+         List<MobCategory> list = new ArrayList<>(SPAWNING_CATEGORIES.length);
  
          for (MobCategory mobCategory : SPAWNING_CATEGORIES) {
 +            if (org.apismc.apis.hooks.ApisHooks.isMobCategoryDisabled(mobCategory)) { // Apis

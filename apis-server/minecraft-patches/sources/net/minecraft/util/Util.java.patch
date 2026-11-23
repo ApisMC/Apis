@@ -1,6 +1,6 @@
 --- a/net/minecraft/util/Util.java
 +++ b/net/minecraft/util/Util.java
-@@ -253,7 +_,7 @@
+@@ -205,7 +_,7 @@
  
      public static int maxAllowedExecutorThreads() {
          // Paper start - Perf: use simpler thread pool that allows 1 thread and reduce worldgen thread worker count for low core count CPUs

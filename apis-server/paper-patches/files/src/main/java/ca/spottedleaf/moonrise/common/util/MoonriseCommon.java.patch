@@ -1,6 +1,6 @@
 --- a/src/main/java/ca/spottedleaf/moonrise/common/util/MoonriseCommon.java
 +++ b/src/main/java/ca/spottedleaf/moonrise/common/util/MoonriseCommon.java
-@@ -40,7 +_,7 @@
+@@ -36,7 +_,7 @@
      public static final BalancedPrioritisedThreadPool.OrderedStreamGroup SERVER_GROUP = MoonriseCommon.WORKER_POOL.createOrderedStreamGroup();
  
      public static void adjustWorkerThreads(final int configWorkerThreads, final int configIoThreads) {

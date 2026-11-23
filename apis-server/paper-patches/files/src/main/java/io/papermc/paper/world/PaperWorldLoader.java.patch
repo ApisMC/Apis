@@ -1,16 +1,30 @@
 --- a/src/main/java/io/papermc/paper/world/PaperWorldLoader.java
 +++ b/src/main/java/io/papermc/paper/world/PaperWorldLoader.java
-@@ -90,6 +_,9 @@
-         } else {
-             environment = World.Environment.CUSTOM;
-         }
-+        if (stemKey != LevelStem.OVERWORLD && (org.apismc.apis.hooks.ApisHooks.isStandaloneWorldsMode() || org.apismc.apis.hooks.ApisHooks.isDimensionDisabled(dimensionKey))) { // Apis - Cut disabled or unused vanilla nether/end stems in standalone mode
-+            enabled = false;
+@@ -62,12 +_,22 @@
+         String name = stemKey == LevelStem.OVERWORLD
+             ? levelId
+             : levelId + "_" + worldType;
++        if (stemKey != LevelStem.OVERWORLD) { // Apis - Cut disabled or unused vanilla nether/end stems in standalone mode
++            final net.minecraft.resources.ResourceKey<net.minecraft.world.level.Level> dimensionKey = stemKey == LevelStem.NETHER
++                ? net.minecraft.world.level.Level.NETHER
++                : (stemKey == LevelStem.END
++                    ? net.minecraft.world.level.Level.END
++                    : net.minecraft.resources.ResourceKey.create(Registries.DIMENSION, stemKey.identifier()));
++            if (org.apismc.apis.hooks.ApisHooks.isStandaloneWorldsMode() || org.apismc.apis.hooks.ApisHooks.isDimensionDisabled(dimensionKey)) {
++                enabled = false;
++            }
 +        }
- 
-         return new WorldLoadingInfo(environment, stemKey, dimensionKey, enabled);
+         return new WorldLoadingInfo(dimension, name, worldType, stemKey, enabled);
      }
-@@ -136,6 +_,10 @@
+ 
+     private void migrateWorldFolder(final WorldLoadingInfo info) {
+         // Migration of old CB world folders...
+-        if (info.dimension() == 0) {
++        if (info.dimension() == 0 || org.apismc.apis.hooks.ApisHooks.isStandaloneWorldsMode()) { // Apis - Keep worlds/<name>/ layout untouched
+             return;
+         }
+ 
+@@ -170,6 +_,10 @@
          for (ServerLevel serverLevel : this.server.getAllLevels()) {
              this.server.prepareLevel(serverLevel);
          }
@@ -20,4 +34,4 @@
 +        } // Apis
      }
  
-     private void loadInitialWorld(final LevelStem stem, final boolean hasWorldData) {
+     public record LevelDataResult(@Nullable Dynamic<?> dataTag, boolean fatalError) {}

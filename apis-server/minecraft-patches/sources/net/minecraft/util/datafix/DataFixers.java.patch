@@ -1,17 +1,17 @@
 --- a/net/minecraft/util/datafix/DataFixers.java
 +++ b/net/minecraft/util/datafix/DataFixers.java
-@@ -1743,7 +_,13 @@
-         int dataVersion = SharedConstants.getCurrentVersion().dataVersion().version();
-         DataFixerBuilder fixerUpper = new DataFixerBuilder(dataVersion);
-         FileFixerUpper.Builder fileFixerUpper = new FileFixerUpper.Builder(dataVersion);
--        addFixers(fixerUpper, fileFixerUpper);
+@@ -408,7 +_,13 @@
+ 
+     private static Result createFixerUpper() {
+         DataFixerBuilder dataFixerBuilder = new DataFixerBuilder(SharedConstants.getCurrentVersion().dataVersion().version());
+-        addFixers(dataFixerBuilder);
 +        if (org.apismc.apis.hooks.ApisHooks.isDataFixersEnabled()) { // Apis
-+            addFixers(fixerUpper, fileFixerUpper);
++            addFixers(dataFixerBuilder);
 +        } else {
-+            fixerUpper.addFixer(org.apismc.apis.hooks.ApisHooks.createNoopDataFix(
-+                fixerUpper.addSchema(0, org.apismc.apis.hooks.ApisHooks::createEmptyDataFixerSchema)
++            dataFixerBuilder.addFixer(org.apismc.apis.hooks.ApisHooks.createNoopDataFix(
++                dataFixerBuilder.addSchema(0, org.apismc.apis.hooks.ApisHooks::createEmptyDataFixerSchema)
 +            ));
 +        } // Apis
-         DATA_FIXER = fixerUpper.build();
-         FILE_FIXER = fileFixerUpper.build(DATA_FIXER);
+         return dataFixerBuilder.build();
      }
+ 

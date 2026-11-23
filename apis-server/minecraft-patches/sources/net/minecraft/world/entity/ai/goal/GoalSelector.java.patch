@@ -5,14 +5,14 @@
  
      public void tick() {
 +        if (org.apismc.apis.hooks.ApisHooks.isGoalSelectorDisabled()) return; // Apis
-         ProfilerFiller profiler = Profiler.get();
-         profiler.push("goalCleanup");
+         ProfilerFiller profilerFiller = Profiler.get();
+         profilerFiller.push("goalCleanup");
  
 @@ -118,6 +_,7 @@
      }
  
-     public void tickRunningGoals(final boolean forceTickAllRunningGoals) {
+     public void tickRunningGoals(boolean tickAllRunning) {
 +        if (org.apismc.apis.hooks.ApisHooks.isGoalSelectorDisabled()) return; // Apis
-         ProfilerFiller profiler = Profiler.get();
-         profiler.push("goalTick");
+         ProfilerFiller profilerFiller = Profiler.get();
+         profilerFiller.push("goalTick");
  

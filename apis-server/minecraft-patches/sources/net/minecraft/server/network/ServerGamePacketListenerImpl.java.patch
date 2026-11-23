@@ -1,6 +1,6 @@
 --- a/net/minecraft/server/network/ServerGamePacketListenerImpl.java
 +++ b/net/minecraft/server/network/ServerGamePacketListenerImpl.java
-@@ -398,7 +_,7 @@
+@@ -379,7 +_,7 @@
          this.tickCount++;
          this.knownMovePacketCount = this.receivedMovePacketCount;
          if (this.clientIsFloating && !this.player.isSleeping() && !this.player.isPassenger() && !this.player.isDeadOrDying()) {
@@ -9,7 +9,7 @@
                  // LOGGER.warn("{} was kicked for floating too long!", this.player.getPlainTextName()); // Paper - Logging moved to net.minecraft.server.network.ServerCommonPacketListenerImpl.disconnect()
                  this.disconnect(io.papermc.paper.configuration.GlobalConfiguration.get().messages.kick.flyingPlayer, org.bukkit.event.player.PlayerKickEvent.Cause.FLYING_PLAYER); // Paper - use configurable kick message & kick event cause
                  return true;
-@@ -417,7 +_,7 @@
+@@ -398,7 +_,7 @@
              this.vehicleLastGoodY = this.lastVehicle.getY();
              this.vehicleLastGoodZ = this.lastVehicle.getZ();
              if (this.clientVehicleIsFloating && this.lastVehicle.getControllingPassenger() == this.player) {
@@ -18,23 +18,23 @@
                      // LOGGER.warn("{} was kicked for floating a vehicle too long!", this.player.getPlainTextName()); // Paper - Logging moved to net.minecraft.server.network.ServerCommonPacketListenerImpl.disconnect()
                      this.disconnect(io.papermc.paper.configuration.GlobalConfiguration.get().messages.kick.flyingVehicle, org.bukkit.event.player.PlayerKickEvent.Cause.FLYING_VEHICLE); // Paper - use configurable kick message & kick event cause
                      return true;
-@@ -692,45 +_,49 @@
-                     this.lastXRot = startXRot;
+@@ -669,45 +_,49 @@
+                     this.lastPitch = prevPitch;
                      this.hasMoved = true;
                  }
--                Location from = new Location(player.getWorld(), this.lastPosX, this.lastPosY, this.lastPosZ, this.lastYRot, this.lastXRot); // Get the Players previous Event location.
--                Location to = new Location(player.getWorld(), targetX, targetY, targetZ, targetYRot, targetXRot);
+-                Location from = new Location(player.getWorld(), this.lastPosX, this.lastPosY, this.lastPosZ, this.lastYaw, this.lastPitch); // Get the Players previous Event location.
+-                Location to = CraftLocation.toBukkit(packet.position(), player.getWorld(), packet.yRot(), packet.xRot());
 -
 -                // Prevent 40 event-calls for less than a single pixel of movement >.>
 -                double delta = Mth.square(this.lastPosX - to.getX()) + Mth.square(this.lastPosY - to.getY()) + Mth.square(this.lastPosZ - to.getZ());
--                float deltaAngle = Math.abs(Mth.wrapDegrees(this.lastYRot - to.getYaw())) + Math.abs(this.lastXRot - to.getPitch());
+-                float deltaAngle = Math.abs(this.lastYaw - to.getYaw()) + Math.abs(this.lastPitch - to.getPitch());
 -
--                if ((delta > 1.0F / 256 || deltaAngle > 10.0F) && !this.player.isImmobile()) {
+-                if ((delta > 1f / 256 || deltaAngle > 10f) && !this.player.isImmobile()) {
 -                    this.lastPosX = to.getX();
 -                    this.lastPosY = to.getY();
 -                    this.lastPosZ = to.getZ();
--                    this.lastYRot = to.getYaw();
--                    this.lastXRot = to.getPitch();
+-                    this.lastYaw = to.getYaw();
+-                    this.lastPitch = to.getPitch();
 -
 -                    Location oldTo = to.clone();
 -                    PlayerMoveEvent event = new PlayerMoveEvent(player, from, to);
@@ -61,20 +61,20 @@
 -                        return;
 -                    }
 -                }
-+                if (PlayerMoveEvent.getHandlerList().hasListeners()) { // Apis - avoid Location & event allocations when no plugin listens
-+                    Location from = new Location(player.getWorld(), this.lastPosX, this.lastPosY, this.lastPosZ, this.lastYRot, this.lastXRot); // Get the Players previous Event location.
-+                    Location to = new Location(player.getWorld(), targetX, targetY, targetZ, targetYRot, targetXRot);
++                if (PlayerMoveEvent.getHandlerList().getRegisteredListeners().length > 0) { // Apis - avoid Location & event allocations when no plugin listens
++                    Location from = new Location(player.getWorld(), this.lastPosX, this.lastPosY, this.lastPosZ, this.lastYaw, this.lastPitch); // Get the Players previous Event location.
++                    Location to = CraftLocation.toBukkit(packet.position(), player.getWorld(), packet.yRot(), packet.xRot());
 +
 +                    // Prevent 40 event-calls for less than a single pixel of movement >.>
 +                    double delta = Mth.square(this.lastPosX - to.getX()) + Mth.square(this.lastPosY - to.getY()) + Mth.square(this.lastPosZ - to.getZ());
-+                    float deltaAngle = Math.abs(Mth.wrapDegrees(this.lastYRot - to.getYaw())) + Math.abs(this.lastXRot - to.getPitch());
++                    float deltaAngle = Math.abs(this.lastYaw - to.getYaw()) + Math.abs(this.lastPitch - to.getPitch());
 +
-+                    if ((delta > 1.0F / 256 || deltaAngle > 10.0F) && !this.player.isImmobile()) {
++                    if ((delta > 1f / 256 || deltaAngle > 10f) && !this.player.isImmobile()) {
 +                        this.lastPosX = to.getX();
 +                        this.lastPosY = to.getY();
 +                        this.lastPosZ = to.getZ();
-+                        this.lastYRot = to.getYaw();
-+                        this.lastXRot = to.getPitch();
++                        this.lastYaw = to.getYaw();
++                        this.lastPitch = to.getPitch();
 +
 +                        Location oldTo = to.clone();
 +                        PlayerMoveEvent event = new PlayerMoveEvent(player, from, to);
@@ -102,156 +102,214 @@
 +                        }
 +                    }
 +                } else {
-+                    this.updateLastEventPosIfMoved(targetX, targetY, targetZ, targetYRot, targetXRot);
++                    this.updateLastEventPosIfMoved(packet.position().x, packet.position().y, packet.position().z, packet.yRot(), packet.xRot());
 +                } // Apis
                  // CraftBukkit end
                  this.player.level().getChunkSource().move(this.player);
-                 Vec3 clientDeltaMovement = new Vec3(vehicle.getX() - oldX, vehicle.getY() - oldY, vehicle.getZ() - oldZ);
-@@ -759,6 +_,24 @@
-         }
+                 Vec3 vec3 = new Vec3(rootVehicle.getX() - x, rootVehicle.getY() - y, rootVehicle.getZ() - z);
+@@ -757,6 +_,24 @@
+         // Paper end - stop using streams, this is already a known fixed problem in Entity#move
      }
  
 +    private void updateLastEventPosIfMoved(
 +        final double targetX,
 +        final double targetY,
 +        final double targetZ,
-+        final float targetYRot,
-+        final float targetXRot
++        final float targetYaw,
++        final float targetPitch
 +    ) {
 +        double delta = Mth.square(this.lastPosX - targetX) + Mth.square(this.lastPosY - targetY) + Mth.square(this.lastPosZ - targetZ);
-+        float deltaAngle = Math.abs(Mth.wrapDegrees(this.lastYRot - targetYRot)) + Math.abs(this.lastXRot - targetXRot);
-+        if ((delta > 1.0F / 256 || deltaAngle > 10.0F) && !this.player.isImmobile()) {
++        float deltaAngle = Math.abs(this.lastYaw - targetYaw) + Math.abs(this.lastPitch - targetPitch);
++        if ((delta > 1f / 256 || deltaAngle > 10f) && !this.player.isImmobile()) {
 +            this.lastPosX = targetX;
 +            this.lastPosY = targetY;
 +            this.lastPosZ = targetZ;
-+            this.lastYRot = targetYRot;
-+            this.lastXRot = targetXRot;
++            this.lastYaw = targetYaw;
++            this.lastPitch = targetPitch;
 +        }
 +    }
 +
-     private boolean noBlocksAround(final Entity entity) {
-         // Paper start - stop using streams, this is already a known fixed problem in Entity#move
-         final AABB box = entity.getBoundingBox().inflate(0.0625).expandTowards(0.0, -0.55, 0.0);
-@@ -1619,18 +_,22 @@
-                 boolean movedUpwards = yDist > 0.0;
-                 if (this.player.onGround() && !isOnGround && movedUpwards) {
-                     // Paper start - Add PlayerJumpEvent
--                    org.bukkit.entity.Player player = this.getCraftPlayer();
--                    Location from = new Location(player.getWorld(), this.lastPosX, this.lastPosY, this.lastPosZ, this.lastYRot, this.lastXRot); // Get the Players previous Event location.
--                    Location to = new Location(player.getWorld(), targetX, targetY, targetZ, targetYRot, targetXRot);
+     @Override
+     public void handleAcceptTeleportPacket(ServerboundAcceptTeleportationPacket packet) {
+         PacketUtils.ensureRunningOnSameThread(packet, this, this.player.level());
+@@ -1543,31 +_,35 @@
+                                 boolean flag = d4 > 0.0;
+                                 if (this.player.onGround() && !packet.isOnGround() && flag) {
+                                     // Paper start - Add PlayerJumpEvent
+-                                    org.bukkit.entity.Player player = this.getCraftPlayer();
+-                                    Location from = new Location(player.getWorld(), this.lastPosX, this.lastPosY, this.lastPosZ, this.lastYaw, this.lastPitch); // Get the Players previous Event location.
+-                                    Location to = player.getLocation().clone(); // Start off the To location as the Players current location.
 -
--                    com.destroystokyo.paper.event.player.PlayerJumpEvent event = new com.destroystokyo.paper.event.player.PlayerJumpEvent(player, from, to);
+-                                    // If the packet contains movement information then we update the To location with the correct XYZ.
+-                                    if (packet.hasPos) {
+-                                        to.setX(packet.x);
+-                                        to.setY(packet.y);
+-                                        to.setZ(packet.z);
+-                                    }
 -
--                    if (event.callEvent()) {
-+                    if (com.destroystokyo.paper.event.player.PlayerJumpEvent.getHandlerList().hasListeners()) { // Apis - Skip event/Location allocations when unlistened
-+                        org.bukkit.entity.Player player = this.getCraftPlayer();
-+                        Location from = new Location(player.getWorld(), this.lastPosX, this.lastPosY, this.lastPosZ, this.lastYRot, this.lastXRot); // Get the Players previous Event location.
-+                        Location to = new Location(player.getWorld(), targetX, targetY, targetZ, targetYRot, targetXRot);
-+
-+                        com.destroystokyo.paper.event.player.PlayerJumpEvent event = new com.destroystokyo.paper.event.player.PlayerJumpEvent(player, from, to);
-+
-+                        if (event.callEvent()) {
-+                            this.player.jumpFromGround();
-+                        } else {
-+                            from = event.getFrom();
-+                            this.internalTeleport(new PositionMoveRotation(org.bukkit.craftbukkit.util.CraftLocation.toVec3(from), Vec3.ZERO, from.getYaw(), from.getPitch()), Collections.emptySet());
-+                            return;
-+                        }
-+                    } else {
-                         this.player.jumpFromGround();
--                    } else {
--                        from = event.getFrom();
--                        this.internalTeleport(new PositionMoveRotation(org.bukkit.craftbukkit.util.CraftLocation.toVec3(from), Vec3.ZERO, from.getYaw(), from.getPitch()), Collections.emptySet());
--                        return;
-                     }
-                     // Paper end - Add PlayerJumpEvent
-                 }
-@@ -1709,45 +_,49 @@
-                         this.lastXRot = startXRot;
-                         this.hasMoved = true;
-                     }
--                    Location from = new Location(player.getWorld(), this.lastPosX, this.lastPosY, this.lastPosZ, this.lastYRot, this.lastXRot); // Get the Players previous Event location.
--                    Location to = new Location(player.getWorld(), targetX, targetY, targetZ, targetYRot, targetXRot);
+-                                    // If the packet contains look information then we update the To location with the correct Yaw & Pitch.
+-                                    if (packet.hasRot) {
+-                                        to.setYaw(packet.yRot);
+-                                        to.setPitch(packet.xRot);
+-                                    }
 -
--                    // Prevent 40 event-calls for less than a single pixel of movement >.>
--                    double delta = Mth.square(this.lastPosX - to.getX()) + Mth.square(this.lastPosY - to.getY()) + Mth.square(this.lastPosZ - to.getZ());
--                    float deltaAngle = Math.abs(Mth.wrapDegrees(this.lastYRot - to.getYaw())) + Math.abs(this.lastXRot - to.getPitch());
+-                                    com.destroystokyo.paper.event.player.PlayerJumpEvent event = new com.destroystokyo.paper.event.player.PlayerJumpEvent(player, from, to);
 -
--                    if ((delta > 1.0F / 256 || deltaAngle > 10.0F) && !this.player.isImmobile()) {
--                        this.lastPosX = to.getX();
--                        this.lastPosY = to.getY();
--                        this.lastPosZ = to.getZ();
--                        this.lastYRot = to.getYaw();
--                        this.lastXRot = to.getPitch();
+-                                    if (event.callEvent()) {
++                                    if (com.destroystokyo.paper.event.player.PlayerJumpEvent.getHandlerList().getRegisteredListeners().length > 0) { // Apis - Skip event/Location allocations when unlistened
++                                        org.bukkit.entity.Player player = this.getCraftPlayer();
++                                        Location from = new Location(player.getWorld(), this.lastPosX, this.lastPosY, this.lastPosZ, this.lastYaw, this.lastPitch); // Get the Players previous Event location.
++                                        Location to = player.getLocation().clone(); // Start off the To location as the Players current location.
++
++                                        // If the packet contains movement information then we update the To location with the correct XYZ.
++                                        if (packet.hasPos) {
++                                            to.setX(packet.x);
++                                            to.setY(packet.y);
++                                            to.setZ(packet.z);
++                                        }
++
++                                        // If the packet contains look information then we update the To location with the correct Yaw & Pitch.
++                                        if (packet.hasRot) {
++                                            to.setYaw(packet.yRot);
++                                            to.setPitch(packet.xRot);
++                                        }
++
++                                        com.destroystokyo.paper.event.player.PlayerJumpEvent event = new com.destroystokyo.paper.event.player.PlayerJumpEvent(player, from, to);
++
++                                        if (event.callEvent()) {
++                                            this.player.jumpFromGround();
++                                        } else {
++                                            from = event.getFrom();
++                                            this.internalTeleport(new PositionMoveRotation(org.bukkit.craftbukkit.util.CraftLocation.toVec3(from), Vec3.ZERO, from.getYaw(), from.getPitch()), Collections.emptySet());
++                                            return;
++                                        }
++                                    } else {
+                                         this.player.jumpFromGround();
+-                                    } else {
+-                                        from = event.getFrom();
+-                                        this.internalTeleport(new PositionMoveRotation(org.bukkit.craftbukkit.util.CraftLocation.toVec3(from), Vec3.ZERO, from.getYaw(), from.getPitch()), Collections.emptySet());
+-                                        return;
+                                     }
+                                     // Paper end - Add PlayerJumpEvent
+                                 }
+@@ -1642,58 +_,68 @@
+                                         this.lastPitch = prevPitch;
+                                         this.hasMoved = true;
+                                     }
+-                                    Location from = new Location(player.getWorld(), this.lastPosX, this.lastPosY, this.lastPosZ, this.lastYaw, this.lastPitch); // Get the Players previous Event location.
+-                                    Location to = player.getLocation().clone(); // Start off the To location as the Players current location.
 -
--                        Location oldTo = to.clone();
--                        PlayerMoveEvent event = new PlayerMoveEvent(player, from, to);
--                        this.cserver.getPluginManager().callEvent(event);
+-                                    // If the packet contains movement information then we update the To location with the correct XYZ.
+-                                    if (packet.hasPos) {
+-                                        to.setX(packet.x);
+-                                        to.setY(packet.y);
+-                                        to.setZ(packet.z);
+-                                    }
 -
--                        // If the event is cancelled we move the player back to their old location.
--                        if (event.isCancelled()) {
--                            this.internalTeleport(from);
--                            return;
--                        }
+-                                    // If the packet contains look information then we update the To location with the correct Yaw & Pitch.
+-                                    if (packet.hasRot) {
+-                                        to.setYaw(packet.yRot);
+-                                        to.setPitch(packet.xRot);
+-                                    }
 -
--                        // If a Plugin has changed the To destination then we teleport the Player
--                        // there to avoid any 'Moved wrongly' or 'Moved too quickly' errors.
--                        // We only do this if the Event was not cancelled.
--                        if (!oldTo.equals(event.getTo()) && !event.isCancelled()) {
--                            this.player.getBukkitEntity().teleport(event.getTo(), PlayerTeleportEvent.TeleportCause.PLUGIN);
--                            return;
--                        }
+-                                    // Prevent 40 event-calls for less than a single pixel of movement >.>
+-                                    double delta = Mth.square(this.lastPosX - to.getX()) + Mth.square(this.lastPosY - to.getY()) + Mth.square(this.lastPosZ - to.getZ());
+-                                    float deltaAngle = Math.abs(this.lastYaw - to.getYaw()) + Math.abs(this.lastPitch - to.getPitch());
 -
--                        // Check to see if the Players Location has some how changed during the call of the event.
--                        // This can happen due to a plugin teleporting the player instead of using .setTo()
--                        if (!from.equals(this.getCraftPlayer().getLocation()) && this.justTeleported) {
--                            this.justTeleported = false;
--                            return;
--                        }
--                    }
-+                    if (PlayerMoveEvent.getHandlerList().hasListeners()) { // Apis - avoid Location & event allocations when no plugin listens
-+                        Location from = new Location(player.getWorld(), this.lastPosX, this.lastPosY, this.lastPosZ, this.lastYRot, this.lastXRot); // Get the Players previous Event location.
-+                        Location to = new Location(player.getWorld(), targetX, targetY, targetZ, targetYRot, targetXRot);
+-                                    if ((delta > 1f / 256 || deltaAngle > 10f) && !this.player.isImmobile()) {
+-                                        this.lastPosX = to.getX();
+-                                        this.lastPosY = to.getY();
+-                                        this.lastPosZ = to.getZ();
+-                                        this.lastYaw = to.getYaw();
+-                                        this.lastPitch = to.getPitch();
+-
+-                                        Location oldTo = to.clone();
+-                                        PlayerMoveEvent event = new PlayerMoveEvent(player, from, to);
+-                                        this.cserver.getPluginManager().callEvent(event);
+-
+-                                        // If the event is cancelled we move the player back to their old location.
+-                                        if (event.isCancelled()) {
+-                                            this.internalTeleport(from);
+-                                            return;
+-                                        }
+-
+-                                        // If a Plugin has changed the To destination then we teleport the Player
+-                                        // there to avoid any 'Moved wrongly' or 'Moved too quickly' errors.
+-                                        // We only do this if the Event was not cancelled.
+-                                        if (!oldTo.equals(event.getTo()) && !event.isCancelled()) {
+-                                            this.player.getBukkitEntity().teleport(event.getTo(), PlayerTeleportEvent.TeleportCause.PLUGIN);
+-                                            return;
+-                                        }
+-
+-                                        // Check to see if the Players Location has some how changed during the call of the event.
+-                                        // This can happen due to a plugin teleporting the player instead of using .setTo()
+-                                        if (!from.equals(this.getCraftPlayer().getLocation()) && this.justTeleported) {
+-                                            this.justTeleported = false;
+-                                            return;
+-                                        }
+-                                    }
++                                    if (PlayerMoveEvent.getHandlerList().getRegisteredListeners().length > 0) { // Apis - avoid Location & event allocations when no plugin listens
++                                        Location from = new Location(player.getWorld(), this.lastPosX, this.lastPosY, this.lastPosZ, this.lastYaw, this.lastPitch); // Get the Players previous Event location.
++                                        Location to = player.getLocation().clone(); // Start off the To location as the Players current location.
 +
-+                        // Prevent 40 event-calls for less than a single pixel of movement >.>
-+                        double delta = Mth.square(this.lastPosX - to.getX()) + Mth.square(this.lastPosY - to.getY()) + Mth.square(this.lastPosZ - to.getZ());
-+                        float deltaAngle = Math.abs(Mth.wrapDegrees(this.lastYRot - to.getYaw())) + Math.abs(this.lastXRot - to.getPitch());
++                                        // If the packet contains movement information then we update the To location with the correct XYZ.
++                                        if (packet.hasPos) {
++                                            to.setX(packet.x);
++                                            to.setY(packet.y);
++                                            to.setZ(packet.z);
++                                        }
 +
-+                        if ((delta > 1.0F / 256 || deltaAngle > 10.0F) && !this.player.isImmobile()) {
-+                            this.lastPosX = to.getX();
-+                            this.lastPosY = to.getY();
-+                            this.lastPosZ = to.getZ();
-+                            this.lastYRot = to.getYaw();
-+                            this.lastXRot = to.getPitch();
++                                        // If the packet contains look information then we update the To location with the correct Yaw & Pitch.
++                                        if (packet.hasRot) {
++                                            to.setYaw(packet.yRot);
++                                            to.setPitch(packet.xRot);
++                                        }
 +
-+                            Location oldTo = to.clone();
-+                            PlayerMoveEvent event = new PlayerMoveEvent(player, from, to);
-+                            this.cserver.getPluginManager().callEvent(event);
++                                        // Prevent 40 event-calls for less than a single pixel of movement >.>
++                                        double delta = Mth.square(this.lastPosX - to.getX()) + Mth.square(this.lastPosY - to.getY()) + Mth.square(this.lastPosZ - to.getZ());
++                                        float deltaAngle = Math.abs(this.lastYaw - to.getYaw()) + Math.abs(this.lastPitch - to.getPitch());
 +
-+                            // If the event is cancelled we move the player back to their old location.
-+                            if (event.isCancelled()) {
-+                                this.internalTeleport(from);
-+                                return;
-+                            }
++                                        if ((delta > 1f / 256 || deltaAngle > 10f) && !this.player.isImmobile()) {
++                                            this.lastPosX = to.getX();
++                                            this.lastPosY = to.getY();
++                                            this.lastPosZ = to.getZ();
++                                            this.lastYaw = to.getYaw();
++                                            this.lastPitch = to.getPitch();
 +
-+                            // If a Plugin has changed the To destination then we teleport the Player
-+                            // there to avoid any 'Moved wrongly' or 'Moved too quickly' errors.
-+                            // We only do this if the Event was not cancelled.
-+                            if (!oldTo.equals(event.getTo()) && !event.isCancelled()) {
-+                                this.player.getBukkitEntity().teleport(event.getTo(), PlayerTeleportEvent.TeleportCause.PLUGIN);
-+                                return;
-+                            }
++                                            Location oldTo = to.clone();
++                                            PlayerMoveEvent event = new PlayerMoveEvent(player, from, to);
++                                            this.cserver.getPluginManager().callEvent(event);
 +
-+                            // Check to see if the Players Location has some how changed during the call of the event.
-+                            // This can happen due to a plugin teleporting the player instead of using .setTo()
-+                            if (!from.equals(this.getCraftPlayer().getLocation()) && this.justTeleported) {
-+                                this.justTeleported = false;
-+                                return;
-+                            }
-+                        }
-+                    } else {
-+                        this.updateLastEventPosIfMoved(targetX, targetY, targetZ, targetYRot, targetXRot);
-+                    } // Apis
-                     // Paper end
-                     this.player.absSnapTo(targetX, targetY, targetZ, targetYRot, targetXRot);
-                     boolean isAutoSpinAttack = this.player.isAutoSpinAttack();
++                                            // If the event is cancelled we move the player back to their old location.
++                                            if (event.isCancelled()) {
++                                                this.internalTeleport(from);
++                                                return;
++                                            }
++
++                                            // If a Plugin has changed the To destination then we teleport the Player
++                                            // there to avoid any 'Moved wrongly' or 'Moved too quickly' errors.
++                                            // We only do this if the Event was not cancelled.
++                                            if (!oldTo.equals(event.getTo()) && !event.isCancelled()) {
++                                                this.player.getBukkitEntity().teleport(event.getTo(), PlayerTeleportEvent.TeleportCause.PLUGIN);
++                                                return;
++                                            }
++
++                                            // Check to see if the Players Location has some how changed during the call of the event.
++                                            // This can happen due to a plugin teleporting the player instead of using .setTo()
++                                            if (!from.equals(this.getCraftPlayer().getLocation()) && this.justTeleported) {
++                                                this.justTeleported = false;
++                                                return;
++                                            }
++                                        }
++                                    } else {
++                                        this.updateLastEventPosIfMoved(
++                                            packet.hasPos ? packet.x : prevX,
++                                            packet.hasPos ? packet.y : prevY,
++                                            packet.hasPos ? packet.z : prevZ,
++                                            packet.hasRot ? packet.yRot : prevYaw,
++                                            packet.hasRot ? packet.xRot : prevPitch
++                                        );
++                                    } // Apis
+                                     // Paper end
+                                     this.player.absSnapTo(d, d1, d2, f, f1);
+                                     boolean isAutoSpinAttack = this.player.isAutoSpinAttack();

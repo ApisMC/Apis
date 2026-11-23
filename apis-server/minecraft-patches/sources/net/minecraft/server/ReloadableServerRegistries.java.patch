@@ -1,10 +1,10 @@
 --- a/net/minecraft/server/ReloadableServerRegistries.java
 +++ b/net/minecraft/server/ReloadableServerRegistries.java
-@@ -58,6 +_,7 @@
+@@ -91,6 +_,7 @@
      }
  
-     private static void validateLootRegistries(final HolderLookup.Provider fullContextWithNewTags) {
+     private static void validateLootRegistries(HolderLookup.Provider registries) {
 +        if (!org.apismc.apis.hooks.ApisHooks.isValidateLootEnabled() || !org.apismc.apis.hooks.ApisHooks.isLootTablesEnabled()) return; // Apis
-         ProblemReporter.Collector problems = new ProblemReporter.Collector();
-         ValidationContextSource contextSource = new ValidationContextSource(problems, fullContextWithNewTags);
-         LootDataType.values().forEach(lootDataType -> lootDataType.runValidation(contextSource, fullContextWithNewTags));
+         ProblemReporter.Collector collector = new ProblemReporter.Collector();
+         ValidationContext validationContext = new ValidationContext(collector, LootContextParamSets.ALL_PARAMS, registries);
+         LootDataType.values().forEach(lootDataType -> validateRegistry(validationContext, (LootDataType<?>)lootDataType, registries));

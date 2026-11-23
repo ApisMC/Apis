@@ -1,12 +1,13 @@
 --- a/net/minecraft/world/level/block/NetherPortalBlock.java
 +++ b/net/minecraft/world/level/block/NetherPortalBlock.java
-@@ -138,7 +_,9 @@
+@@ -136,8 +_,10 @@
  
      @Override
-     public @Nullable TeleportTransition getPortalDestination(final ServerLevel currentLevel, final Entity entity, final BlockPos portalEntryPos) {
+     public @Nullable TeleportTransition getPortalDestination(ServerLevel level, Entity entity, BlockPos pos) {
 +        if (org.apismc.apis.hooks.ApisHooks.isPortalsDisabled()) return null; // Apis
-         ResourceKey<Level> newDimension = currentLevel.getTypeKey() == net.minecraft.world.level.dimension.LevelStem.NETHER ? Level.OVERWORLD : Level.NETHER; // CraftBukkit
-+        if (org.apismc.apis.hooks.ApisHooks.isDimensionDisabled(newDimension)) return null; // Apis
-         ServerLevel newLevel = currentLevel.getServer().getLevel(newDimension);
+         // CraftBukkit start
+         ResourceKey<Level> resourceKey = level.getTypeKey() == net.minecraft.world.level.dimension.LevelStem.NETHER ? Level.OVERWORLD : Level.NETHER;
++        if (org.apismc.apis.hooks.ApisHooks.isDimensionDisabled(resourceKey)) return null; // Apis
+         ServerLevel level1 = level.getServer().getLevel(resourceKey);
          // Paper start - Add EntityPortalReadyEvent
-         io.papermc.paper.event.entity.EntityPortalReadyEvent portalReadyEvent = new io.papermc.paper.event.entity.EntityPortalReadyEvent(entity.getBukkitEntity(), newLevel == null ? null : newLevel.getWorld(), org.bukkit.PortalType.NETHER);
+         io.papermc.paper.event.entity.EntityPortalReadyEvent portalReadyEvent = new io.papermc.paper.event.entity.EntityPortalReadyEvent(entity.getBukkitEntity(), level1 == null ? null : level1.getWorld(), org.bukkit.PortalType.NETHER);

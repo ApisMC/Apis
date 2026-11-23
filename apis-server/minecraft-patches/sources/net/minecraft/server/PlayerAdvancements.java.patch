@@ -1,35 +1,35 @@
 --- a/net/minecraft/server/PlayerAdvancements.java
 +++ b/net/minecraft/server/PlayerAdvancements.java
-@@ -111,6 +_,7 @@
+@@ -110,6 +_,7 @@
      }
  
-     private void load(final ServerAdvancementManager manager) {
+     private void load(ServerAdvancementManager manager) {
 +        if (org.apismc.apis.hooks.ApisHooks.isAdvancementsDisabled()) return; // Apis
          if (Files.isRegularFile(this.playerSavePath)) {
-             try (Reader reader = Files.newBufferedReader(this.playerSavePath, StandardCharsets.UTF_8)) {
-                 JsonElement json = StrictJsonParser.parse(reader);
-@@ -128,7 +_,7 @@
+             try (Reader bufferedReader = Files.newBufferedReader(this.playerSavePath, StandardCharsets.UTF_8)) {
+                 JsonElement jsonElement = StrictJsonParser.parse(bufferedReader);
+@@ -127,7 +_,7 @@
      }
  
      public void save() {
 -        if (org.spigotmc.SpigotConfig.disableAdvancementSaving) return; // Spigot
 +        if (org.spigotmc.SpigotConfig.disableAdvancementSaving || org.apismc.apis.hooks.ApisHooks.isAdvancementsDisabled() || org.apismc.apis.hooks.ApisHooks.isPlayerDataSavingDisabled()) return; // Spigot // Apis
-         JsonElement json = this.codec.encodeStart(JsonOps.INSTANCE, this.asData()).getOrThrow();
+         JsonElement jsonElement = this.codec.encodeStart(JsonOps.INSTANCE, this.asData()).getOrThrow();
  
          try {
-@@ -167,6 +_,7 @@
+@@ -166,6 +_,7 @@
      }
  
-     public boolean award(final AdvancementHolder holder, final String criterion) {
+     public boolean award(AdvancementHolder advancement, String criterionKey) {
 +        if (org.apismc.apis.hooks.ApisHooks.isAdvancementsDisabled()) return false; // Apis
-         boolean result = false;
-         AdvancementProgress progress = this.getOrStartProgress(holder);
-         boolean wasDone = progress.isDone();
-@@ -255,6 +_,7 @@
+         boolean flag = false;
+         AdvancementProgress orStartProgress = this.getOrStartProgress(advancement);
+         boolean isDone = orStartProgress.isDone();
+@@ -263,6 +_,7 @@
      }
  
-     public void flushDirty(final ServerPlayer player, final boolean showAdvancements) {
+     public void flushDirty(ServerPlayer player, boolean showAdvancements) {
 +        if (org.apismc.apis.hooks.ApisHooks.isAdvancementsDisabled()) return; // Apis
          if (this.isFirstPacket || !this.rootsToUpdate.isEmpty() || !this.progressChanged.isEmpty()) {
-             Map<Identifier, AdvancementProgress> progress = new HashMap<>();
-             Set<AdvancementNode> added = new java.util.TreeSet<>(java.util.Comparator.comparing(node -> node.holder().id().toString())); // Paper - Changed from HashSet to TreeSet ordered alphabetically.
+             Map<Identifier, AdvancementProgress> map = new HashMap<>();
+             Set<AdvancementHolder> set = new java.util.TreeSet<>(java.util.Comparator.comparing(adv -> adv.id().toString())); // Paper - Changed from HashSet to TreeSet ordered alphabetically.

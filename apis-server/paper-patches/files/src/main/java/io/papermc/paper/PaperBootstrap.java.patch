@@ -5,6 +5,6 @@
      public static void boot(final OptionSet options) {
          SharedConstants.tryDetectVersion();
 +        org.apismc.apis.hooks.ApisHooks.bootstrapEarly(); // Apis - Early kill-switch config load
-         // Paper start - Perf: Skip data fixer schema sanity check
-         // This is a startup sanity check for entity and block entity types and forces Vanilla datafixer building
-         SharedConstants.CHECK_DATA_FIXER_SCHEMA = Boolean.getBoolean("paper.updatingMinecraft");
+ 
+         getStartupVersionMessages().forEach(LOGGER::info);
+ 

@@ -3,9 +3,9 @@
 @@ -31,7 +_,7 @@
      }
  
-     public void save(final Player player) {
+     public void save(Player player) {
 -        if (org.spigotmc.SpigotConfig.disablePlayerDataSaving) return; // Spigot
 +        if (org.spigotmc.SpigotConfig.disablePlayerDataSaving || org.apismc.apis.hooks.ApisHooks.isPlayerDataSavingDisabled()) return; // Spigot // Apis
-         try (ProblemReporter.ScopedCollector reporter = new ProblemReporter.ScopedCollector(player.problemPath(), LOGGER)) {
-             TagValueOutput output = TagValueOutput.createWithContext(reporter, player.registryAccess());
-             player.saveWithoutId(output);
+         try (ProblemReporter.ScopedCollector scopedCollector = new ProblemReporter.ScopedCollector(player.problemPath(), LOGGER)) {
+             TagValueOutput tagValueOutput = TagValueOutput.createWithContext(scopedCollector, player.registryAccess());
+             player.saveWithoutId(tagValueOutput);

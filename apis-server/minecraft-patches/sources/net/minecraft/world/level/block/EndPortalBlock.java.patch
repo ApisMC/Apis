@@ -1,14 +1,15 @@
 --- a/net/minecraft/world/level/block/EndPortalBlock.java
 +++ b/net/minecraft/world/level/block/EndPortalBlock.java
-@@ -76,9 +_,11 @@
+@@ -77,10 +_,12 @@
  
      @Override
-     public @Nullable TeleportTransition getPortalDestination(final ServerLevel currentLevel, final Entity entity, final BlockPos portalEntryPos) {
+     public @Nullable TeleportTransition getPortalDestination(ServerLevel level, Entity entity, BlockPos pos) {
 +        if (org.apismc.apis.hooks.ApisHooks.isPortalsDisabled()) return null; // Apis
-         LevelData.RespawnData respawnData = currentLevel.getRespawnData();
-         boolean fromEnd = currentLevel.getTypeKey() == net.minecraft.world.level.dimension.LevelStem.END; // CraftBukkit - SPIGOT-6152: send back to main overworld in custom ends
-         ResourceKey<Level> newDimension = fromEnd ? respawnData.dimension() : Level.END;
-+        if (org.apismc.apis.hooks.ApisHooks.isDimensionDisabled(newDimension)) return null; // Apis
-         BlockPos spawnBlockPos = fromEnd ? respawnData.pos() : ServerLevel.END_SPAWN_POINT;
-         ServerLevel newLevel = currentLevel.getServer().getLevel(newDimension);
-         if (newLevel == null) {
+         LevelData.RespawnData respawnData = level.getRespawnData();
+         ResourceKey<Level> resourceKey = level.dimension();
+         boolean flag = level.getTypeKey() == net.minecraft.world.level.dimension.LevelStem.END; // CraftBukkit - SPIGOT-6152: send back to main overworld in custom ends
+         ResourceKey<Level> resourceKey1 = flag ? respawnData.dimension() : Level.END;
++        if (org.apismc.apis.hooks.ApisHooks.isDimensionDisabled(resourceKey1)) return null; // Apis
+         BlockPos blockPos = flag ? respawnData.pos() : ServerLevel.END_SPAWN_POINT;
+         ServerLevel level1 = level.getServer().getLevel(resourceKey1);
+         if (level1 == null) {

@@ -1,29 +1,41 @@
 --- a/net/minecraft/world/level/levelgen/flat/FlatLevelGeneratorSettings.java
 +++ b/net/minecraft/world/level/levelgen/flat/FlatLevelGeneratorSettings.java
-@@ -35,19 +_,70 @@
+@@ -16,6 +_,7 @@
+ import net.minecraft.data.worldgen.placement.MiscOverworldPlacements;
+ import net.minecraft.data.worldgen.placement.PlacementUtils;
+ import net.minecraft.resources.RegistryOps;
++import net.minecraft.util.ExtraCodecs;
+ import net.minecraft.world.level.biome.Biome;
+ import net.minecraft.world.level.biome.BiomeGenerationSettings;
+ import net.minecraft.world.level.biome.Biomes;
+@@ -35,9 +_,7 @@
      private static final Logger LOGGER = LogUtils.getLogger();
      public static final Codec<FlatLevelGeneratorSettings> CODEC = RecordCodecBuilder.<FlatLevelGeneratorSettings>create(
-             i -> i.group(
--                    RegistryCodecs.holderSet(Registries.STRUCTURE_SET).lenientOptionalFieldOf("structure_overrides").forGetter(c -> c.structureOverrides),
-+                    structureOverridesCodec().forGetter(c -> c.structureOverrides), // Apis
+             instance -> instance.group(
+-                    RegistryCodecs.homogeneousList(Registries.STRUCTURE_SET)
+-                        .lenientOptionalFieldOf("structure_overrides")
+-                        .forGetter(flatLevelGeneratorSettings -> flatLevelGeneratorSettings.structureOverrides),
++                    structureOverridesCodec().forGetter(flatLevelGeneratorSettings -> flatLevelGeneratorSettings.structureOverrides), // Apis
                      FlatLayerInfo.CODEC.listOf().fieldOf("layers").forGetter(FlatLevelGeneratorSettings::getLayersInfo),
-                     ExtraCodecs.optionalAlwaysPresentFieldOf(Codec.BOOL, "lakes", false).forGetter(s -> s.addLakes),
-                     ExtraCodecs.optionalAlwaysPresentFieldOf(Codec.BOOL, "features", false).forGetter(s -> s.decoration),
-                     Biome.CODEC.lenientOptionalFieldOf("biome").orElseGet(Optional::empty).forGetter(s -> Optional.of(s.biome)),
+                     Codec.BOOL.fieldOf("lakes").orElse(false).forGetter(flatLevelGeneratorSettings -> flatLevelGeneratorSettings.addLakes),
+                     Codec.BOOL.fieldOf("features").orElse(false).forGetter(flatLevelGeneratorSettings -> flatLevelGeneratorSettings.decoration),
+@@ -46,13 +_,64 @@
+                         .orElseGet(Optional::empty)
+                         .forGetter(flatLevelGeneratorSettings -> Optional.of(flatLevelGeneratorSettings.biome)),
                      RegistryOps.retrieveElement(Biomes.PLAINS),
 -                    RegistryOps.retrieveElement(MiscOverworldPlacements.LAKE_LAVA_UNDERGROUND),
 -                    RegistryOps.retrieveElement(MiscOverworldPlacements.LAKE_LAVA_SURFACE)
 +                    retrieveOptionalPlacedFeature(MiscOverworldPlacements.LAKE_LAVA_UNDERGROUND), // Apis
 +                    retrieveOptionalPlacedFeature(MiscOverworldPlacements.LAKE_LAVA_SURFACE) // Apis
                  )
-                 .apply(i, FlatLevelGeneratorSettings::new)
+                 .apply(instance, FlatLevelGeneratorSettings::new)
          )
          .comapFlatMap(FlatLevelGeneratorSettings::validateHeight, Function.identity())
          .stable();
 +
 +    private static com.mojang.serialization.MapCodec<Optional<HolderSet<StructureSet>>> structureOverridesCodec() { // Apis
 +        final com.mojang.serialization.MapCodec<Optional<HolderSet<StructureSet>>> delegate = RegistryCodecs
-+            .holderSet(Registries.STRUCTURE_SET)
++            .homogeneousList(Registries.STRUCTURE_SET)
 +            .lenientOptionalFieldOf("structure_overrides");
 +        return new com.mojang.serialization.MapCodec<>() {
 +            @Override
@@ -74,23 +86,23 @@
      private final Optional<HolderSet<StructureSet>> structureOverrides;
      private final List<FlatLayerInfo> layersInfo = Lists.newArrayList();
      private final Holder<Biome> biome;
-@@ -71,10 +_,16 @@
-         final boolean features,
-         final Optional<Holder<Biome>> biome,
-         final Holder.Reference<Biome> fallbackBiome,
--        final Holder<PlacedFeature> lavaUnderground,
--        final Holder<PlacedFeature> lavaSurface
-+        final Optional<Holder.Reference<PlacedFeature>> lavaUnderground, // Apis
-+        final Optional<Holder.Reference<PlacedFeature>> lavaSurface // Apis
+@@ -76,10 +_,16 @@
+         boolean decoration,
+         Optional<Holder<Biome>> biome,
+         Holder.Reference<Biome> defaultBiome,
+-        Holder<PlacedFeature> lavaUnderground,
+-        Holder<PlacedFeature> lavaSurface
++        Optional<Holder.Reference<PlacedFeature>> lavaUnderground, // Apis
++        Optional<Holder.Reference<PlacedFeature>> lavaSurface // Apis
      ) {
--        this(structureOverrides, getBiome(biome, fallbackBiome), List.of(lavaUnderground, lavaSurface));
+-        this(structureOverrides, getBiome(biome, defaultBiome), List.of(lavaUnderground, lavaSurface));
 +        this(
 +            structureOverrides,
-+            getBiome(biome, fallbackBiome),
++            getBiome(biome, defaultBiome),
 +            lavaUnderground.isPresent() && lavaSurface.isPresent()
 +                ? List.of(lavaUnderground.get(), lavaSurface.get())
 +                : List.of()
 +        );
-         if (lakes) {
+         if (addLakes) {
              this.setAddLakes();
          }

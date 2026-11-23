@@ -1,6 +1,6 @@
 --- a/net/minecraft/server/level/ServerChunkCache.java
 +++ b/net/minecraft/server/level/ServerChunkCache.java
-@@ -67,9 +_,11 @@
+@@ -69,9 +_,11 @@
      public boolean spawnEnemies = true;
      public boolean spawnFriendlies = true; // Paper - add back spawnFriendlies field
      private static final int CACHE_SIZE = 4;
@@ -15,7 +15,7 @@
      private final List<LevelChunk> spawningChunks = new ObjectArrayList<>();
      private final Set<ChunkHolder> chunkHoldersToBroadcast = new ReferenceOpenHashSet<>();
      @VisibleForDebug
-@@ -88,6 +_,16 @@
+@@ -90,6 +_,16 @@
          final long key = ca.spottedleaf.moonrise.common.util.CoordinateUtils.getChunkKey(chunkX, chunkZ);
          if (chunk == null) {
              this.fullChunks.remove(key);
@@ -32,20 +32,20 @@
          } else {
              this.fullChunks.put(key, chunk);
          }
-@@ -280,7 +_,7 @@
+@@ -279,7 +_,7 @@
  
      @Nullable
      public LevelChunk getChunkAtIfLoadedImmediately(int x, int z) {
--        return this.fullChunks.get(ChunkPos.pack(x, z));
+-        return this.fullChunks.get(ChunkPos.asLong(x, z));
 +        return this.getFullChunkCached(x, z);
      }
      // Paper end
  
-@@ -293,51 +_,101 @@
-         return this.chunkMap.getVisibleChunkIfPresent(key);
+@@ -292,51 +_,101 @@
+         return this.chunkMap.getVisibleChunkIfPresent(chunkPos);
      }
  
--    private void storeInCache(final long pos, final @Nullable ChunkAccess chunk, final ChunkStatus status) {
+-    private void storeInCache(long chunkPos, @Nullable ChunkAccess chunk, ChunkStatus chunkStatus) {
 -        for (int i = 3; i > 0; i--) {
 -            this.lastChunkPos[i] = this.lastChunkPos[i - 1];
 -            this.lastChunkStatus[i] = this.lastChunkStatus[i - 1];
@@ -76,20 +76,20 @@
 +        return this.fullChunks.get(key);
 +    }
  
--        this.lastChunkPos[0] = pos;
--        this.lastChunkStatus[0] = status;
+-        this.lastChunkPos[0] = chunkPos;
+-        this.lastChunkStatus[0] = chunkStatus;
 -        this.lastChunk[0] = chunk;
-+    private void storeInCache(final int x, final int z, final long pos, final @Nullable ChunkAccess chunk, final ChunkStatus status) {
++    private void storeInCache(final int x, final int z, long chunkPos, @Nullable ChunkAccess chunk, ChunkStatus chunkStatus) {
 +        final int slot = cacheSlot(x, z);
-+        this.lastChunkPos[slot] = pos;
-+        this.lastChunkStatus[slot] = status;
++        this.lastChunkPos[slot] = chunkPos;
++        this.lastChunkStatus[slot] = chunkStatus;
 +        this.lastChunk[slot] = chunk;
      }
  
      @Override
-     public @Nullable ChunkAccess getChunk(final int x, final int z, final ChunkStatus targetStatus, final boolean loadOrGenerate) {
+     public @Nullable ChunkAccess getChunk(int x, int z, ChunkStatus chunkStatus, boolean requireChunk) {
          // Paper start - rewrite chunk system
-         if (targetStatus == ChunkStatus.FULL) {
+         if (chunkStatus == ChunkStatus.FULL) {
 -            final LevelChunk ret = this.fullChunks.get(ca.spottedleaf.moonrise.common.util.CoordinateUtils.getChunkKey(x, z));
 +            final LevelChunk ret = this.getFullChunkCached(x, z);
  
@@ -97,15 +97,15 @@
                  return ret;
              }
  
--            return loadOrGenerate ? this.getChunkFallback(x, z, targetStatus, loadOrGenerate) : null;
+-            return requireChunk ? this.getChunkFallback(x, z, chunkStatus, requireChunk) : null;
 -        }
 -
--        return this.getChunkFallback(x, z, targetStatus, loadOrGenerate);
-+            if (!loadOrGenerate) {
+-        return this.getChunkFallback(x, z, chunkStatus, requireChunk);
++            if (!requireChunk) {
 +                return null;
 +            }
 +
-+            final ChunkAccess fallback = this.getChunkFallback(x, z, targetStatus, true);
++            final ChunkAccess fallback = this.getChunkFallback(x, z, chunkStatus, true);
 +            if (fallback instanceof LevelChunk levelChunk && Thread.currentThread() == this.mainThread) {
 +                final long key = ca.spottedleaf.moonrise.common.util.CoordinateUtils.getChunkKey(x, z);
 +                if (this.fullChunks.get(key) == levelChunk) {
@@ -123,7 +123,7 @@
 +                this.clearCache();
 +            } else {
 +                final int slot = cacheSlot(x, z);
-+                if (this.lastChunkPos[slot] == key && this.lastChunkStatus[slot] == targetStatus) {
++                if (this.lastChunkPos[slot] == key && this.lastChunkStatus[slot] == chunkStatus) {
 +                    final ChunkAccess cached = this.lastChunk[slot];
 +                    if (cached != null) {
 +                        return cached;
@@ -132,76 +132,76 @@
 +            }
 +        }
 +
-+        final ChunkAccess ret = this.getChunkFallback(x, z, targetStatus, loadOrGenerate);
-+        if (ret != null && isMain && ret.getPersistedStatus().isOrAfter(targetStatus)) {
-+            this.storeInCache(x, z, key, ret, targetStatus);
++        final ChunkAccess ret = this.getChunkFallback(x, z, chunkStatus, requireChunk);
++        if (ret != null && isMain && ret.getPersistedStatus().isOrAfter(chunkStatus)) {
++            this.storeInCache(x, z, key, ret, chunkStatus);
 +        }
 +        return ret;
          // Paper end - rewrite chunk system
      }
  
      @Override
-     public @Nullable LevelChunk getChunkNow(final int x, final int z) {
+     public @Nullable LevelChunk getChunkNow(int chunkX, int chunkZ) {
          // Paper start - rewrite chunk system
--        final LevelChunk ret = this.fullChunks.get(ca.spottedleaf.moonrise.common.util.CoordinateUtils.getChunkKey(x, z));
+-        final LevelChunk ret = this.fullChunks.get(ca.spottedleaf.moonrise.common.util.CoordinateUtils.getChunkKey(chunkX, chunkZ));
 -        if (!ca.spottedleaf.moonrise.common.PlatformHooks.get().hasCurrentlyLoadingChunk()) {
 -            return ret;
 -        }
 -
 -        if (ret != null || !ca.spottedleaf.moonrise.common.util.TickThread.isTickThread()) {
-+        final LevelChunk ret = this.getFullChunkCached(x, z);
++        final LevelChunk ret = this.getFullChunkCached(chunkX, chunkZ);
 +        if (ret != null || !ca.spottedleaf.moonrise.common.PlatformHooks.get().hasCurrentlyLoadingChunk()
 +            || !ca.spottedleaf.moonrise.common.util.TickThread.isTickThread()) {
              return ret;
          }
  
          final ca.spottedleaf.moonrise.patches.chunk_system.scheduling.NewChunkHolder holder = ((ca.spottedleaf.moonrise.patches.chunk_system.level.ChunkSystemServerLevel)this.level).moonrise$getChunkTaskScheduler()
-             .chunkHolderManager.getChunkHolder(x, z);
+             .chunkHolderManager.getChunkHolder(chunkX, chunkZ);
          if (holder == null) {
 -            return ret;
 +            return null;
          }
  
          return ca.spottedleaf.moonrise.common.PlatformHooks.get().getCurrentlyLoadingChunk(holder.vanillaChunkHolder);
-@@ -519,7 +_,7 @@
+@@ -502,7 +_,7 @@
          if (!this.level.isDebug()) {
-             ProfilerFiller profiler = Profiler.get();
-             profiler.push("pollingChunks");
--            if (this.level.tickRateManager().runsNormally() && this.level.paperConfig().unsupportedSettings.ticking.chunks) { // Paper - option to disable ticking
-+            if (this.level.tickRateManager().runsNormally() && this.level.paperConfig().unsupportedSettings.ticking.chunks && !org.apismc.apis.hooks.ApisHooks.isChunkTickingDisabled()) { // Paper - option to disable ticking // Apis
-                 profiler.push("tickingChunks");
-                 this.tickChunks(profiler);
-                 profiler.pop();
-@@ -549,7 +_,9 @@
-         int chunkCount = this.distanceManager.getNaturalSpawnChunkCount();
+             ProfilerFiller profilerFiller = Profiler.get();
+             profilerFiller.push("pollingChunks");
+-            if (this.level.tickRateManager().runsNormally()) {
++            if (this.level.tickRateManager().runsNormally() && !org.apismc.apis.hooks.ApisHooks.isChunkTickingDisabled()) { // Apis
+                 profilerFiller.push("tickingChunks");
+                 this.tickChunks(profilerFiller, l);
+                 profilerFiller.pop();
+@@ -532,7 +_,9 @@
+         int naturalSpawnChunkCount = this.distanceManager.getNaturalSpawnChunkCount();
          // Paper start - Optional per player mob spawns
-         NaturalSpawner.SpawnState spawnCookie;
+         NaturalSpawner.SpawnState spawnState;
 -        if ((this.spawnFriendlies || this.spawnEnemies) && this.level.paperConfig().entities.spawning.perPlayerMobSpawns) { // don't count mobs when animals and monsters are disabled
 +        boolean spawnFriendliesEffective = this.spawnFriendlies && !org.apismc.apis.hooks.ApisHooks.isAnimalsDisabled(); // Apis
 +        boolean spawnEnemiesEffective = this.spawnEnemies && !org.apismc.apis.hooks.ApisHooks.isMonstersDisabled(); // Apis
 +        if ((spawnFriendliesEffective || spawnEnemiesEffective) && this.level.paperConfig().entities.spawning.perPlayerMobSpawns) { // don't count mobs when animals and monsters are disabled
              // re-set mob counts
-             for (ServerPlayer player : this.level.players()) {
+             for (ServerPlayer player : this.level.players) {
                  // Paper start - per player mob spawning backoff
-@@ -570,10 +_,10 @@
+@@ -553,10 +_,10 @@
          }
          // Paper end - Optional per player mob spawns
-         this.lastSpawnState = spawnCookie;
--        boolean doMobSpawning = this.level.getGameRules().get(GameRules.SPAWN_MOBS) && !this.level.players().isEmpty(); // CraftBukkit
-+        boolean doMobSpawning = this.level.getGameRules().get(GameRules.SPAWN_MOBS) && !this.level.players().isEmpty() && !org.apismc.apis.hooks.ApisHooks.isNaturalSpawningDisabled(); // CraftBukkit // Apis
-         int tickSpeed = this.level.getGameRules().get(GameRules.RANDOM_TICK_SPEED);
-         List<MobCategory> spawningCategories;
--        if (doMobSpawning && (this.spawnEnemies || this.spawnFriendlies)) { // Paper
-+        if (doMobSpawning && (spawnEnemiesEffective || spawnFriendliesEffective)) { // Paper // Apis
+         this.lastSpawnState = spawnState;
+-        boolean flag = this.level.getGameRules().get(GameRules.SPAWN_MOBS) && !this.level.players().isEmpty(); // CraftBukkit
++        boolean flag = this.level.getGameRules().get(GameRules.SPAWN_MOBS) && !this.level.players().isEmpty() && !org.apismc.apis.hooks.ApisHooks.isNaturalSpawningDisabled(); // CraftBukkit // Apis
+         int i = this.level.getGameRules().get(GameRules.RANDOM_TICK_SPEED);
+         List<MobCategory> filteredSpawningCategories;
+-        if (flag && (this.spawnEnemies || this.spawnFriendlies)) { // Paper
++        if (flag && (spawnEnemiesEffective || spawnFriendliesEffective)) { // Paper // Apis
              // Paper start - PlayerNaturallySpawnCreaturesEvent
-             for (ServerPlayer player : this.level.players()) {
-                 int chunkRange = Math.min(level.spigotConfig.mobSpawnRange, player.getBukkitEntity().getViewDistance());
-@@ -583,7 +_,7 @@
+             for (ServerPlayer entityPlayer : this.level.players()) {
+                 int chunkRange = Math.min(level.spigotConfig.mobSpawnRange, entityPlayer.getBukkitEntity().getViewDistance());
+@@ -566,7 +_,7 @@
              }
              // Paper end - PlayerNaturallySpawnCreaturesEvent
-             boolean spawnPersistent = this.level.ticksPerSpawnCategory.getLong(org.bukkit.entity.SpawnCategory.ANIMAL) != 0L && this.level.getGameTime() % this.level.ticksPerSpawnCategory.getLong(org.bukkit.entity.SpawnCategory.ANIMAL) == 0L; // CraftBukkit
--            spawningCategories = NaturalSpawner.getFilteredSpawningCategories(spawnCookie, this.spawnFriendlies, this.spawnEnemies, spawnPersistent, this.level); // CraftBukkit
-+            spawningCategories = NaturalSpawner.getFilteredSpawningCategories(spawnCookie, spawnFriendliesEffective, spawnEnemiesEffective, spawnPersistent, this.level); // CraftBukkit // Apis
+             boolean flag1 = this.level.ticksPerSpawnCategory.getLong(org.bukkit.entity.SpawnCategory.ANIMAL) != 0L && this.level.getGameTime() % this.level.ticksPerSpawnCategory.getLong(org.bukkit.entity.SpawnCategory.ANIMAL) == 0L; // CraftBukkit
+-            filteredSpawningCategories = NaturalSpawner.getFilteredSpawningCategories(spawnState, this.spawnFriendlies, this.spawnEnemies, flag1, this.level); // CraftBukkit
++            filteredSpawningCategories = NaturalSpawner.getFilteredSpawningCategories(spawnState, spawnFriendliesEffective, spawnEnemiesEffective, flag1, this.level); // CraftBukkit // Apis
          } else {
-             spawningCategories = List.of();
+             filteredSpawningCategories = List.of();
          }

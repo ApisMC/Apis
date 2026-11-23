@@ -3,24 +3,24 @@
 @@ -59,6 +_,7 @@
      }
  
-     public int addRecipes(final Collection<RecipeHolder<?>> recipes, final ServerPlayer player) {
+     public int addRecipes(Collection<RecipeHolder<?>> recipes, ServerPlayer player) {
 +        if (org.apismc.apis.hooks.ApisHooks.isRecipesDisabled()) return 0; // Apis
-         List<ClientboundRecipeBookAddPacket.Entry> recipesToAdd = new ArrayList<>();
+         List<ClientboundRecipeBookAddPacket.Entry> list = new ArrayList<>();
  
-         for (RecipeHolder<?> recipe : recipes) {
-@@ -118,6 +_,7 @@
+         for (RecipeHolder<?> recipeHolder : recipes) {
+@@ -114,6 +_,7 @@
      }
  
-     public void sendInitialRecipeBook(final ServerPlayer player) {
+     public void sendInitialRecipeBook(ServerPlayer player) {
 +        if (org.apismc.apis.hooks.ApisHooks.isRecipesDisabled()) return; // Apis
          player.connection.send(new ClientboundRecipeBookSettingsPacket(this.getBookSettings().copy()));
-         List<ClientboundRecipeBookAddPacket.Entry> recipesToSend = new ArrayList<>(this.known.size());
+         List<ClientboundRecipeBookAddPacket.Entry> list = new ArrayList<>(this.known.size());
  
-@@ -145,6 +_,7 @@
+@@ -142,6 +_,7 @@
      }
  
-     public void loadUntrusted(final ServerRecipeBook.Packed packed, final Predicate<ResourceKey<Recipe<?>>> validator) {
+     public void loadUntrusted(ServerRecipeBook.Packed recipeBook, Predicate<ResourceKey<Recipe<?>>> predicate) {
 +        if (org.apismc.apis.hooks.ApisHooks.isRecipesDisabled()) return; // Apis
-         this.bookSettings.replaceFrom(packed.settings);
-         this.loadRecipes(packed.known, this.known::add, validator);
-         this.loadRecipes(packed.highlight, this.highlight::add, validator);
+         this.bookSettings.replaceFrom(recipeBook.settings);
+         this.loadRecipes(recipeBook.known, this.known::add, predicate);
+         this.loadRecipes(recipeBook.highlight, this.highlight::add, predicate);

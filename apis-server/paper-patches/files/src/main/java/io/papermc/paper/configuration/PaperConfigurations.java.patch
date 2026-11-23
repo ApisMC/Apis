@@ -1,6 +1,6 @@
 --- a/src/main/java/io/papermc/paper/configuration/PaperConfigurations.java
 +++ b/src/main/java/io/papermc/paper/configuration/PaperConfigurations.java
-@@ -95,7 +_,7 @@
+@@ -92,7 +_,7 @@
      static final String GLOBAL_CONFIG_FILE_NAME = "paper-global.yml";
      static final String WORLD_DEFAULTS_CONFIG_FILE_NAME = "paper-world-defaults.yml";
      static final String WORLD_CONFIG_FILE_NAME = "paper-world.yml";

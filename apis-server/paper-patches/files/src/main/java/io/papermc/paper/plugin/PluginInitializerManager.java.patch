@@ -1,19 +1,22 @@
 --- a/src/main/java/io/papermc/paper/plugin/PluginInitializerManager.java
 +++ b/src/main/java/io/papermc/paper/plugin/PluginInitializerManager.java
-@@ -26,54 +_,58 @@
+@@ -29,11 +_,14 @@
      private static final Logger LOGGER = LogUtils.getClassLogger();
      private static PluginInitializerManager impl;
      private final Path pluginDirectory;
 +    private final Path addonsDirectory; // Apis
      private final Path updateDirectory;
 +    private volatile @Nullable Boolean hasPendingUpdates; // Apis - Single-check cache for addons/update/
+     public final io.papermc.paper.pluginremap.@org.checkerframework.checker.nullness.qual.MonotonicNonNull PluginRemapper pluginRemapper; // Paper
  
 -    PluginInitializerManager(final Path pluginDirectory, final Path updateDirectory) {
 +    PluginInitializerManager(final Path pluginDirectory, final Path addonsDirectory, final Path updateDirectory) { // Apis
          this.pluginDirectory = pluginDirectory;
 +        this.addonsDirectory = addonsDirectory; // Apis
          this.updateDirectory = updateDirectory;
-     }
+         this.pluginRemapper = Boolean.getBoolean("paper.disablePluginRemapping")
+             ? null
+@@ -43,45 +_,46 @@
  
      private static PluginInitializerManager parse(@NotNull final OptionSet minecraftOptionSet) throws Exception {
          // We have to load the bukkit configuration inorder to get the update folder location.
@@ -71,7 +74,7 @@
      }
  
      public static PluginInitializerManager init(final OptionSet optionSet) throws Exception {
-@@ -90,18 +_,55 @@
+@@ -98,19 +_,56 @@
          return pluginDirectory;
      }
  
@@ -103,7 +106,7 @@
 +        boolean found;
 +        try (java.util.stream.Stream<Path> entries = Files.list(this.updateDirectory)) {
 +            found = entries.anyMatch(Files::isRegularFile);
-+        } catch (final IOException _) {
++        } catch (final IOException ignored) {
 +            return true;
 +        }
 +        this.hasPendingUpdates = found;
@@ -121,6 +124,7 @@
          LOGGER.info("Initializing plugins...");
          // We have to load the bukkit configuration inorder to get the update folder location.
          io.papermc.paper.plugin.PluginInitializerManager pluginSystem = io.papermc.paper.plugin.PluginInitializerManager.init(optionSet);
+         if (pluginSystem.pluginRemapper != null) pluginSystem.pluginRemapper.loadingPlugins();
  
 -        // Register the default plugin directory
 -        io.papermc.paper.plugin.util.EntrypointUtil.registerProvidersFromSource(io.papermc.paper.plugin.provider.source.DirectoryProviderSource.INSTANCE, pluginSystem.pluginDirectoryPath());

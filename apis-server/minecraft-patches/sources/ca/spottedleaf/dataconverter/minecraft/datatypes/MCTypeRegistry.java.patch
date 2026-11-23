@@ -1,6 +1,6 @@
 --- a/ca/spottedleaf/dataconverter/minecraft/datatypes/MCTypeRegistry.java
 +++ b/ca/spottedleaf/dataconverter/minecraft/datatypes/MCTypeRegistry.java
-@@ -62,20 +_,22 @@
+@@ -61,20 +_,22 @@
      public static final DynamicDataType DATACONVERTER_CUSTOM_TYPE_COMMAND = new DynamicDataType("DC_Custom/Command");
  
      static {

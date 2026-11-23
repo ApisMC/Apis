@@ -1,6 +1,6 @@
 --- a/src/main/java/org/bukkit/craftbukkit/Main.java
 +++ b/src/main/java/org/bukkit/craftbukkit/Main.java
-@@ -32,10 +_,28 @@
+@@ -27,10 +_,28 @@
              {
                  this.acceptsAll(asList("?", "help"), "Show the help");
  
@@ -30,7 +30,7 @@
                          .describedAs("Properties file");
  
                  this.acceptsAll(asList("P", "plugins"), "Plugin directory to use")
-@@ -87,13 +_,13 @@
+@@ -82,13 +_,13 @@
                  this.acceptsAll(asList("b", "bukkit-settings"), "File for bukkit settings")
                          .withRequiredArg()
                          .ofType(File.class)
@@ -46,7 +46,7 @@
                          .describedAs("Yml file");
  
                  this.accepts("forceUpgrade", "Whether to force a world upgrade");
-@@ -117,7 +_,7 @@
+@@ -112,7 +_,7 @@
                  this.acceptsAll(asList("S", "spigot-settings"), "File for spigot settings")
                          .withRequiredArg()
                          .ofType(File.class)
@@ -55,7 +55,7 @@
                          .describedAs("Yml file");
  
                  this.acceptsAll(asList("paper-dir", "paper-settings-directory"), "Directory for Paper settings")
-@@ -129,7 +_,7 @@
+@@ -124,7 +_,7 @@
                  this.acceptsAll(asList("paper", "paper-settings"), "File for Paper settings")
                          .withRequiredArg()
                          .ofType(File.class)
@@ -64,7 +64,7 @@
                          .describedAs("Yml file");
  
                  this.acceptsAll(asList("add-plugin", "add-extra-plugin-jar"), "Specify paths to extra plugin jars to be loaded in addition to those in the plugins folder. This argument can be specified multiple times, once for each extra plugin jar path.")
-@@ -169,6 +_,7 @@
+@@ -164,6 +_,7 @@
          } else if (options.has("v")) {
              System.out.println(CraftServer.class.getPackage().getImplementationVersion());
          } else {

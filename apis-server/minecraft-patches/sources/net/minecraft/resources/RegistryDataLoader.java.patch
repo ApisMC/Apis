@@ -1,0 +1,60 @@
+--- a/net/minecraft/resources/RegistryDataLoader.java
++++ b/net/minecraft/resources/RegistryDataLoader.java
+@@ -190,12 +_,17 @@
+             Registry<?> registry = loader.registry();
+ 
+             try {
++                if (org.apismc.apis.hooks.ApisHooks.shouldPruneRegistryAtLoad(registry.key())
++                    && registry instanceof MappedRegistry<?> mappedRegistry) { // Apis
++                    mappedRegistry.bindAllTagsToEmpty();
++                    org.apismc.apis.hooks.ApisHooks.bindPrunedFallbackHolders((MappedRegistry) mappedRegistry);
++                } // Apis
+                 registry.freeze();
+             } catch (Exception var4x) {
+                 map.put(registry.key(), var4x);
+             }
+ 
+-            if (loader.data.requiredNonEmpty && registry.size() == 0) {
++            if (loader.data.requiredNonEmpty && registry.size() == 0 && !org.apismc.apis.hooks.ApisHooks.shouldPruneRegistryAtLoad(registry.key())) { // Apis
+                 map.put(registry.key(), new IllegalStateException("Registry must be non-empty: " + registry.key().identifier()));
+             }
+         });
+@@ -231,7 +_,10 @@
+     }
+ 
+     private static <T> RegistryOps.RegistryInfo<T> createInfoForNewRegistry(WritableRegistry<T> registry) {
+-        return new RegistryOps.RegistryInfo<>(registry, registry.createRegistrationLookup(), registry.registryLifecycle());
++        final net.minecraft.core.HolderGetter<T> registrationLookup = org.apismc.apis.hooks.ApisHooks.shouldSkipUnboundRegistrationLookup(registry.key()) // Apis
++            ? org.apismc.apis.hooks.ApisHooks.createEmptyReadOnlyLookup(registry)
++            : registry.createRegistrationLookup();
++        return new RegistryOps.RegistryInfo<>(registry, registrationLookup, registry.registryLifecycle());
+     }
+ 
+     private static <T> RegistryOps.RegistryInfo<T> createInfoForContextRegistry(HolderLookup.RegistryLookup<T> registryLookup) {
+@@ -308,10 +_,16 @@
+         Decoder<E> codec,
+         Map<ResourceKey<?>, Exception> loadingErrors
+     ) {
++        final io.papermc.paper.registry.data.util.Conversions conversions = new io.papermc.paper.registry.data.util.Conversions(registryInfoLookup); // Paper - create conversions
++        if (org.apismc.apis.hooks.ApisHooks.shouldPruneRegistryAtLoad(registry.key())) { // Apis - Early datapack registry pruning before scanning/parsing
++            io.papermc.paper.registry.PaperRegistryAccess.instance().lockReferenceHolders(registry.key());
++            io.papermc.paper.registry.PaperRegistryListenerManager.INSTANCE.runFreezeListeners(registry.key(), conversions);
++            return;
++        } // Apis
+         FileToIdConverter fileToIdConverter = FileToIdConverter.registry(registry.key());
+         RegistryOps<JsonElement> registryOps = RegistryOps.create(JsonOps.INSTANCE, registryInfoLookup);
++        final Decoder<E> elementDecoder = org.apismc.apis.hooks.ApisHooks.resolveRegistryDecoder(registry.key(), codec); // Apis
+ 
+-        final io.papermc.paper.registry.data.util.Conversions conversions = new io.papermc.paper.registry.data.util.Conversions(registryInfoLookup); // Paper - create conversions
+         for (Entry<Identifier, Resource> entry : fileToIdConverter.listMatchingResources(resourceManager).entrySet()) {
+             Identifier identifier = entry.getKey();
+             ResourceKey<E> resourceKey = ResourceKey.create(registry.key(), fileToIdConverter.fileToId(identifier));
+@@ -319,7 +_,7 @@
+             RegistrationInfo registrationInfo = REGISTRATION_INFO_CACHE.apply(resource.knownPackInfo());
+ 
+             try {
+-                loadElementFromResource(registry, codec, registryOps, resourceKey, resource, registrationInfo, conversions); // Paper - pass conversions
++                loadElementFromResource(registry, elementDecoder, registryOps, resourceKey, resource, registrationInfo, conversions); // Paper - pass conversions // Apis
+             } catch (Exception var14) {
+                 loadingErrors.put(
+                     resourceKey,

@@ -1,0 +1,103 @@
+--- a/src/main/java/io/papermc/paper/pluginremap/reflect/ReflectionRemapper.java
++++ b/src/main/java/io/papermc/paper/pluginremap/reflect/ReflectionRemapper.java
+@@ -8,6 +_,7 @@
+ import io.papermc.reflectionrewriter.proxygenerator.ProxyGenerator;
+ import java.lang.invoke.MethodHandles;
+ import java.lang.reflect.Method;
++import java.nio.charset.StandardCharsets;
+ import org.checkerframework.checker.nullness.qual.NonNull;
+ import org.checkerframework.framework.qual.DefaultQualifier;
+ import org.objectweb.asm.ClassReader;
+@@ -32,9 +_,83 @@
+         }
+     }
+ 
++    private static final byte[][] REFLECTION_CONSTANT_POOL_TARGETS = {
++        "java/lang/Class".getBytes(StandardCharsets.US_ASCII),
++        "java/lang/invoke/MethodHandles$Lookup".getBytes(StandardCharsets.US_ASCII),
++        "java/lang/invoke/LambdaMetafactory".getBytes(StandardCharsets.US_ASCII),
++        "java/lang/invoke/ConstantBootstraps".getBytes(StandardCharsets.US_ASCII),
++        "java/lang/invoke/MethodType".getBytes(StandardCharsets.US_ASCII),
++        "defineClass".getBytes(StandardCharsets.US_ASCII)
++    };
++
+     private ReflectionRemapper() {
+     }
+ 
++    public static boolean mayNeedRewrite(final byte[] bytes) {
++        if (bytes.length < 10) {
++            return true;
++        }
++        final int cpCount = ((bytes[8] & 0xFF) << 8) | (bytes[9] & 0xFF);
++        int pos = 10;
++        for (int i = 1; i < cpCount; i++) {
++            if (pos >= bytes.length) {
++                return true;
++            }
++            final int tag = bytes[pos++] & 0xFF;
++            switch (tag) {
++                case 1 -> {
++                    if (pos + 2 > bytes.length) {
++                        return true;
++                    }
++                    final int len = ((bytes[pos] & 0xFF) << 8) | (bytes[pos + 1] & 0xFF);
++                    pos += 2;
++                    if (pos + len > bytes.length) {
++                        return true;
++                    }
++                    final int end = pos + len;
++                    for (final byte[] target : REFLECTION_CONSTANT_POOL_TARGETS) {
++                        if (end - pos >= target.length && containsAscii(bytes, pos, end, target)) {
++                            return true;
++                        }
++                    }
++                    pos = end;
++                }
++                case 3, 4, 9, 10, 11, 12, 17, 18 -> pos += 4;
++                case 5, 6 -> {
++                    pos += 8;
++                    i++;
++                }
++                case 7, 8, 16, 19, 20 -> pos += 2;
++                case 15 -> pos += 3;
++                default -> {
++                    return true;
++                }
++            }
++        }
++        return false;
++    }
++
++    private static boolean containsAscii(final byte[] buf, final int start, final int end, final byte[] needle) {
++        final byte first = needle[0];
++        final int maxStart = end - needle.length;
++        for (int i = start; i <= maxStart; i++) {
++            if (buf[i] != first) {
++                continue;
++            }
++            boolean matched = true;
++            for (int j = 1; j < needle.length; j++) {
++                if (buf[i + j] != needle[j]) {
++                    matched = false;
++                    break;
++                }
++            }
++            if (matched) {
++                return true;
++            }
++        }
++        return false;
++    }
++
+     public static ClassVisitor visitor(final ClassVisitor parent) {
+         if (MappingEnvironment.reobf() || MappingEnvironment.DISABLE_PLUGIN_REMAPPING) {
+             return parent;
+@@ -43,7 +_,7 @@
+     }
+ 
+     public static byte[] processClass(final byte[] bytes) {
+-        if (MappingEnvironment.DISABLE_PLUGIN_REMAPPING) {
++        if (MappingEnvironment.DISABLE_PLUGIN_REMAPPING || !mayNeedRewrite(bytes)) {
+             return bytes;
+         }
+         final ClassReader classReader = new ClassReader(bytes);

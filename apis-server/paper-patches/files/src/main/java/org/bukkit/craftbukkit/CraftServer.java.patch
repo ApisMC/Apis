@@ -1,6 +1,6 @@
 --- a/src/main/java/org/bukkit/craftbukkit/CraftServer.java
 +++ b/src/main/java/org/bukkit/craftbukkit/CraftServer.java
-@@ -453,10 +_,12 @@
+@@ -476,10 +_,12 @@
          this.minimumAPI = ApiVersion.getOrCreateVersion(this.configuration.getString("settings.minimum-api"));
          this.loadIcon();
          this.loadCompatibilities();
@@ -15,7 +15,7 @@
              MapPalette.setMapColorCache(new CraftMapColorCache(this.logger));
          }
          this.potionBrewer = new io.papermc.paper.potion.PaperPotionBrewer(console); // Paper - custom potion mixes
-@@ -469,11 +_,11 @@
+@@ -492,11 +_,11 @@
      }
  
      private File getConfigFile() {
@@ -29,7 +29,7 @@
      }
  
      private void overrideSpawnLimits() {
-@@ -486,6 +_,7 @@
+@@ -509,6 +_,7 @@
  
      private void saveConfig() {
          try {
@@ -37,7 +37,7 @@
              this.configuration.save(this.getConfigFile());
          } catch (IOException ex) {
              Logger.getLogger(CraftServer.class.getName()).log(Level.SEVERE, "Could not save " + this.getConfigFile(), ex);
-@@ -766,7 +_,7 @@
+@@ -790,7 +_,7 @@
  
      @Override
      public boolean getAllowEnd() {
@@ -46,7 +46,7 @@
      }
  
      @Override
-@@ -845,7 +_,7 @@
+@@ -869,7 +_,7 @@
  
      @Override
      public File getUpdateFolderFile() {
@@ -55,7 +55,7 @@
      }
  
      @Override
-@@ -953,7 +_,9 @@
+@@ -977,7 +_,9 @@
          this.console.autosavePeriod = this.configuration.getInt("ticks-per.autosave");
          this.loadIcon();
          this.loadCompatibilities();
@@ -66,7 +66,7 @@
  
          try {
              this.playerList.getIpBans().load();
-@@ -966,7 +_,7 @@
+@@ -990,7 +_,7 @@
              this.logger.log(Level.WARNING, "Failed to load banned-players.json, " + ex.getMessage());
          }
  
@@ -75,23 +75,26 @@
          this.console.paperConfigurations.reloadConfigs(this.console);
          for (ServerLevel world : this.console.getAllLevels()) {
              // world.serverLevelData.setDifficulty(config.difficulty); // Paper - per level difficulty
-@@ -1095,7 +_,7 @@
-     }
+@@ -1121,7 +_,7 @@
  
+     @SuppressWarnings({ "unchecked", "finally" })
      private void loadCustomPermissions() {
 -        File file = new File(this.configuration.getString("settings.permissions-file"));
 +        File file = org.apismc.apis.hooks.ApisHooks.resolveConfigRelativeFile(this.configuration.getString("settings.permissions-file"), "permissions.yml"); // Apis - Store permissions.yml inside <configs-dir>
-         if (!file.isFile()) {
-             return;
-         }
-@@ -1163,14 +_,19 @@
-             }
+         FileInputStream stream;
+ 
+         try {
+@@ -1192,6 +_,9 @@
              throw new IllegalArgumentException("Cannot create a world with key " + creator.key() + " and name " + name + " one (or both) already match a world that exists");
          }
+         // Paper end
 +        if (org.apismc.apis.hooks.ApisHooks.isWorldCreationBlocked(creator)) { // Apis - Block custom/disabled runtime world creation after existing-world lookup
 +            return null;
 +        }
  
+         if (folder.exists()) {
+             Preconditions.checkArgument(folder.isDirectory(), "File (%s) exists and isn't a folder", name);
+@@ -1200,10 +_,12 @@
          if (chunkGenerator == null) {
              chunkGenerator = this.getGenerator(name);
          }
@@ -104,54 +107,36 @@
  
          ResourceKey<LevelStem> actualDimension = switch (creator.environment()) {
              case NORMAL -> LevelStem.OVERWORLD;
-@@ -1181,6 +_,7 @@
- 
-         RegistryAccess registryAccess = this.console.registryAccess();
-         final ResourceKey<net.minecraft.world.level.Level> dimensionKey = CraftNamespacedKey.toResourceKey(Registries.DIMENSION, creator.key());
-+        org.apismc.apis.hooks.ApisHooks.registerStandaloneWorldFolder(dimensionKey, name); // Apis - Keep standalone world folders in worlds/<name>/
-         net.minecraft.core.Registry<LevelStem> levelStemRegistry = registryAccess.lookupOrThrow(Registries.LEVEL_STEM);
-         final LevelStem configuredStem = levelStemRegistry.getValue(actualDimension);
-         if (configuredStem == null) {
-@@ -1210,16 +_,21 @@
-         if (worldGenSettings == null) {
-             WorldOptions worldOptions = new WorldOptions(creator.seed(), creator.generateStructures(), creator.bonusChest());
- 
--            String flatGenSettings = creator.generatorSettings();
--            if (flatGenSettings.isEmpty()) {
--                flatGenSettings = FlatLevelGeneratorSettings.CODEC.encodeStart(registryAccess.createSerializationContext(JsonOps.INSTANCE), FlatLevelGeneratorSettings.getDefault(
--                    registryAccess.lookupOrThrow(Registries.BIOME),
--                    registryAccess.lookupOrThrow(Registries.STRUCTURE_SET),
--                    registryAccess.lookupOrThrow(Registries.PLACED_FEATURE)
--                )).getOrThrow().toString();
-+            WorldDimensions worldDimensions;
+@@ -1246,7 +_,11 @@
+                 new GameRules(context.dataConfiguration().enabledFeatures()),
+                 context.dataConfiguration()
+             );
+-            worldDimensions = properties.create(context.datapackWorldgen());
 +            if (org.apismc.apis.hooks.ApisHooks.isStandaloneWorldsMode()) { // Apis - Build void dimensions without pruned WORLD_PRESET
-+                worldDimensions = org.apismc.apis.hooks.ApisHooks.createVoidBukkitWorldDimensions(registryAccess, actualDimension);
++                worldDimensions = org.apismc.apis.hooks.ApisHooks.createVoidBukkitWorldDimensions(context.datapackWorldgen(), actualDimension);
 +            } else {
-+                String flatGenSettings = creator.generatorSettings();
-+                if (flatGenSettings.isEmpty()) {
-+                    flatGenSettings = FlatLevelGeneratorSettings.CODEC.encodeStart(registryAccess.createSerializationContext(JsonOps.INSTANCE), FlatLevelGeneratorSettings.getDefault(
-+                        registryAccess.lookupOrThrow(Registries.BIOME),
-+                        registryAccess.lookupOrThrow(Registries.STRUCTURE_SET),
-+                        registryAccess.lookupOrThrow(Registries.PLACED_FEATURE)
-+                    )).getOrThrow().toString();
-+                }
-+                DedicatedServerProperties.WorldDimensionData properties = new DedicatedServerProperties.WorldDimensionData(GsonHelper.parse(flatGenSettings), creator.type().name().toLowerCase(Locale.ROOT));
-+                worldDimensions = properties.create(registryAccess);
-             }
--            DedicatedServerProperties.WorldDimensionData properties = new DedicatedServerProperties.WorldDimensionData(GsonHelper.parse(flatGenSettings), creator.type().name().toLowerCase(Locale.ROOT));
--            WorldDimensions worldDimensions = properties.create(registryAccess);
++                worldDimensions = properties.create(context.datapackWorldgen());
++            }
  
-             WorldDimensions.Complete complete = worldDimensions.bake(levelStemRegistry);
-             if (complete.dimensions().getValue(actualDimension) == null) {
-@@ -1293,6 +_,7 @@
-         serverLevel.setSpawnSettings(true);
+             WorldDimensions.Complete complete = worldDimensions.bake(contextLevelStemRegistry);
+             Lifecycle lifecycle = complete.lifecycle().add(context.datapackWorldgen().allRegistriesLifecycle());
+@@ -1284,6 +_,7 @@
+         } else {
+             dimensionKey = ResourceKey.create(Registries.DIMENSION, Identifier.fromNamespaceAndPath(creator.key().namespace(), creator.key().value()));
+         }
++        org.apismc.apis.hooks.ApisHooks.registerStandaloneWorldFolder(dimensionKey, name); // Apis - Keep standalone world folders in worlds/<name>/
+ 
+         ServerLevel serverLevel = new ServerLevel(
+             this.console,
+@@ -1312,6 +_,7 @@
+         // Paper - Put world into worldlist before initing the world; move up
  
          this.getServer().prepareLevel(serverLevel);
 +        org.apismc.apis.hooks.ApisHooks.ensureStandaloneWorldConfig(serverLevel); // Apis
  
          return serverLevel.getWorld();
      }
-@@ -1341,6 +_,7 @@
+@@ -1361,6 +_,7 @@
  
          this.worlds.remove(world.getName().toLowerCase(Locale.ROOT));
          this.console.removeLevel(handle);
@@ -159,7 +144,7 @@
          return true;
      }
  
-@@ -1365,7 +_,9 @@
+@@ -1385,7 +_,9 @@
      public World getWorld(String name) {
          Preconditions.checkArgument(name != null, "name cannot be null");
  
@@ -170,7 +155,7 @@
      }
  
      @Override
-@@ -1381,7 +_,10 @@
+@@ -1401,7 +_,10 @@
      @Override
      public World getWorld(net.kyori.adventure.key.Key worldKey) {
          ServerLevel level = console.getLevel(ResourceKey.create(net.minecraft.core.registries.Registries.DIMENSION, io.papermc.paper.adventure.PaperAdventure.asVanilla(worldKey)));

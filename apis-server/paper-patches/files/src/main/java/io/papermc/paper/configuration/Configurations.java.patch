@@ -1,6 +1,6 @@
 --- a/src/main/java/io/papermc/paper/configuration/Configurations.java
 +++ b/src/main/java/io/papermc/paper/configuration/Configurations.java
-@@ -90,6 +_,7 @@
+@@ -91,6 +_,7 @@
              if (refreshNode) {
                  node.set(type, instance);
              }
@@ -8,7 +8,7 @@
              return instance;
          };
      }
-@@ -99,6 +_,7 @@
+@@ -100,6 +_,7 @@
              ObjectMapper.Factory factory = (ObjectMapper.Factory) Objects.requireNonNull(node.options().serializers().get(type));
              ObjectMapper.Mutable<T> mutable = (ObjectMapper.Mutable<T>) factory.get(type);
              mutable.load(instance, node);
@@ -16,7 +16,7 @@
              return instance;
          };
      }
-@@ -109,6 +_,7 @@
+@@ -110,6 +_,7 @@
  
      private void trySaveFileNode(YamlConfigurationLoader loader, ConfigurationNode node, String filename) throws ConfigurateException {
          try {

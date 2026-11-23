@@ -1,6 +1,6 @@
 --- a/src/main/java/ca/spottedleaf/moonrise/common/util/MoonriseConstants.java
 +++ b/src/main/java/ca/spottedleaf/moonrise/common/util/MoonriseConstants.java
-@@ -14,7 +_,9 @@
+@@ -13,7 +_,9 @@
      public static final boolean NUMA_ENABLE;
      static {
          final boolean numaScheduling = Boolean.getBoolean(PlatformHooks.get().getBrand() + ".NumaScheduling");

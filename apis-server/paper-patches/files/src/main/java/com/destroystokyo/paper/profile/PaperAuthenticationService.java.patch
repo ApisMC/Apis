@@ -1,0 +1,17 @@
+--- a/src/main/java/com/destroystokyo/paper/profile/PaperAuthenticationService.java
++++ b/src/main/java/com/destroystokyo/paper/profile/PaperAuthenticationService.java
+@@ -19,6 +_,14 @@
+     }
+ 
+     @Override
++    public com.mojang.authlib.yggdrasil.ServicesKeySet getServicesKeySet() { // Apis - Honor startup.mojang-service-discovery
++        if (!org.apismc.apis.hooks.ApisHooks.isMojangServiceDiscoveryEnabled()) {
++            return com.mojang.authlib.yggdrasil.ServicesKeySet.EMPTY;
++        }
++        return super.getServicesKeySet();
++    }
++
++    @Override
+     public MinecraftSessionService createMinecraftSessionService() {
+         return new PaperMinecraftSessionService(this.getServicesKeySet(),  this.getProxy(), this.environment);
+     }

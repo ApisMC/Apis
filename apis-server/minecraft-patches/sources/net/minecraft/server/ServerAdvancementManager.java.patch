@@ -1,14 +1,23 @@
 --- a/net/minecraft/server/ServerAdvancementManager.java
 +++ b/net/minecraft/server/ServerAdvancementManager.java
-@@ -22,6 +_,11 @@
-     private final AdvancementTree tree;
+@@ -32,7 +_,20 @@
+     }
  
-     public ServerAdvancementManager(final HolderLookup.Provider registries) {
+     @Override
++    protected Map<Identifier, Advancement> prepare(ResourceManager resourceManager, ProfilerFiller profiler) {
++        if (org.apismc.apis.hooks.ApisHooks.isAdvancementsDisabled()) { // Apis
++            return Map.of();
++        } // Apis
++        return super.prepare(resourceManager, profiler);
++    }
++
++    @Override
+     protected void apply(Map<Identifier, Advancement> object, ResourceManager resourceManager, ProfilerFiller profiler) {
 +        if (org.apismc.apis.hooks.ApisHooks.isAdvancementsDisabled()) { // Apis
 +            this.advancements = ImmutableMap.of();
 +            this.tree = new AdvancementTree();
 +            return;
 +        } // Apis
-         HolderLookup.RegistryLookup<Advancement> advancements = registries.lookupOrThrow(Registries.ADVANCEMENT);
          Builder<Identifier, AdvancementHolder> builder = ImmutableMap.builder();
-         advancements.listElements().forEach(advancement -> {
+         object.forEach((identifier, advancement) -> {
+             // Spigot start

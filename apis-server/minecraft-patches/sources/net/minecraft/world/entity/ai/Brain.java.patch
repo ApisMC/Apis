@@ -1,18 +1,18 @@
 --- a/net/minecraft/world/entity/ai/Brain.java
 +++ b/net/minecraft/world/entity/ai/Brain.java
-@@ -383,6 +_,7 @@
+@@ -405,6 +_,7 @@
      }
  
-     public void tick(final ServerLevel level, final E body) {
+     public void tick(ServerLevel level, E entity) {
 +        if (org.apismc.apis.hooks.ApisHooks.isBrainDisabled()) return; // Apis
          this.forgetOutdatedMemories();
-         this.tickSensors(level, body);
-         this.startEachNonRunningBehavior(level, body);
-@@ -390,6 +_,7 @@
+         this.tickSensors(level, entity);
+         this.startEachNonRunningBehavior(level, entity);
+@@ -412,6 +_,7 @@
      }
  
-     private void tickSensors(final ServerLevel level, final E body) {
+     private void tickSensors(ServerLevel level, E brainHolder) {
 +        if (org.apismc.apis.hooks.ApisHooks.isSensorsDisabled()) return; // Apis
          for (Sensor<? super E> sensor : this.sensors.values()) {
-             sensor.tick(level, body);
+             sensor.tick(level, brainHolder);
          }

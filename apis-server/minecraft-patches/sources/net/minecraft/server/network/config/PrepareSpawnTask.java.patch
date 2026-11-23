@@ -1,24 +1,27 @@
 --- a/net/minecraft/server/network/config/PrepareSpawnTask.java
 +++ b/net/minecraft/server/network/config/PrepareSpawnTask.java
-@@ -110,6 +_,13 @@
-                 .orElseGet(() -> PlayerSpawnFinder.findSpawn(finalSpawnLevel, respawnData.pos()));
-             // Paper end - move logic in Entity to here, to use bukkit supplied world UUID & reset to main world spawn if no valid world is found
-             Vec2 spawnAngle = loadedPosition.rotation().orElse(new Vec2(respawnData.yaw(), respawnData.pitch()));
+@@ -111,7 +_,15 @@
+                 .map(CompletableFuture::completedFuture)
+                 .orElseGet(() -> PlayerSpawnFinder.findSpawn(serverLevel, respawnData.pos()));
+             Vec2 vec2 = savedPosition.rotation().orElse(new Vec2(respawnData.yaw(), respawnData.pitch()));
+-            this.state = new PrepareSpawnTask.Preparing(serverLevel, completableFuture, vec2);
++            ServerLevel resolvedLevel = serverLevel;
 +            final org.apismc.apis.world.StandaloneWorldManager.ResolvedSpawn apisSpawn =
-+                org.apismc.apis.hooks.ApisHooks.resolveStandaloneJoinSpawn(this.server, this.newPlayer, spawnLevel, loadedPosition.position().isPresent()); // Apis
++                org.apismc.apis.hooks.ApisHooks.resolveStandaloneJoinSpawn(this.server, this.newPlayer, serverLevel, savedPosition.position().isPresent()); // Apis
 +            if (apisSpawn != null) {
-+                spawnLevel = apisSpawn.level();
-+                spawnPosition = CompletableFuture.completedFuture(apisSpawn.position());
-+                spawnAngle = apisSpawn.angle();
++                resolvedLevel = apisSpawn.level();
++                completableFuture = CompletableFuture.completedFuture(apisSpawn.position());
++                vec2 = apisSpawn.angle();
 +            } // Apis
-             this.state = new PrepareSpawnTask.Preparing(spawnLevel, spawnPosition, spawnAngle);
++            this.state = new PrepareSpawnTask.Preparing(resolvedLevel, completableFuture, vec2);
          }
      }
-@@ -310,6 +_,7 @@
+ 
+@@ -307,6 +_,7 @@
                  }
                  // Paper end - Entity#getEntitySpawnReason
-                 player.snapTo(this.spawnPosition, this.spawnAngle.x, this.spawnAngle.y);
-+                org.apismc.apis.hooks.ApisHooks.applyStandaloneJoinGameMode(player); // Apis
-                 PrepareSpawnTask.this.server.getPlayerList().placeNewPlayer(connection, player, cookie);
-                 input.ifPresent(tag -> {
-                     player.loadAndSpawnEnderPearls(tag);
+                 serverPlayer.snapTo(this.spawnPosition, this.spawnAngle.x, this.spawnAngle.y);
++                org.apismc.apis.hooks.ApisHooks.applyStandaloneJoinGameMode(serverPlayer); // Apis
+                 PrepareSpawnTask.this.server.getPlayerList().placeNewPlayer(connection, serverPlayer, cookie);
+                 optional.ifPresent(valueInput -> {
+                     serverPlayer.loadAndSpawnEnderPearls(valueInput);

@@ -1,6 +1,6 @@
 --- a/net/minecraft/world/entity/Entity.java
 +++ b/net/minecraft/world/entity/Entity.java
-@@ -911,15 +_,19 @@
+@@ -865,15 +_,19 @@
          }
  
          if (this instanceof ServerPlayer) this.handlePortal(); // CraftBukkit - Moved up to postTick
@@ -11,12 +11,12 @@
  
          this.wasInPowderSnow = this.isInPowderSnow;
          this.isInPowderSnow = false;
--        this.wasEyeInWater = this.isEyeInFluid(FluidTags.WATER);
--        this.updateFluidInteraction();
+-        this.updateInWaterStateAndDoFluidPushing();
+-        this.updateFluidOnEyes();
 -        this.updateSwimming();
 +        if (org.apismc.apis.hooks.ApisHooks.isFluidInteractionEnabled()) { // Apis
-+            this.wasEyeInWater = this.isEyeInFluid(FluidTags.WATER);
-+            this.updateFluidInteraction();
++            this.updateInWaterStateAndDoFluidPushing();
++            this.updateFluidOnEyes();
 +            this.updateSwimming();
 +        } else {
 +            this.wasEyeInWater = false;
@@ -24,10 +24,10 @@
          if (this.level() instanceof ServerLevel serverLevel) {
              if (this.remainingFireTicks > 0) {
                  if (this.fireImmune()) {
-@@ -1473,8 +_,10 @@
-             boolean wasOnFire = this.isOnFire();
-             boolean wasFreezing = this.isFreezing();
-             int previousRemainingFireTicks = this.getRemainingFireTicks();
+@@ -1345,8 +_,10 @@
+             boolean isOnFire = this.isOnFire();
+             boolean isFreezing = this.isFreezing();
+             int remainingFireTicks = this.getRemainingFireTicks();
 -            this.checkInsideBlocks(movements, this.insideEffectCollector);
 -            this.insideEffectCollector.applyAndClear(this);
 +            if (org.apismc.apis.hooks.ApisHooks.isInsideBlockChecksEnabled()) { // Apis
@@ -37,10 +37,10 @@
              if (this.isInRain()) {
                  this.clearFire();
              }
-@@ -2449,6 +_,7 @@
+@@ -2289,6 +_,7 @@
      }
  
-     public void push(final Entity entity) {
+     public void push(Entity entity) {
 +        if (org.apismc.apis.hooks.ApisHooks.isEntityCollisionDisabled(this, entity)) return; // Apis - Skip entity/player collisions
          if (!this.isPassengerOfSameVehicle(entity)) {
              if (!entity.noPhysics && !this.noPhysics) {

@@ -1,6 +1,6 @@
 --- a/net/minecraft/network/Connection.java
 +++ b/net/minecraft/network/Connection.java
-@@ -126,6 +_,17 @@
+@@ -127,6 +_,17 @@
      public boolean isPending = true;
      public boolean queueImmunity;
      // Paper end - Optimize network
@@ -16,37 +16,22 @@
 +    private volatile boolean mayHaveUnflushedEventLoopWrites;
 +    // Apis end - Per-tick outbound packet batching
  
-     public Connection(final PacketFlow receiving) {
+     public Connection(PacketFlow receiving) {
          this.receiving = receiving;
-@@ -468,9 +_,13 @@
-         }
- 
-         if (connected && this.pendingActions.isEmpty()) {
-+            this.flushOutboundBatch(false); // Apis - Preserve FIFO order before scheduled Netty task
-             this.channel.eventLoop().execute(task);
-         } else {
--            this.pendingActions.add(new WrappedConsumer(connection -> connection.channel.eventLoop().execute(task)));
-+            this.pendingActions.add(new WrappedConsumer(connection -> {
-+                connection.flushOutboundBatch(false); // Apis - Preserve FIFO order before scheduled Netty task
-+                connection.channel.eventLoop().execute(task);
-+            }));
-             this.flushQueue();
-         }
-     }
-@@ -496,11 +_,192 @@
-     private void sendPacket(final Packet<?> packet, final @Nullable ChannelFutureListener listener, final boolean flush) {
+@@ -446,11 +_,192 @@
+     private void sendPacket(Packet<?> packet, @Nullable ChannelFutureListener sendListener, boolean flush) {
          this.sentPackets++;
          if (this.channel.eventLoop().inEventLoop()) {
 +            this.drainBatchOnEventLoop();
-             this.doSendPacket(packet, listener, flush);
+             this.doSendPacket(packet, sendListener, flush);
 -        } else {
--            this.channel.eventLoop().execute(() -> this.doSendPacket(packet, listener, flush));
+-            this.channel.eventLoop().execute(() -> this.doSendPacket(packet, sendListener, flush));
 -        }
 -    }
 +        } else if (!flush) {
-+            this.enqueueBatchPacket(packet, listener);
++            this.enqueueBatchPacket(packet, sendListener);
 +        } else {
-+            this.sendImmediateOrFlushBatch(packet, listener);
++            this.sendImmediateOrFlushBatch(packet, sendListener);
 +        }
 +    }
 +
@@ -228,17 +213,17 @@
 +    }
 +    // Apis end - Per-tick outbound packet batching
  
-     private void doSendPacket(final Packet<?> packet, final @Nullable ChannelFutureListener listener, final boolean flush) {
+     private void doSendPacket(Packet<?> packet, @Nullable ChannelFutureListener sendListener, boolean flush) {
          // Paper start - Optimize network
-@@ -520,6 +_,7 @@
+@@ -470,6 +_,7 @@
          } else {
-             future = this.channel.write(packet, this.channel.voidPromise()); // Paper - Optimize network
+             channelFuture = this.channel.write(packet, this.channel.voidPromise()); // Paper - Optimize network
          }
 +        this.mayHaveUnflushedEventLoopWrites = !flush; // Apis
  
          // Paper start - Optimize network
          if (packet.hasFinishListener()) {
-@@ -543,9 +_,17 @@
+@@ -492,9 +_,17 @@
      }
  
      private void flush() {
@@ -258,7 +243,7 @@
              this.channel.eventLoop().execute(() -> this.channel.flush());
          }
      }
-@@ -607,6 +_,9 @@
+@@ -556,6 +_,9 @@
      private static int currTick; // Paper - Buffer joins to world
      public void tick() {
          this.flushQueue();
@@ -268,15 +253,15 @@
          // Paper start - Buffer joins to world
          if (Connection.currTick != net.minecraft.server.MinecraftServer.currentTick) {
              Connection.currTick = net.minecraft.server.MinecraftServer.currentTick;
-@@ -678,6 +_,7 @@
+@@ -627,6 +_,7 @@
          if (this.isConnected()) {
-             this.channel.close().awaitUninterruptibly();
-             this.disconnectionDetails = details;
+             this.channel.close(); // We can't wait as this may be called from an event loop.
+             this.disconnectionDetails = disconnectionDetails;
 +            this.clearPacketQueue(); // Apis - Drain any batch packets queued right before channel close
          }
      }
  
-@@ -925,6 +_,33 @@
+@@ -858,6 +_,33 @@
      // Paper start - Optimize network
      public void clearPacketQueue() {
          final net.minecraft.server.level.ServerPlayer player = getPlayer();

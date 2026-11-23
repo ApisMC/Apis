@@ -1,8 +1,8 @@
 --- a/src/main/java/org/bukkit/craftbukkit/block/data/CraftBlockData.java
 +++ b/src/main/java/org/bukkit/craftbukkit/block/data/CraftBlockData.java
-@@ -448,7 +_,9 @@
+@@ -564,7 +_,9 @@
      static {
-         // cache all the default states at startup, will not cache ones with the custom states inside of the
+         // cache all of the default states at startup, will not cache ones with the custom states inside of the
          // brackets in a different order, though
 -        reloadCache();
 +        if (org.apismc.apis.hooks.ApisHooks.isEagerCraftBlockDataCacheEnabled()) { // Apis
@@ -11,14 +11,14 @@
      }
  
      public static void reloadCache() {
-@@ -498,7 +_,9 @@
- 
+@@ -623,7 +_,9 @@
+     // Paper start - optimize creating BlockData to not need a map lookup
      static {
          // Initialize cached data for all BlockState instances after registration
--        Block.BLOCK_STATE_REGISTRY.forEach(BlockState::asBlockData);
+-        Block.BLOCK_STATE_REGISTRY.iterator().forEachRemaining(net.minecraft.world.level.block.state.BlockState::createCraftBlockData);
 +        if (org.apismc.apis.hooks.ApisHooks.isEagerCraftBlockDataCacheEnabled()) { // Apis
-+            Block.BLOCK_STATE_REGISTRY.forEach(BlockState::asBlockData);
++            Block.BLOCK_STATE_REGISTRY.iterator().forEachRemaining(net.minecraft.world.level.block.state.BlockState::createCraftBlockData);
 +        } // Apis
      }
- 
-     public static CraftBlockData createData(BlockState state) {
+     public static CraftBlockData fromData(net.minecraft.world.level.block.state.BlockState data) {
+         return data.createCraftBlockData();

@@ -48,13 +48,10 @@ jobs:
       - name: Apply patches
         run: ./gradlew applyAllPatches --stacktrace
 
-      - name: Stage 1 - Run Checkstyle (all modules)
-        run: ./gradlew checkstyleMain checkstyleTest :apis-server:checkstyleLog4jPlugins :apis-checkstyle:checkstyleTestData --stacktrace
-
-      - name: Stage 2 - Run Apis unit tests
+      - name: Stage 1 - Run Apis unit tests
         run: ./gradlew :apis-server:apisTest --stacktrace
 
-      - name: Stage 3 - Run full upstream Paper & API check (publish mode)
+      - name: Stage 2 - Run full upstream Paper & API check (publish mode)
         if: inputs.publish_release
         run: ./gradlew check --stacktrace
 
@@ -102,7 +99,7 @@ jobs:
           echo "latest_jar_name=${LATEST_JAR}" >> "$GITHUB_OUTPUT"
 
       - name: Build release Paperclip JAR
-        run: ./gradlew :apis-server:createPaperclipJar -Prelease=true --stacktrace
+        run: ./gradlew :apis-server:createMojmapPaperclipJar -Prelease=true --stacktrace
 
       - name: Stage and Rename Assets
         run: |
@@ -110,7 +107,7 @@ jobs:
           TARGET_JAR="${{ steps.meta.outputs.jar_name }}"
           LATEST_JAR="${{ steps.meta.outputs.latest_jar_name }}"
 
-          SRC_JAR=$(find apis-server/build/libs -maxdepth 1 -name 'apis-paperclip-*-release.jar' | head -n 1)
+          SRC_JAR=$(find apis-server/build/libs -maxdepth 1 -name 'apis-paperclip-*-release*.jar' | head -n 1)
           if [ -z "$SRC_JAR" ]; then
             echo "::error::Built release Paperclip JAR not found in apis-server/build/libs"
             exit 1

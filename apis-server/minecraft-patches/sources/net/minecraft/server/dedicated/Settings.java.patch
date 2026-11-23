@@ -1,10 +1,10 @@
 --- a/net/minecraft/server/dedicated/Settings.java
 +++ b/net/minecraft/server/dedicated/Settings.java
-@@ -118,6 +_,7 @@
+@@ -126,6 +_,7 @@
              };
-             java.io.BufferedWriter os = new java.io.BufferedWriter(new java.io.OutputStreamWriter(bufferedOutputStream, java.nio.charset.StandardCharsets.UTF_8.newEncoder()));
+             java.io.BufferedWriter bufferedWriter = new java.io.BufferedWriter(new java.io.OutputStreamWriter(bufferedOutputStream, java.nio.charset.StandardCharsets.UTF_8.newEncoder()));
              // Paper end - allow skipping server.properties comments
 +            org.apismc.apis.config.ApisConfigSync.stripLegacyProperties(this.properties); // Apis
-             this.properties.store(os, "Minecraft server properties");
-         } catch (IOException e) {
-             LOGGER.error("Failed to store properties to file: {}", output);
+             this.properties.store(bufferedWriter, "Minecraft server properties");
+         } catch (IOException var7) {
+             LOGGER.error("Failed to store properties to file: {}", filePath);

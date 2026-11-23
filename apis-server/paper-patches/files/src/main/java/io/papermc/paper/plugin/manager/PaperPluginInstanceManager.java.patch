@@ -1,6 +1,6 @@
 --- a/src/main/java/io/papermc/paper/plugin/manager/PaperPluginInstanceManager.java
 +++ b/src/main/java/io/papermc/paper/plugin/manager/PaperPluginInstanceManager.java
-@@ -200,7 +_,9 @@
+@@ -206,7 +_,9 @@
              try {
                  jPlugin.setEnabled(true);
              } catch (Throwable ex) {
@@ -11,7 +11,7 @@
                  // Paper start - Disable plugins that fail to load
                  this.server.getPluginManager().disablePlugin(jPlugin);
                  return;
-@@ -211,8 +_,12 @@
+@@ -217,8 +_,12 @@
              // an abort is not possible the way it's currently written
              this.server.getPluginManager().callEvent(new PluginEnableEvent(plugin));
          } catch (Throwable ex) {

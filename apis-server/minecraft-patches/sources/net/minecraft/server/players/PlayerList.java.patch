@@ -1,6 +1,6 @@
 --- a/net/minecraft/server/players/PlayerList.java
 +++ b/net/minecraft/server/players/PlayerList.java
-@@ -105,10 +_,10 @@
+@@ -104,10 +_,10 @@
  import org.slf4j.Logger;
  
  public abstract class PlayerList {
@@ -15,17 +15,17 @@
      public static final Component CHAT_FILTERED_FULL = Component.translatable("chat.filtered_full");
      public static final Component DUPLICATE_LOGIN_DISCONNECT_MESSAGE = Component.translatable("multiplayer.disconnect.duplicate_login");
      private static final Logger LOGGER = LogUtils.getLogger();
-@@ -198,13 +_,19 @@
-         playerConnection.send(new ClientboundChangeDifficultyPacket(levelData.getDifficulty(), levelData.isDifficultyLocked()));
-         playerConnection.send(new ClientboundPlayerAbilitiesPacket(player.getAbilities()));
-         playerConnection.send(new ClientboundSetHeldSlotPacket(player.getInventory().getSelectedSlot()));
+@@ -194,13 +_,19 @@
+         serverGamePacketListenerImpl.send(new ClientboundChangeDifficultyPacket(levelData.getDifficulty(), levelData.isDifficultyLocked()));
+         serverGamePacketListenerImpl.send(new ClientboundPlayerAbilitiesPacket(player.getAbilities()));
+         serverGamePacketListenerImpl.send(new ClientboundSetHeldSlotPacket(player.getInventory().getSelectedSlot()));
 -        RecipeManager recipeManager = this.server.getRecipeManager();
--        playerConnection.send(
+-        serverGamePacketListenerImpl.send(
 -            new ClientboundUpdateRecipesPacket(recipeManager.getSynchronizedItemProperties(), recipeManager.getSynchronizedStonecutterRecipes())
 -        );
 +        if (!org.apismc.apis.hooks.ApisHooks.isRecipesDisabled()) { // Apis - Skip recipe sync when gameplay.recipes=false
 +            RecipeManager recipeManager = this.server.getRecipeManager();
-+            playerConnection.send(
++            serverGamePacketListenerImpl.send(
 +                new ClientboundUpdateRecipesPacket(recipeManager.getSynchronizedItemProperties(), recipeManager.getSynchronizedStonecutterRecipes())
 +            );
 +        } // Apis
@@ -38,18 +38,18 @@
 +        if (!org.apismc.apis.hooks.ApisHooks.isRecipesDisabled()) { // Apis - Skip initial recipe book sync when gameplay.recipes=false
 +            player.getRecipeBook().sendInitialRecipeBook(player);
 +        } // Apis
-         this.updateEntireScoreboard(level.getScoreboard(), player);
+         this.updateEntireScoreboard(serverLevel.getScoreboard(), player);
          this.server.invalidateStatus();
-         MutableComponent component;
-@@ -697,6 +_,7 @@
+         MutableComponent mutableComponent;
+@@ -689,6 +_,7 @@
  
          // It's possible for respawn to be in a diff dimension
          if (fromLevel != level) {
-+            org.apismc.apis.hooks.ApisHooks.applyStandaloneWorldGameMode(player); // Apis
-             new org.bukkit.event.player.PlayerChangedWorldEvent(player.getBukkitEntity(), fromLevel.getWorld()).callEvent();
-             player.triggerDimensionChangeTriggers(level);
++            org.apismc.apis.hooks.ApisHooks.applyStandaloneWorldGameMode(serverPlayer); // Apis
+             new org.bukkit.event.player.PlayerChangedWorldEvent(serverPlayer.getBukkitEntity(), fromLevel.getWorld()).callEvent();
+             serverPlayer.triggerDimensionChangeTriggers(level);
          }
-@@ -742,6 +_,7 @@
+@@ -734,6 +_,7 @@
      }
  
      public void tick() {
@@ -57,12 +57,12 @@
          if (++this.sendAllPlayerInfoIn > 600) {
              // CraftBukkit start
              for (int i = 0; i < this.players.size(); ++i) {
-@@ -1189,7 +_,7 @@
-         }
- 
-         String playerNameStatsFile = gameProfile.name() + ".json";
--        if (FileUtil.isValidPathSegment(playerNameStatsFile)) {
-+        if (!org.apismc.apis.hooks.ApisHooks.isPlayerDataSavingDisabled() && FileUtil.isValidPathSegment(playerNameStatsFile)) { // Apis
-             Path playerNameStatsPath = statFolder.resolve(playerNameStatsFile);
-             if (Files.isRegularFile(playerNameStatsPath)) {
-                 try {
+@@ -1179,7 +_,7 @@
+             return path;
+         } else {
+             String string = profile.name() + ".json";
+-            if (FileUtil.isValidPathSegment(string)) {
++            if (!org.apismc.apis.hooks.ApisHooks.isPlayerDataSavingDisabled() && FileUtil.isValidPathSegment(string)) { // Apis
+                 Path path1 = worldPath.resolve(string);
+                 if (Files.isRegularFile(path1)) {
+                     try {

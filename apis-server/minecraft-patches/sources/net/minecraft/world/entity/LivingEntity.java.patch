@@ -1,25 +1,25 @@
 --- a/net/minecraft/world/entity/LivingEntity.java
 +++ b/net/minecraft/world/entity/LivingEntity.java
-@@ -922,7 +_,9 @@
+@@ -906,7 +_,9 @@
              }
              } // Paper - The sleeping pos will always also set the actual pos, so a desync suggests something is wrong
          }, this::clearSleepingPos);
--        input.read("Brain", Brain.Packed.CODEC).ifPresent(packedBrain -> this.brain = this.makeBrain(packedBrain));
+-        input.read("Brain", Codec.PASSTHROUGH).ifPresent(dynamic -> this.brain = this.makeBrain((Dynamic<?>)dynamic));
 +        if (!org.apismc.apis.hooks.ApisHooks.isBrainDisabled()) { // Apis
-+            input.read("Brain", Brain.Packed.CODEC).ifPresent(packedBrain -> this.brain = this.makeBrain(packedBrain));
++            input.read("Brain", Codec.PASSTHROUGH).ifPresent(dynamic -> this.brain = this.makeBrain((Dynamic<?>)dynamic));
 +        }
          this.lastHurtByPlayer = EntityReference.read(input, "last_hurt_by_player");
          this.lastHurtByPlayerMemoryTime = input.getIntOr("last_hurt_by_player_memory_time", 0);
          this.lastHurtByMob = EntityReference.read(input, "last_hurt_by_mob");
-@@ -3671,7 +_,18 @@
-     }
- 
-     private void updatePlayersWithNewEquipment(final ServerLevel level, final List<Pair<EquipmentSlot, ItemStack>> itemsToSend) {
--        level.getChunkSource().sendToTrackingPlayers(this, new ClientboundSetEquipmentPacket(this.getId(), itemsToSend, true)); // Paper - data sanitization
-+        final ClientboundSetEquipmentPacket packet = new ClientboundSetEquipmentPacket(this.getId(), itemsToSend, true); // Paper - data sanitization
+@@ -3590,7 +_,18 @@
+             list.add(Pair.of(equipmentSlot, itemStack1));
+             this.lastEquipmentItems.put(equipmentSlot, itemStack1);
+         });
+-        ((ServerLevel)this.level()).getChunkSource().sendToTrackingPlayers(this, new ClientboundSetEquipmentPacket(this.getId(), list, true)); // Paper - data sanitization
++        final ClientboundSetEquipmentPacket packet = new ClientboundSetEquipmentPacket(this.getId(), list, true); // Paper - data sanitization
 +        if (org.apismc.apis.hooks.ApisHooks.isFastPacketFilteringEnabled()) { // Apis
 +            final org.bukkit.entity.Entity bukkitSelf = this.getBukkitEntity();
-+            level.getChunkSource().sendToTrackingPlayersFiltered(
++            ((ServerLevel)this.level()).getChunkSource().chunkMap.sendToTrackingPlayersFiltered(
 +                this,
 +                packet,
 +                viewer -> !org.apismc.apis.hooks.ApisHooks.shouldFilterEquipmentPacket(this, viewer)
@@ -27,11 +27,11 @@
 +            );
 +            return;
 +        }
-+        level.getChunkSource().sendToTrackingPlayers(this, packet);
++        ((ServerLevel)this.level()).getChunkSource().sendToTrackingPlayers(this, packet);
      }
  
-     protected void tickHeadTurn(final float yBodyRotT) {
-@@ -3893,6 +_,7 @@
+     protected void tickHeadTurn(float yBodyRot) {
+@@ -3817,6 +_,7 @@
      }
  
      protected void pushEntities() {

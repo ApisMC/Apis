@@ -1,20 +1,20 @@
 --- a/net/minecraft/world/level/chunk/ChunkGenerator.java
 +++ b/net/minecraft/world/level/chunk/ChunkGenerator.java
-@@ -599,7 +_,7 @@
-     public void applyBiomeDecoration(
-         final WorldGenLevel level, final ChunkAccess chunk, final StructureManager structureManager, final boolean addVanillaDecorations
-     ) {
+@@ -443,7 +_,7 @@
+     }
+ 
+     public void applyBiomeDecoration(WorldGenLevel level, ChunkAccess chunk, StructureManager structureManager, boolean addVanillaDecorations) {
 -        if (addVanillaDecorations) {
 +        if (addVanillaDecorations && !org.apismc.apis.hooks.ApisHooks.isBiomeDecorationDisabled()) { // Apis
              this.addVanillaDecorations(level, chunk, structureManager);
          }
  
-@@ -677,7 +_,7 @@
-         final StructureTemplateManager structureTemplateManager,
-         final ResourceKey<Level> level
+@@ -521,7 +_,7 @@
+         StructureTemplateManager structureTemplateManager,
+         ResourceKey<Level> level
      ) {
 -        if (!SharedConstants.DEBUG_DISABLE_STRUCTURES) {
 +        if (!SharedConstants.DEBUG_DISABLE_STRUCTURES && !org.apismc.apis.hooks.ApisHooks.isStructuresDisabled()) { // Apis
-             ChunkPos sourceChunkPos = centerChunk.getPos();
-             RandomState randomState = state.randomState();
-             Climate.Sampler climateSampler = randomState.createClimateSampler(SamplerContext.builder().enableCaches().build());
+             ChunkPos pos = chunk.getPos();
+             SectionPos sectionPos = SectionPos.bottomOf(chunk);
+             RandomState randomState = structureState.randomState();

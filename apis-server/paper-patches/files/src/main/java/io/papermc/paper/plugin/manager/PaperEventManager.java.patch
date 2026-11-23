@@ -1,10 +1,16 @@
 --- a/src/main/java/io/papermc/paper/plugin/manager/PaperEventManager.java
 +++ b/src/main/java/io/papermc/paper/plugin/manager/PaperEventManager.java
-@@ -2,11 +_,12 @@
- 
+@@ -3,7 +_,6 @@
+ import co.aikar.timings.TimedEventExecutor;
  import com.destroystokyo.paper.event.server.ServerExceptionEvent;
  import com.destroystokyo.paper.exception.ServerEventException;
 -import com.google.common.collect.Sets;
+ import org.bukkit.Server;
+ import org.bukkit.Warning;
+ import org.bukkit.event.Event;
+@@ -19,9 +_,11 @@
+ import org.jetbrains.annotations.NotNull;
+ 
  import java.lang.reflect.Method;
 +import java.util.ArrayList;
  import java.util.Arrays;
@@ -14,7 +20,7 @@
  import java.util.Map;
  import java.util.Set;
  import java.util.logging.Level;
-@@ -107,20 +_,29 @@
+@@ -110,20 +_,29 @@
          }
      }
  
@@ -56,7 +62,7 @@
      }
  
      // JavaPluginLoader
-@@ -128,13 +_,20 @@
+@@ -131,13 +_,20 @@
      public Map<Class<? extends Event>, Set<RegisteredListener>> createRegisteredListeners(@NotNull Listener listener, @NotNull final Plugin plugin) {
          Map<Class<? extends Event>, Set<RegisteredListener>> ret = new HashMap<>();
  

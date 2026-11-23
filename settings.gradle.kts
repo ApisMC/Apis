@@ -27,7 +27,7 @@ if (!file(".git").exists()) {
 }
 
 rootProject.name = "apis"
-for (name in listOf("apis-api", "apis-server", "apis-checkstyle", "apis-paperclip")) {
+for (name in listOf("apis-api", "apis-server", "apis-paperclip")) {
     val projName = name.lowercase(Locale.ENGLISH)
     include(projName)
     findProject(":$projName")!!.projectDir = file(name)

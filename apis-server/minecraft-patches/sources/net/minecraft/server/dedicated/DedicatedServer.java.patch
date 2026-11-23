@@ -1,6 +1,6 @@
 --- a/net/minecraft/server/dedicated/DedicatedServer.java
 +++ b/net/minecraft/server/dedicated/DedicatedServer.java
-@@ -231,14 +_,15 @@
+@@ -253,15 +_,16 @@
  
          // Spigot start
          this.setPlayerList(new DedicatedPlayerList(this, this.registries(), this.playerDataStorage));
@@ -8,6 +8,7 @@
 +        org.spigotmc.SpigotConfig.init(org.apismc.apis.hooks.ApisHooks.resolveCliConfigFile(this.options, "spigot-settings", "spigot.yml")); // Apis
          org.spigotmc.SpigotConfig.registerCommands();
          // Spigot end
+         io.papermc.paper.util.ObfHelper.INSTANCE.getClass(); // Paper - load mappings for stacktrace deobf and etc.
          // Paper start - initialize global and world-defaults configuration
          this.paperConfigurations.initializeGlobalConfiguration(this.registryAccess());
          this.paperConfigurations.initializeWorldDefaultsConfiguration(this.registryAccess());
@@ -18,9 +19,9 @@
          // Paper start - fix converting txt to json file; convert old users earlier after PlayerList creation but before file load/save
          if (this.convertOldUsers()) {
              this.services().nameToIdCache().save(false); // Paper
-@@ -248,8 +_,9 @@
+@@ -271,8 +_,9 @@
          org.spigotmc.WatchdogThread.doStart(org.spigotmc.SpigotConfig.timeoutTime, org.spigotmc.SpigotConfig.restartOnCrash); // Paper - start watchdog thread
-         consoleThread.start(); // Paper - Enhance console tab completions for brigadier commands; start console thread after MinecraftServer.console & PaperConfig are initialized
+         thread.start(); // Paper - Enhance console tab completions for brigadier commands; start console thread after MinecraftServer.console & PaperConfig are initialized
          io.papermc.paper.command.PaperCommands.registerCommands(this); // Paper - setup /paper command
 -        this.server.spark.registerCommandBeforePlugins(this.server); // Paper - spark
 -        com.destroystokyo.paper.Metrics.PaperMetrics.startMetrics(); // Paper - start metrics
@@ -30,7 +31,7 @@
          com.destroystokyo.paper.VersionHistoryManager.INSTANCE.getClass(); // Paper - load version history now
  
          // this.worldData.setGameType(properties.gameMode.get()); // CraftBukkit - moved to world loading
-@@ -280,7 +_,7 @@
+@@ -303,7 +_,7 @@
          }
          // Paper end - Unix domain socket support
  
@@ -39,7 +40,7 @@
          LOGGER.info("Starting Minecraft server on {}:{}", this.getLocalIp().isEmpty() ? "*" : this.getLocalIp(), this.getPort());
  
          try {
-@@ -298,25 +_,14 @@
+@@ -321,25 +_,14 @@
          this.server.enablePlugins(org.bukkit.plugin.PluginLoadOrder.STARTUP);
          // CraftBukkit end
  
@@ -70,12 +71,12 @@
          }
  
          // CraftBukkit start
-@@ -339,7 +_,7 @@
-         this.loadLevel(this.storageSource.getLevelId()); // CraftBukkit
-         long elapsed = Util.getNanos() - levelNanoTime;
-         String time = String.format(Locale.ROOT, "%.3fs", elapsed / 1.0E9);
--        LOGGER.info("Done preparing level \"{}\" ({})", this.getLevelIdName(), time); // Paper - Improve startup message, add total time
-+        org.apismc.apis.hooks.ApisLog.ok(LOGGER, "Done preparing level \"{}\" ({})", this.getLevelIdName(), time); // Paper - Improve startup message, add total time // Apis
-         this.initPostWorld(); // Paper - don't include plugins in world preparation time
-         if (properties.announcePlayerAchievements != null) {
-             this.getAllLevels().forEach(l -> l.getGameRules().set(GameRules.SHOW_ADVANCEMENT_MESSAGES, properties.announcePlayerAchievements, this.overworld())); // Paper - per-world game rules
+@@ -361,7 +_,7 @@
+             this.loadLevel(this.storageSource.getLevelId()); // CraftBukkit
+             long l = Util.getNanos() - nanos;
+             String string3 = String.format(Locale.ROOT, "%.3fs", l / 1.0E9);
+-            LOGGER.info("Done preparing level \"{}\" ({})", this.getLevelIdName(), string3); // Paper - Improve startup message, add total time
++            org.apismc.apis.hooks.ApisLog.ok(LOGGER, "Done preparing level \"{}\" ({})", this.getLevelIdName(), string3); // Paper - Improve startup message, add total time // Apis
+             this.initPostWorld(); // Paper - don't include plugins in world preparation time
+             if (properties.announcePlayerAchievements != null) {
+                 this.worldData.getGameRules().set(GameRules.SHOW_ADVANCEMENT_MESSAGES, properties.announcePlayerAchievements, this.overworld()); // Paper - per-world game rules

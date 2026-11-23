@@ -1,15 +1,15 @@
 --- a/net/minecraft/server/Services.java
 +++ b/net/minecraft/server/Services.java
-@@ -44,9 +_,9 @@
-         GameProfileRepository profileRepository = serviceAccess.createProfileRepository();
-         UserNameToIdResolver profileCache = new CachedUserNameToIdResolver(profileRepository, userCacheFile); // Paper
+@@ -43,9 +_,9 @@
+         GameProfileRepository gameProfileRepository = authenticationService.createProfileRepository();
+         UserNameToIdResolver userNameToIdResolver = new CachedUserNameToIdResolver(gameProfileRepository, userCacheFile); // Paper
          // Paper start - load paper config files from cli options
--        final java.nio.file.Path legacyConfigPath = ((File) options.valueOf("paper-settings")).toPath();
--        final java.nio.file.Path configDirPath = ((File) options.valueOf("paper-settings-directory")).toPath();
--        io.papermc.paper.configuration.PaperConfigurations paperConfigurations = io.papermc.paper.configuration.PaperConfigurations.setup(legacyConfigPath, configDirPath, nameCacheDir.toPath(), (File) options.valueOf("spigot-settings"));
-+        final java.nio.file.Path legacyConfigPath = org.apismc.apis.hooks.ApisHooks.resolveCliConfigFile(options, "paper-settings", "paper.yml").toPath(); // Apis
-+        final java.nio.file.Path configDirPath = org.apismc.apis.hooks.ApisHooks.resolvePaperDir(options); // Apis
-+        io.papermc.paper.configuration.PaperConfigurations paperConfigurations = io.papermc.paper.configuration.PaperConfigurations.setup(legacyConfigPath, configDirPath, nameCacheDir.toPath(), org.apismc.apis.hooks.ApisHooks.resolveCliConfigFile(options, "spigot-settings", "spigot.yml")); // Apis
+-        final java.nio.file.Path legacyConfigPath = ((File) optionSet.valueOf("paper-settings")).toPath();
+-        final java.nio.file.Path configDirPath = ((File) optionSet.valueOf("paper-settings-directory")).toPath();
+-        io.papermc.paper.configuration.PaperConfigurations paperConfigurations = io.papermc.paper.configuration.PaperConfigurations.setup(legacyConfigPath, configDirPath, profileRepository.toPath(), (File) optionSet.valueOf("spigot-settings"));
++        final java.nio.file.Path legacyConfigPath = org.apismc.apis.hooks.ApisHooks.resolveCliConfigFile(optionSet, "paper-settings", "paper.yml").toPath(); // Apis
++        final java.nio.file.Path configDirPath = org.apismc.apis.hooks.ApisHooks.resolvePaperDir(optionSet); // Apis
++        io.papermc.paper.configuration.PaperConfigurations paperConfigurations = io.papermc.paper.configuration.PaperConfigurations.setup(legacyConfigPath, configDirPath, profileRepository.toPath(), org.apismc.apis.hooks.ApisHooks.resolveCliConfigFile(optionSet, "spigot-settings", "spigot.yml")); // Apis
          PaperServices paperServices = new PaperServices(
              paperConfigurations,
              new io.papermc.paper.profile.PaperFilledProfileCache()

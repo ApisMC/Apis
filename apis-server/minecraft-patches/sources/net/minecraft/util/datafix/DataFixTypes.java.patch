@@ -1,11 +1,10 @@
 --- a/net/minecraft/util/datafix/DataFixTypes.java
 +++ b/net/minecraft/util/datafix/DataFixTypes.java
-@@ -77,7 +_,7 @@
+@@ -68,6 +_,7 @@
      }
  
-     public <T> Dynamic<T> update(final DataFixer fixerUpper, final Dynamic<T> input, final int fromVersion, final int toVersion) {
--        if (this.type == null) return input; // Paper - add no-op fix for custom types until we actually need fixers for them
-+        if (this.type == null || !org.apismc.apis.hooks.ApisHooks.isDataFixersEnabled()) return input; // Paper - add no-op fix for custom types until we actually need fixers for them // Apis
-         return fixerUpper.update(this.type, input, fromVersion, toVersion);
+     public <T> Dynamic<T> update(DataFixer fixer, Dynamic<T> input, int version, int newVersion) {
++        if (!org.apismc.apis.hooks.ApisHooks.isDataFixersEnabled()) return input; // Apis
+         return fixer.update(this.type, input, version, newVersion);
      }
  

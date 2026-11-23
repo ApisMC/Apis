@@ -21,54 +21,54 @@
 +    private volatile boolean noopClosed;
      private static final ByteBuffer DUMMY;
  
-     public static DirectoryLock create(final Path dir) throws IOException {
-         Path lockPath = dir.resolve("session.lock");
+     public static DirectoryLock create(Path path) throws IOException {
+         Path path1 = path.resolve("session.lock");
 +        if (org.apismc.apis.hooks.ApisHooks.isMemoryOnlyWorld()) {
-+            org.apismc.apis.hooks.ApisHooks.cleanupStaleSessionLockSilently(lockPath);
++            org.apismc.apis.hooks.ApisHooks.cleanupStaleSessionLockSilently(path1);
 +            return new DirectoryLock(null, null);
 +        }
 +        try {
-+            return createOsLock(dir, lockPath);
++            return createOsLock(path, path1);
 +        } catch (IOException | OverlappingFileLockException ex) {
 +            if ((ex instanceof LockException
 +                || ex instanceof AccessDeniedException
 +                || ex instanceof OverlappingFileLockException)
-+                && org.apismc.apis.hooks.ApisHooks.tryBreakStaleSessionLock(dir, lockPath)) {
-+                return createOsLock(dir, lockPath);
++                && org.apismc.apis.hooks.ApisHooks.tryBreakStaleSessionLock(path, path1)) {
++                return createOsLock(path, path1);
 +            }
 +            if (ex instanceof IOException ioEx) {
 +                throw ioEx;
 +            }
-+            throw DirectoryLock.LockException.alreadyLocked(lockPath);
++            throw DirectoryLock.LockException.alreadyLocked(path1);
 +        }
 +    }
 +
-+    private static DirectoryLock createOsLock(final Path dir, final Path lockPath) throws IOException {
-         FileUtil.createDirectoriesSafe(dir);
-         FileChannel lockFile = FileChannel.open(lockPath, StandardOpenOption.CREATE, StandardOpenOption.WRITE);
++    private static DirectoryLock createOsLock(Path path, Path path1) throws IOException {
+         FileUtil.createDirectoriesSafe(path);
+         FileChannel fileChannel = FileChannel.open(path1, StandardOpenOption.CREATE, StandardOpenOption.WRITE);
  
          try {
--            lockFile.write(DUMMY.duplicate());
--            lockFile.force(true);
-             FileLock lock = lockFile.tryLock();
-             if (lock == null) {
-                 throw DirectoryLock.LockException.alreadyLocked(lockPath);
+-            fileChannel.write(DUMMY.duplicate());
+-            fileChannel.force(true);
+             FileLock fileLock = fileChannel.tryLock();
+             if (fileLock == null) {
+                 throw DirectoryLock.LockException.alreadyLocked(path1);
              } else {
-+                lockFile.truncate(0L);
-+                lockFile.write(org.apismc.apis.hooks.ApisHooks.sessionLockPayload(DUMMY));
-+                lockFile.force(true);
-                 return new DirectoryLock(lockFile, lock);
++                fileChannel.truncate(0L);
++                fileChannel.write(org.apismc.apis.hooks.ApisHooks.sessionLockPayload(DUMMY));
++                fileChannel.force(true);
+                 return new DirectoryLock(fileChannel, fileLock);
              }
--        } catch (IOException e) {
-+        } catch (IOException | RuntimeException e) {
+-        } catch (IOException var6) {
++        } catch (IOException | RuntimeException var6) {
              try {
-                 lockFile.close();
-             } catch (IOException nested) {
+                 fileChannel.close();
+             } catch (IOException var5) {
 @@ -41,13 +_,17 @@
          }
      }
  
--    private DirectoryLock(final FileChannel lockFile, final FileLock lock) {
+-    private DirectoryLock(FileChannel lockFile, FileLock lock) {
 +    private DirectoryLock(final @Nullable FileChannel lockFile, final @Nullable FileLock lock) {
          this.lockFile = lockFile;
          this.lock = lock;
@@ -83,7 +83,7 @@
          try {
              if (this.lock.isValid()) {
                  this.lock.release();
-@@ -60,19 +_,25 @@
+@@ -60,10 +_,13 @@
      }
  
      public boolean isValid() {
@@ -91,24 +91,29 @@
 +        return this.lock != null ? this.lock.isValid() : !this.noopClosed;
      }
  
-     public static boolean isLocked(final Path dir) throws IOException {
+     public static boolean isLocked(Path path) throws IOException {
 +        if (org.apismc.apis.hooks.ApisHooks.isMemoryOnlyWorld()) {
 +            return false;
 +        }
-         Path lockPath = dir.resolve("session.lock");
+         Path path1 = path.resolve("session.lock");
  
-         try (
-             FileChannel lockFile = FileChannel.open(lockPath, StandardOpenOption.WRITE);
-             FileLock maybeLock = lockFile.tryLock();
-         ) {
--            return maybeLock == null;
-+            if (maybeLock != null) {
-+                return false;
-+            }
-+            return org.apismc.apis.hooks.ApisHooks.isSessionLockOwnerAlive(lockPath);
-         } catch (AccessDeniedException e) {
+         try {
+@@ -72,12 +_,16 @@
+                 FileChannel fileChannel = FileChannel.open(path1, StandardOpenOption.WRITE);
+                 FileLock fileLock = fileChannel.tryLock();
+             ) {
+-                var4 = fileLock == null;
++                if (fileLock != null) {
++                    var4 = false;
++                } else {
++                    var4 = org.apismc.apis.hooks.ApisHooks.isSessionLockOwnerAlive(path1);
++                }
+             }
+ 
+             return var4;
+         } catch (AccessDeniedException var10) {
 -            return true;
-+            return org.apismc.apis.hooks.ApisHooks.isSessionLockOwnerAlive(lockPath);
-         } catch (NoSuchFileException e) {
++            return org.apismc.apis.hooks.ApisHooks.isSessionLockOwnerAlive(path1);
+         } catch (NoSuchFileException var11) {
              return false;
          }

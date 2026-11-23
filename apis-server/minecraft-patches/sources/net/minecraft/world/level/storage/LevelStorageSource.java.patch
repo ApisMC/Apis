@@ -1,31 +1,31 @@
 --- a/net/minecraft/world/level/storage/LevelStorageSource.java
 +++ b/net/minecraft/world/level/storage/LevelStorageSource.java
-@@ -545,7 +_,11 @@
+@@ -468,7 +_,11 @@
          }
  
-         public Path getDimensionPath(final ResourceKey<Level> name) {
--            return DimensionType.getStorageFolder(name, this.levelDirectory.path());
+         public Path getDimensionPath(ResourceKey<Level> dimensionPath) {
+-            return LevelStorageSource.getStorageFolder(this.levelDirectory.path(), this.dimensionType); // CraftBukkit
 +            return org.apismc.apis.hooks.ApisHooks.resolveDimensionPath(
-+                name,
++                dimensionPath,
 +                this.levelDirectory.path(),
-+                DimensionType.getStorageFolder(name, this.levelDirectory.path())
-+            ); // Apis
++                LevelStorageSource.getStorageFolder(this.levelDirectory.path(), this.dimensionType)
++            ); // CraftBukkit // Apis
          }
  
          private void checkLock() {
-@@ -609,6 +_,7 @@
+@@ -507,6 +_,7 @@
          }
  
-         public void saveDataTag(final WorldData levelData, final @Nullable UUID singleplayerUUID) {
+         public void saveDataTag(RegistryAccess registries, WorldData serverConfiguration, @Nullable CompoundTag singlePlayerTag) {
 +            if (org.apismc.apis.hooks.ApisHooks.isMemoryOnlyWorld()) return; // Apis - Ephemeral memory-only world
-             CompoundTag dataTag = levelData.createTag(singleplayerUUID);
-             CompoundTag root = new CompoundTag();
-             root.put("Data", dataTag);
-@@ -616,6 +_,7 @@
+             CompoundTag compoundTag = serverConfiguration.createTag(registries, singlePlayerTag);
+             CompoundTag compoundTag1 = new CompoundTag();
+             compoundTag1.put("Data", compoundTag);
+@@ -514,6 +_,7 @@
          }
  
-         public void saveLevelData(final Dynamic<?> tag) {
+         private void saveLevelData(CompoundTag tag) {
 +            if (org.apismc.apis.hooks.ApisHooks.isMemoryOnlyWorld()) return; // Apis - Ephemeral memory-only world
-             Tag genericTag = tag.convert(NbtOps.INSTANCE).getValue();
-             CompoundTag root = new CompoundTag();
-             root.put("Data", genericTag);
+             Path path = this.levelDirectory.path();
+ 
+             try {

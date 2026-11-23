@@ -1,6 +1,6 @@
---- a/net/minecraft/world/level/storage/SavedDataStorage.java
-+++ b/net/minecraft/world/level/storage/SavedDataStorage.java
-@@ -215,6 +_,7 @@
+--- a/net/minecraft/world/level/storage/DimensionDataStorage.java
++++ b/net/minecraft/world/level/storage/DimensionDataStorage.java
+@@ -205,6 +_,7 @@
      }
  
      public void saveAndJoin() {

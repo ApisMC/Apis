@@ -146,7 +146,7 @@
 +    private static @Nullable URL @Nullable [] safeGetUrls(final URLClassLoader ucl) {
 +        try {
 +            return ucl.getURLs();
-+        } catch (final RuntimeException _) {
++        } catch (final RuntimeException ignored) {
 +            return null;
 +        }
 +    }
@@ -158,7 +158,7 @@
 +        final File file;
 +        try {
 +            file = new File(url.toURI());
-+        } catch (final URISyntaxException | IllegalArgumentException _) {
++        } catch (final URISyntaxException | IllegalArgumentException ignored) {
 +            return false;
 +        }
 +        if (!file.isFile()) {
@@ -166,7 +166,7 @@
 +        }
 +        try (JarFile jar = new JarFile(file, true, ZipFile.OPEN_READ, JarFile.runtimeVersion())) {
 +            return indexJarInto(jar, target);
-+        } catch (final IOException | IllegalStateException | SecurityException | ZipError _) {
++        } catch (final IOException | IllegalStateException | SecurityException | ZipError ignored) {
 +            return false;
 +        }
 +    }
@@ -185,7 +185,7 @@
 +                }
 +            }
 +            return true;
-+        } catch (final IllegalStateException | SecurityException | ZipError _) {
++        } catch (final IllegalStateException | SecurityException | ZipError ignored) {
 +            return false;
 +        }
 +    }

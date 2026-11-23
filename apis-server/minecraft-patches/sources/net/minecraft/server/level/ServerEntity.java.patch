@@ -1,11 +1,11 @@
 --- a/net/minecraft/server/level/ServerEntity.java
 +++ b/net/minecraft/server/level/ServerEntity.java
-@@ -380,7 +_,7 @@
+@@ -339,7 +_,7 @@
              }
          }
  
--        if (this.entity instanceof LivingEntity livingEntity) {
-+        if (this.entity instanceof LivingEntity livingEntity && !org.apismc.apis.hooks.ApisHooks.shouldFilterEquipmentPacket(this.entity, player)) { // Apis - Fast packet filtering
-             List<Pair<EquipmentSlot, ItemStack>> slots = Lists.newArrayList();
+-        if (this.entity instanceof LivingEntity livingEntityx) {
++        if (this.entity instanceof LivingEntity livingEntityx && !org.apismc.apis.hooks.ApisHooks.shouldFilterEquipmentPacket(this.entity, player)) { // Apis - Fast packet filtering
+             List<Pair<EquipmentSlot, ItemStack>> list = Lists.newArrayList();
  
-             for (EquipmentSlot slot : EquipmentSlot.VALUES) {
+             for (EquipmentSlot equipmentSlot : EquipmentSlot.VALUES) {

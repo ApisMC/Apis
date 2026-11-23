@@ -3,8 +3,8 @@
 @@ -129,6 +_,7 @@
      }
  
-     public static void pushItemsTick(final Level level, final BlockPos pos, final BlockState state, final HopperBlockEntity entity) {
+     public static void pushItemsTick(Level level, BlockPos pos, BlockState state, HopperBlockEntity blockEntity) {
 +        if (org.apismc.apis.hooks.ApisHooks.isHopperTickingDisabled()) return; // Apis
-         entity.cooldownTime--;
-         entity.tickedGameTime = level.getGameTime();
-         if (!entity.isOnCooldown()) {
+         blockEntity.cooldownTime--;
+         blockEntity.tickedGameTime = level.getGameTime();
+         if (!blockEntity.isOnCooldown()) {

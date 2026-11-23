@@ -1,0 +1,18 @@
+--- a/net/minecraft/world/level/block/RedStoneWireBlock.java
++++ b/net/minecraft/world/level/block/RedStoneWireBlock.java
+@@ -345,6 +_,7 @@
+ 
+     @Override
+     protected void onPlace(BlockState state, Level level, BlockPos pos, BlockState oldState, boolean movedByPiston) {
++        if (org.apismc.apis.hooks.ApisHooks.isRedstoneDisabled()) return; // Apis
+         if (!oldState.is(state.getBlock()) && !level.isClientSide()) {
+             // Paper start - optimize redstone - replace call to updatePowerStrength
+             if (level.paperConfig().misc.redstoneImplementation == io.papermc.paper.configuration.WorldConfiguration.Misc.RedstoneImplementation.ALTERNATE_CURRENT) {
+@@ -397,6 +_,7 @@
+ 
+     @Override
+     protected void neighborChanged(BlockState state, Level level, BlockPos pos, Block neighborBlock, @Nullable Orientation orientation, boolean movedByPiston) {
++        if (org.apismc.apis.hooks.ApisHooks.isRedstoneDisabled()) return; // Apis
+         if (!level.isClientSide()) {
+             // Paper start - optimize redstone (Alternate Current)
+             // Alternate Current handles breaking of redstone wires in the WireHandler.

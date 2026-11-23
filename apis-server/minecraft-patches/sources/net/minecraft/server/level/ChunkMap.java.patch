@@ -1,35 +1,35 @@
 --- a/net/minecraft/server/level/ChunkMap.java
 +++ b/net/minecraft/server/level/ChunkMap.java
-@@ -391,6 +_,7 @@
+@@ -407,6 +_,7 @@
      }
  
-     protected void saveAllChunks(final boolean flushStorage) {
+     protected void saveAllChunks(boolean flush) {
 +        if (org.apismc.apis.hooks.ApisHooks.isMemoryOnlyWorld()) return; // Apis - Ephemeral memory-only world
          // Paper start - rewrite chunk system
          ((ca.spottedleaf.moonrise.patches.chunk_system.level.ChunkSystemServerLevel)this.level).moonrise$getChunkTaskScheduler().chunkHolderManager.saveAllChunks(
-             flushStorage, false, false, false
-@@ -400,10 +_,14 @@
+             flush, false, false, false
+@@ -416,10 +_,14 @@
  
-     protected void tick(final BooleanSupplier haveTime) {
-         ProfilerFiller profiler = Profiler.get();
--        profiler.push("poi");
--        this.poiManager.tick(haveTime);
--        profiler.popPush("chunk_unload");
+     protected void tick(BooleanSupplier hasMoreTime) {
+         ProfilerFiller profilerFiller = Profiler.get();
+-        profilerFiller.push("poi");
+-        this.poiManager.tick(hasMoreTime);
+-        profilerFiller.popPush("chunk_unload");
 -        if (!this.level.noSave()) {
 +        if (!org.apismc.apis.hooks.ApisHooks.isPoiTickingDisabled()) { // Apis
-+            profiler.push("poi");
-+            this.poiManager.tick(haveTime);
-+            profiler.popPush("chunk_unload");
++            profilerFiller.push("poi");
++            this.poiManager.tick(hasMoreTime);
++            profilerFiller.popPush("chunk_unload");
 +        } else {
-+            profiler.push("chunk_unload");
++            profilerFiller.push("chunk_unload");
 +        }
 +        if (!this.level.noSave() && !org.apismc.apis.hooks.ApisHooks.isMemoryOnlyWorld()) { // Apis
-             this.processUnloads(haveTime);
+             this.processUnloads(hasMoreTime);
          }
  
-@@ -416,7 +_,9 @@
+@@ -432,7 +_,9 @@
  
-     private void processUnloads(final BooleanSupplier haveTime) {
+     private void processUnloads(BooleanSupplier hasMoreTime) {
          ((ca.spottedleaf.moonrise.patches.chunk_system.level.ChunkSystemServerLevel)this.level).moonrise$getChunkTaskScheduler().chunkHolderManager.processUnloads(); // Paper - rewrite chunk system
 -        ((ca.spottedleaf.moonrise.patches.chunk_system.level.ChunkSystemServerLevel)this.level).moonrise$getChunkTaskScheduler().chunkHolderManager.autoSave(); // Paper - rewrite chunk system
 +        if (org.apismc.apis.hooks.ApisHooks.isPeriodicAutosaveEnabled()) { // Apis
@@ -37,8 +37,8 @@
 +        } // Apis
      }
  
-     private void saveChunksEagerly(final BooleanSupplier haveTime) {
-@@ -1465,7 +_,7 @@
+     private void saveChunksEagerly(BooleanSupplier hasMoreTime) {
+@@ -1412,7 +_,7 @@
              int range = this.range;
  
              if (entity.getPassengers() == ImmutableList.<Entity>of()) {
@@ -47,7 +47,7 @@
              }
  
              // note: we change to List
-@@ -1476,7 +_,7 @@
+@@ -1423,7 +_,7 @@
                  range = Math.max(range, ca.spottedleaf.moonrise.common.PlatformHooks.get().modifyEntityTrackingRange(passenger, passenger.getType().clientTrackingRange() << 4));
              }
  
