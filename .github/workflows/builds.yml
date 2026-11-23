@@ -23,52 +23,12 @@ env:
 
 jobs:
   #
-  # Tests & Verification
-  #
-  test:
-    name: "Tests & Verification"
-    runs-on: ubuntu-latest
-    timeout-minutes: 30
-
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v7
-        with:
-          fetch-depth: 0
-
-      - uses: ./.github/actions/setup-env
-
-      - name: Apply patches
-        run: ./gradlew applyAllPatches --stacktrace
-
-      - name: Run full check (publish mode)
-        if: inputs.publish_release
-        run: ./gradlew check --stacktrace
-
-      - name: Run quickCheck (build-only mode)
-        if: "!inputs.publish_release"
-        run: ./gradlew quickCheck --stacktrace
-
-      - name: Upload test reports
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: test-reports-${{ github.run_number }}
-          path: |
-            */build/test-results/**/TEST-*.xml
-            */build/reports/tests/
-            */build/reports/checkstyle/*.xml
-          if-no-files-found: ignore
-          retention-days: 14
-
-  #
-  # Build Paperclip
+  # Checkstyle, Tests & Build Paperclip (single warmed runner avoids re-applying patches)
   #
   build:
-    name: "Build Paperclip"
-    needs: test
+    name: "Test & Build Paperclip"
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 55
 
     outputs:
       mc_version: ${{ steps.meta.outputs.mc_version }}
@@ -84,6 +44,31 @@ jobs:
           fetch-depth: 0
 
       - uses: ./.github/actions/setup-env
+
+      - name: Apply patches
+        run: ./gradlew applyAllPatches --stacktrace
+
+      - name: Stage 1 - Run Checkstyle (all modules)
+        run: ./gradlew checkstyleMain checkstyleTest :apis-server:checkstyleLog4jPlugins :apis-checkstyle:checkstyleTestData --stacktrace
+
+      - name: Stage 2 - Run Apis unit tests
+        run: ./gradlew :apis-server:apisTest --stacktrace
+
+      - name: Stage 3 - Run full upstream Paper & API check (publish mode)
+        if: inputs.publish_release
+        run: ./gradlew check --stacktrace
+
+      - name: Upload test and Checkstyle reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-reports-${{ github.run_number }}
+          path: |
+            */build/test-results/**/TEST-*.xml
+            */build/reports/tests/
+            */build/reports/checkstyle/*.xml
+          if-no-files-found: ignore
+          retention-days: 14
 
       - name: Resolve Minecraft Version and Build Number
         id: meta
@@ -115,9 +100,6 @@ jobs:
           echo "build_num=${BUILD_NUM}" >> "$GITHUB_OUTPUT"
           echo "jar_name=${TARGET_JAR}" >> "$GITHUB_OUTPUT"
           echo "latest_jar_name=${LATEST_JAR}" >> "$GITHUB_OUTPUT"
-
-      - name: Apply patches
-        run: ./gradlew applyAllPatches --stacktrace
 
       - name: Build release Paperclip JAR
         run: ./gradlew :apis-server:createPaperclipJar -Prelease=true --stacktrace

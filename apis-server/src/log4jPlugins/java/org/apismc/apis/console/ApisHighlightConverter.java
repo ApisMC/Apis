@@ -55,7 +55,7 @@ public final class ApisHighlightConverter extends LogEventPatternConverter {
 
     @Override
     public void format(final LogEvent event, final StringBuilder toAppendTo) {
-        format(event, TerminalConsoleAppender.isAnsiSupported(), toAppendTo);
+        this.format(event, TerminalConsoleAppender.isAnsiSupported(), toAppendTo);
     }
 
     /**

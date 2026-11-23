@@ -74,7 +74,7 @@ Apis separates server configs, worlds, plugin JARs, and plugin data/configs:
 - **Configuration Cache (Fixed):** Enabled globally in `gradle.properties` (`org.gradle.configuration-cache=true`). `:apis-paperclip:jar` now uses injected `ArchiveOperations` (`PaperclipServices`) and local variable capture instead of `Project.zipTree(...)`, and `:apis-server:jar` avoids top-level script `this$0` captures. Commands such as `quickCheck`, `:apis-server:createBundlerJar`, `:apis-server:createPaperclipJar`, and `rebuildPaperSingleFilePatches` run cleanly **without** `--no-configuration-cache`.
 
 ### Why Builds Can Stay Fast
-1. **Use `./gradlew quickCheck` instead of `./gradlew check` during iteration:** Full `./gradlew check` executes Checkstyle across all modules, `scanJarForBadCalls`, and all ~10,779 upstream Paper/Bukkit + Apis tests (~2.5–3 minutes). Root task `quickCheck` runs only `org.apismc.apis.ApisTestSuite` (`:apis-server:apisTest`), `:apis-server:checkstyleMain`, and `:apis-server:checkstyleTest`.
+1. **Use `./gradlew quickCheck` instead of `./gradlew check` during iteration:** Full `./gradlew check` executes Checkstyle across all modules, `scanJarForBadCalls`, and all ~10,779 upstream Paper/Bukkit + Apis tests (~2.5–3 minutes). Root task `quickCheck` runs `org.apismc.apis.ApisTestSuite` (`:apis-server:apisTest`) plus Checkstyle across all modules (`apis-server` including `log4jPlugins`, `apis-api`, `apis-paperclip`, and `apis-checkstyle`).
 2. **Deterministic release `Build-Time`:** With `-Prelease=true` (when `BUILD_STARTED_AT` is unset), `:apis-server:jar` uses `git log -1 --format=%cI` instead of `Instant.now()`, so repeated release bundler builds hit `UP-TO-DATE` (~1s with configuration cache) rather than repackaging every time.
 3. **Don't flip `-Prelease=true` <-> dev mode unnecessarily:** `build.gradle.kts` switches `JavaCompile` debug flags (`-g:lines,source` for release vs `-g` for dev). Switching between the two invalidates Gradle's compilation cache and forces a full `:apis-server:compileJava` / `compileTestJava` rebuild (~35–50s). Stick to one mode during an iteration cycle.
 4. **Use `--offline` when dependencies are cached:** Skips remote checks such as `:apis-server:downloadMcManifest`.
@@ -83,7 +83,7 @@ Apis separates server configs, worlds, plugin JARs, and plugin data/configs:
 
 | Purpose | Command | Output / Notes |
 |---|---|---|
-| **Fast Apis unit tests + Checkstyle** | `./gradlew quickCheck` | Runs `ApisTestSuite` + `:apis-server:checkstyleMain` + `:apis-server:checkstyleTest` (~10s cold, <1s `UP-TO-DATE` with CC). |
+| **Fast Apis unit tests + Checkstyle** | `./gradlew quickCheck` | Runs `ApisTestSuite` + Checkstyle across all modules including `log4jPlugins` (~10s cold, <1s `UP-TO-DATE` with CC). |
 | **Fastest live server test (no JAR repack)** | `./gradlew :apis-server:runDevServer` | Runs directly from `sourceSets.main.runtimeClasspath` in `run/`. |
 | **Run Mojang-mapped server JAR** | `./gradlew :apis-server:runServer` | Assembles server JAR without bundling dependencies. |
 | **Dev Bundler JAR** | `./gradlew :apis-server:createBundlerJar` | Outputs `apis-server/build/libs/apis-bundler-<mcVersion>.local-SNAPSHOT.jar`. Add `--offline` to skip manifest network checks. |

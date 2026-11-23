@@ -120,6 +120,17 @@ tasks.register("printMinecraftVersion") {
 
 tasks.register("quickCheck") {
     group = LifecycleBasePlugin.VERIFICATION_GROUP
-    description = "Runs Apis unit tests (ApisTestSuite) and apis-server Checkstyle without upstream Paper tests."
-    dependsOn(":apis-server:apisTest", ":apis-server:checkstyleMain", ":apis-server:checkstyleTest")
+    description = "Runs Apis unit tests (ApisTestSuite) and Checkstyle across all modules without upstream Paper tests."
+    dependsOn(
+        ":apis-server:apisTest",
+        ":apis-server:checkstyleMain",
+        ":apis-server:checkstyleTest",
+        ":apis-server:checkstyleLog4jPlugins",
+        ":apis-api:checkstyleMain",
+        ":apis-api:checkstyleTest",
+        ":apis-paperclip:checkstyleMain",
+        ":apis-checkstyle:checkstyleMain",
+        ":apis-checkstyle:checkstyleTest",
+        ":apis-checkstyle:checkstyleTestData",
+    )
 }
