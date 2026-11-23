@@ -1,6 +1,6 @@
 name: Builds
 
-run-name: "Build ${{ github.ref_name }}"
+run-name: "${{ inputs.publish_release && 'Release Build' || 'Build' }} ${{ github.ref_name }}"
 
 on:
   workflow_dispatch:
@@ -60,7 +60,7 @@ jobs:
 
       - name: Upload test and Checkstyle reports
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: test-reports-${{ github.run_number }}
           path: |
@@ -124,7 +124,7 @@ jobs:
           cat SHA256SUMS.txt
 
       - name: Upload Artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: ${{ steps.meta.outputs.jar_name }}
           path: release-assets/*
@@ -147,7 +147,7 @@ jobs:
           fetch-depth: 0
 
       - name: Download Staged Assets
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: ${{ needs.build.outputs.jar_name }}
           path: release-assets
@@ -179,7 +179,7 @@ jobs:
           fi
 
       - name: Publish Rolling GitHub Release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           tag_name: ${{ needs.build.outputs.tag_name }}
           target_commitish: ${{ github.sha }}
