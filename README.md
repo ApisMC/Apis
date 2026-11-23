@@ -1,8 +1,22 @@
-# Apis (ApisMC)
+<div align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="public/badge-dark.svg" />
+    <source media="(prefers-color-scheme: light)" srcset="public/badge-white.svg" />
+    <img alt="Apis" src="public/badge-white.svg" width="250" />
+  </picture>
 
-High-performance Paper 26.3 fork designed for stripped, ultra-fast lobby and minigame servers with positive O(1) subsystem kill-switches and JVM AOT cache support.
+  <p>
+    <a href="https://apismc.github.io/"><img src="https://img.shields.io/badge/Docs-apismc.github.io-2D333B?style=flat&logo=gitbook&logoColor=FEC106&labelColor=1E222A" alt="Documentation" /></a>
+    <a href="https://github.com/ApisMC/Apis/releases"><img src="https://img.shields.io/github/v/release/ApisMC/Apis?style=flat&logo=github&logoColor=FEC106&label=Release&labelColor=1E222A&color=2D333B" alt="Release" /></a>
+    <a href="https://github.com/ApisMC/Apis/actions/workflows/builds.yml"><img src="https://img.shields.io/github/actions/workflow/status/ApisMC/Apis/builds.yml?style=flat&logo=githubactions&logoColor=FEC106&label=Builds&labelColor=1E222A" alt="Builds" /></a>
+    <img src="https://img.shields.io/badge/Runtime-Java-2D333B?style=flat&logo=openjdk&logoColor=FEC106&labelColor=1E222A" alt="Java" />
+    <a href="https://docs.papermc.io/paper/"><img src="https://img.shields.io/badge/API-Paper-2D333B?style=flat&logo=spigotmc&logoColor=FEC106&labelColor=1E222A" alt="Paper API" /></a>
+  </p>
 
-* **Website & Docs:** https://kotop21.github.io/apismc/
+  <p>
+    High-performance Paper fork designed for stripped, ultra-fast lobby and minigame servers with positive O(1) subsystem kill-switches and JVM AOT cache support.
+  </p>
+</div>
 
 ## Key Features
 

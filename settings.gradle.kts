@@ -18,9 +18,9 @@ if (!file(".git").exists()) {
          The Apis directory is not a properly cloned Git repository.
 
          Clone via Git rather than downloading a source ZIP:
-         https://github.com/kotop21/apis-mc
+         https://github.com/ApisMC/Apis
 
-         Documentation: https://kotop21.github.io/apismc/
+         Documentation: https://apismc.github.io/
         ===================================================
         """.trimIndent()
     )

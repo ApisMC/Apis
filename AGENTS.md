@@ -1,6 +1,6 @@
 # AGENTS.md — Apis (ApisMC) Engineering & Build Guide
 
-Instructions and invariants for AI agents and contributors working on **Apis** (Paper/Minecraft 26.3 fork).
+Instructions and invariants for AI agents and contributors working on **Apis** (Paper/Minecraft fork; target MC version is set in `gradle.properties`).
 
 > **Maintenance Rule (Mandatory):** Whenever an infrastructure change is made (CLI flags, directory layout, Gradle/Paperweight build logic, Paperclip behavior, patch workflow, or test suite conventions), update this `AGENTS.md` in the same task/commit.
 > **Privacy Rule:** Never write real machine paths, home directories, usernames, `.env` contents, tokens, or secrets into `AGENTS.md` or any repository file. Use repository-relative paths only.
