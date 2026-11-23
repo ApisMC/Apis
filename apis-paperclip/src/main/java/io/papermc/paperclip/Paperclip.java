@@ -247,7 +247,7 @@ public final class Paperclip {
             for (final PatchEntry patch : patches) {
                 final Path outputFile = repoDir.resolve(patch.location()).resolve(patch.outputPath());
                 if (stamp != null && stamp.matches(patch.location(), patch.outputPath(), patch.outputHash(), outputFile)) {
-                    urls.computeIfAbsent(patch.location(), _ -> new HashMap<>())
+                    urls.computeIfAbsent(patch.location(), ignored -> new HashMap<>())
                         .put(patch.originalPath(), outputFile.toUri().toURL());
                     continue;
                 }
@@ -275,9 +275,9 @@ public final class Paperclip {
         for (final PatchEntry patch : patches) {
             final Path outputFile = repoDir.resolve(patch.location()).resolve(patch.outputPath());
             try {
-                stampUrls.computeIfAbsent(patch.location(), _ -> new HashMap<>())
+                stampUrls.computeIfAbsent(patch.location(), ignored -> new HashMap<>())
                     .put(patch.outputPath(), outputFile.toUri().toURL());
-            } catch (IOException _) {
+            } catch (IOException ignored) {
                 // Non-fatal: next startup falls back to SHA-256 verification
             }
         }

@@ -45,7 +45,7 @@ final class PaperclipStamp {
             updateManifestResource(digest, "/META-INF/patches.list");
             updateManifestResource(digest, "/META-INF/download-context");
             return Util.toHex(digest.digest());
-        } catch (Exception _) {
+        } catch (Exception ignored) {
             return "";
         }
     }
@@ -91,7 +91,7 @@ final class PaperclipStamp {
                 map.put(key, new StampedFile(size, mtime, sha256));
             }
             return new PaperclipStamp(expectedManifestHash, map);
-        } catch (Exception _) {
+        } catch (Exception ignored) {
             return null;
         }
     }
@@ -106,7 +106,7 @@ final class PaperclipStamp {
             return attrs.isRegularFile()
                 && attrs.size() == stamped.size()
                 && attrs.lastModifiedTime().toMillis() == stamped.mtimeMillis();
-        } catch (IOException _) {
+        } catch (IOException ignored) {
             return false;
         }
     }
@@ -147,7 +147,7 @@ final class PaperclipStamp {
                         .append('\t')
                         .append(Util.toHex(hash))
                         .append('\n');
-                } catch (Exception _) {
+                } catch (Exception ignored) {
                     // Skip entries that cannot be statted cleanly
                 }
             }
@@ -165,7 +165,7 @@ final class PaperclipStamp {
             } finally {
                 Files.deleteIfExists(tmp);
             }
-        } catch (IOException _) {
+        } catch (IOException ignored) {
             // Non-fatal: next startup falls back to SHA-256 verification
         }
     }

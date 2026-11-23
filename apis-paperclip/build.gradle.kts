@@ -8,7 +8,7 @@ configurations.named("compileOnly") {
 }
 
 dependencies {
-    upstreamPaperclip("io.papermc:paperclip:3.0.4")
+    upstreamPaperclip("io.papermc:paperclip:3.0.3")
     compileOnly("org.jspecify:jspecify:1.0.0")
 }
 

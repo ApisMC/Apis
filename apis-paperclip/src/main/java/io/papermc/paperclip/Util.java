@@ -66,7 +66,7 @@ final class Util {
                 digest.update(buffer, 0, read);
             }
             return Arrays.equals(hash, digest.digest());
-        } catch (IOException _) {
+        } catch (IOException ignored) {
             return false;
         }
     }
