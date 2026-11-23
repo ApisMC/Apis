@@ -1,0 +1,62 @@
+name: "Generate Changelog"
+description: "Generate split changelog between Apis and Paper upstream"
+
+inputs:
+  tag_name:
+    description: "Target tag name"
+    required: true
+  mc_version:
+    description: "Minecraft target version"
+    required: true
+  github_token:
+    description: "GitHub Token for API rate limits"
+    required: true
+  output_file:
+    description: "Output markdown file path"
+    required: false
+    default: "release-assets/release_notes.md"
+
+runs:
+  using: "composite"
+  steps:
+    - name: Build notes
+      shell: bash
+      run: |
+        mkdir -p "$(dirname "${{ inputs.output_file }}")"
+        TAG="${{ inputs.tag_name }}"
+        BODY_FILE="${{ inputs.output_file }}"
+        > "$BODY_FILE"
+
+        if git rev-parse -q --verify "refs/tags/$TAG" >/dev/null; then
+          BASE_REF="refs/tags/$TAG"
+          APIS_COMMITS=$(git log "$BASE_REF..HEAD" --no-merges --pretty=format:"* %s ([%h](https://github.com/${{ github.repository }}/commit/%H))" || true)
+        else
+          BASE_REF=""
+          APIS_COMMITS=$(git log -n 20 HEAD --no-merges --pretty=format:"* %s ([%h](https://github.com/${{ github.repository }}/commit/%H))" || true)
+        fi
+
+        if [ -n "$APIS_COMMITS" ]; then
+          echo "### Apis Changes" >> "$BODY_FILE"
+          echo "$APIS_COMMITS" >> "$BODY_FILE"
+          echo "" >> "$BODY_FILE"
+        fi
+
+        OLD_PAPER_COMMIT=""
+        if [ -n "$BASE_REF" ]; then
+          OLD_PAPER_COMMIT=$(git show "$BASE_REF:gradle.properties" 2>/dev/null | grep '^paperCommit=' | cut -d'=' -f2 | tr -d ' \r\n' || true)
+        fi
+        NEW_PAPER_COMMIT=$(grep '^paperCommit=' gradle.properties | cut -d'=' -f2 | tr -d ' \r\n' || true)
+
+        if [ -n "$OLD_PAPER_COMMIT" ] && [ -n "$NEW_PAPER_COMMIT" ] && [ "$OLD_PAPER_COMMIT" != "$NEW_PAPER_COMMIT" ]; then
+          PAPER_LOG=$(curl -s -H "Authorization: Bearer ${{ inputs.github_token }}" "https://api.github.com/repos/PaperMC/Paper/compare/${OLD_PAPER_COMMIT}...${NEW_PAPER_COMMIT}" | jq -r '.commits[]? | "* " + (.commit.message | split("\n")[0]) + " ([" + .sha[0:7] + "](https://github.com/PaperMC/Paper/commit/" + .sha + "))"' || true)
+
+          if [ -n "$PAPER_LOG" ]; then
+            echo "### Updated Upstream (Paper)" >> "$BODY_FILE"
+            echo "$PAPER_LOG" >> "$BODY_FILE"
+            echo "" >> "$BODY_FILE"
+          fi
+        fi
+
+        if [ ! -s "$BODY_FILE" ]; then
+          echo "Manual rebuild for ${{ inputs.mc_version }}." >> "$BODY_FILE"
+        fi

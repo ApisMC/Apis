@@ -1,0 +1,202 @@
+name: Builds
+
+run-name: "Build ${{ github.ref_name }}"
+
+on:
+  workflow_dispatch:
+    inputs:
+      publish_release:
+        description: 'Update rolling release?'
+        type: boolean
+        default: true
+        required: true
+
+permissions:
+  contents: write
+
+concurrency:
+  group: builds-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  GRADLE_OPTS: -Dorg.gradle.jvmargs=-Xmx4g -XX:+UseParallelGC
+
+jobs:
+  #
+  # Tests & Verification
+  #
+  test:
+    name: "Tests & Verification"
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - uses: ./.github/actions/setup-env
+
+      - name: Apply patches
+        run: ./gradlew applyAllPatches --stacktrace
+
+      - name: Run full check (publish mode)
+        if: inputs.publish_release
+        run: ./gradlew check --stacktrace
+
+      - name: Run quickCheck (build-only mode)
+        if: "!inputs.publish_release"
+        run: ./gradlew quickCheck --stacktrace
+
+      - name: Upload test reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-reports-${{ github.run_number }}
+          path: |
+            */build/test-results/**/TEST-*.xml
+            */build/reports/tests/
+            */build/reports/checkstyle/*.xml
+          if-no-files-found: ignore
+          retention-days: 14
+
+  #
+  # Build Paperclip
+  #
+  build:
+    name: "Build Paperclip"
+    needs: test
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    outputs:
+      mc_version: ${{ steps.meta.outputs.mc_version }}
+      tag_name: ${{ steps.meta.outputs.tag_name }}
+      build_num: ${{ steps.meta.outputs.build_num }}
+      jar_name: ${{ steps.meta.outputs.jar_name }}
+      latest_jar_name: ${{ steps.meta.outputs.latest_jar_name }}
+
+    steps:
+      - uses: ./.github/actions/setup-env
+
+      - name: Resolve Minecraft Version and Build Number
+        id: meta
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          MC_VER=$(grep '^mcVersion=' gradle.properties | cut -d'=' -f2 | tr -d ' \r\n')
+          if [ -z "$MC_VER" ]; then
+            echo "::error::mcVersion not found in gradle.properties"
+            exit 1
+          fi
+
+          TAG_NAME="${MC_VER}-latest"
+
+          RELEASE_TITLE=$(gh release view "$TAG_NAME" --json name -q '.name' 2>/dev/null || true)
+          PREV_NUM=$(echo "$RELEASE_TITLE" | grep -o 'Build #[0-9]*' | cut -d'#' -f2 || true)
+
+          if [ -n "$PREV_NUM" ]; then
+            BUILD_NUM=$((PREV_NUM + 1))
+          else
+            BUILD_NUM=1
+          fi
+
+          TARGET_JAR="apis-${MC_VER}-${BUILD_NUM}.jar"
+          LATEST_JAR="apis-${MC_VER}.jar"
+
+          echo "mc_version=${MC_VER}" >> "$GITHUB_OUTPUT"
+          echo "tag_name=${TAG_NAME}" >> "$GITHUB_OUTPUT"
+          echo "build_num=${BUILD_NUM}" >> "$GITHUB_OUTPUT"
+          echo "jar_name=${TARGET_JAR}" >> "$GITHUB_OUTPUT"
+          echo "latest_jar_name=${LATEST_JAR}" >> "$GITHUB_OUTPUT"
+
+      - name: Apply patches
+        run: ./gradlew applyAllPatches --stacktrace
+
+      - name: Build release Paperclip JAR
+        run: ./gradlew :apis-server:createPaperclipJar -Prelease=true --stacktrace
+
+      - name: Stage and Rename Assets
+        run: |
+          mkdir -p release-assets
+          TARGET_JAR="${{ steps.meta.outputs.jar_name }}"
+          LATEST_JAR="${{ steps.meta.outputs.latest_jar_name }}"
+
+          SRC_JAR=$(find apis-server/build/libs -maxdepth 1 -name 'apis-paperclip-*-release.jar' | head -n 1)
+          if [ -z "$SRC_JAR" ]; then
+            echo "::error::Built release Paperclip JAR not found in apis-server/build/libs"
+            exit 1
+          fi
+
+          cp "$SRC_JAR" "release-assets/$TARGET_JAR"
+          cp "$SRC_JAR" "release-assets/$LATEST_JAR"
+
+          cd release-assets
+          sha256sum "$TARGET_JAR" "$LATEST_JAR" > SHA256SUMS.txt
+          cat SHA256SUMS.txt
+
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.meta.outputs.jar_name }}
+          path: release-assets/*
+          retention-days: 90
+
+  #
+  # Publish Release
+  #
+  release:
+    name: "Publish Release"
+    needs: build
+    if: inputs.publish_release
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Download Staged Assets
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ needs.build.outputs.jar_name }}
+          path: release-assets
+
+      - name: Generate Changelog
+        uses: ./.github/actions/generate-changelog
+        with:
+          tag_name: ${{ needs.build.outputs.tag_name }}
+          mc_version: ${{ needs.build.outputs.mc_version }}
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Update rolling tag and prune old release JARs
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG_NAME: ${{ needs.build.outputs.tag_name }}
+        run: |
+          git config user.name "GitHub Actions"
+          git config user.email "no-reply@github.com"
+          git tag -f "$TAG_NAME" "${{ github.sha }}"
+          git push origin "refs/tags/$TAG_NAME" --force
+
+          if gh release view "$TAG_NAME" >/dev/null 2>&1; then
+            gh release view "$TAG_NAME" --json assets -q '.assets[].name | select(startswith("apis-") and endswith(".jar"))' | while IFS= read -r asset; do
+              if [ -n "$asset" ]; then
+                echo "Removing old release asset: $asset"
+                gh release delete-asset "$TAG_NAME" "$asset" -y
+              fi
+            done
+          fi
+
+      - name: Publish Rolling GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ needs.build.outputs.tag_name }}
+          target_commitish: ${{ github.sha }}
+          name: "Apis ${{ needs.build.outputs.mc_version }} (Build #${{ needs.build.outputs.build_num }})"
+          body_path: release-assets/release_notes.md
+          draft: false
+          prerelease: false
+          generate_release_notes: false
+          files: |
+            release-assets/${{ needs.build.outputs.jar_name }}
+            release-assets/${{ needs.build.outputs.latest_jar_name }}
+            release-assets/SHA256SUMS.txt
