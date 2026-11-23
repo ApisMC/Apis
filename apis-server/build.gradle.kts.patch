@@ -1,6 +1,6 @@
 --- a/paper-server/build.gradle.kts
 +++ b/paper-server/build.gradle.kts
-@@ -1,7 +_,10 @@
+@@ -1,7 +1,10 @@
  import io.papermc.fill.model.BuildChannel
  import io.papermc.paperweight.attribute.DevBundleOutput
  import io.papermc.paperweight.util.*
@@ -11,19 +11,21 @@
  
  plugins {
      `java-library`
-@@ -16,20 +_,36 @@
+@@ -15,7 +18,7 @@
  
  dependencies {
-     mache("io.papermc:mache:26.3+build.2")
--    paperclip("io.papermc:paperclip:3.0.4")
+     mache("io.papermc:mache:1.21.11+build.1")
+-    paperclip("io.papermc:paperclip:3.0.3")
 +    paperclip(project(":apis-paperclip")) // Apis - Fast stamped Paperclip
  }
  
  paperweight {
-     minecraftVersion = providers.gradleProperty("mcVersion")
-     gitFilePatches = false
+@@ -40,9 +43,21 @@
+         "org.spigotmc",
+     )
  
 -    updatingMinecraft {
+-        // oldPaperCommit = "c82b438b5b4ea0b230439b8e690e34708cd11ab3"
 +    // Apis start - Rebrand
 +    val apis = forks.register("apis") {
 +        upstream.patchDir("paperServer") {
@@ -32,27 +34,17 @@
 +            patchesDir = rootDirectory.dir("apis-server/paper-patches")
 +            outputDir = rootDirectory.dir("paper-server")
 +        }
-+    }
+     }
 +    activeFork = apis
 +    // Apis end - Rebrand
 +
 +    /*updatingMinecraft {
-         //oldPaperCommit = "e5fe71723e2ffde7cc9fafc085ac3bb73e63175e"
--    }
++        // oldPaperCommit = "c82b438b5b4ea0b230439b8e690e34708cd11ab3"
 +    }*/
  }
  
- paperCheckstyle {
--    directoriesToSkipFile = layout.projectDirectory.file(".checkstyle/ignored_directories.txt")
-+    directoriesToSkipFile = layout.projectDirectory.file("../paper-server/.checkstyle/ignored_directories.txt")
-+}
-+
-+tasks.named<io.papermc.paperweight.checkstyle.tasks.MergeCheckstyleConfigs>("mergeCheckstyleConfigs") {
-+    overrideConfigFile.set(layout.projectDirectory.file("../paper-server/.checkstyle/checkstyle.xml"))
- }
- 
  tasks.generateDevelopmentBundle {
-@@ -91,7 +_,21 @@
+@@ -104,7 +119,21 @@
      }
  }
  
@@ -75,23 +67,19 @@
  configurations.named(log4jPlugins.compileClasspathConfigurationName) {
      extendsFrom(configurations.compileClasspath.get())
  }
-@@ -114,7 +_,7 @@
+@@ -127,7 +156,7 @@
  }
  
  dependencies {
 -    implementation(project(":paper-api"))
 +    implementation(project(":apis-api")) // Apis
-     implementation(platform("ca.spottedleaf.leafpile:bom:1.3.2"))
-     implementation("ca.spottedleaf.leafpile:common")
-     implementation("ca.spottedleaf.leafpile:concurrentutil")
-@@ -165,28 +_,80 @@
-     // Spark
-     implementation("me.lucko:spark-api:0.1-20240720.200737-2")
-     implementation("me.lucko:spark-paper:1.10.191")
-+
-+    checkstyle(project(":apis-checkstyle"))
-+}
-+
+     implementation("ca.spottedleaf:concurrentutil:0.0.8")
+     implementation("org.jline:jline-terminal-ffm:3.27.1") // use ffm on java 22+
+     implementation("org.jline:jline-terminal-jni:3.27.1") // fall back to jni on java 21
+@@ -186,26 +215,76 @@
+     implementation("me.lucko:spark-paper:1.10.152")
+ }
+ 
 +fun buildLibraryClassPath(
 +    resolvedArtifacts: Provider<Set<ResolvedArtifactResult>>,
 +    apiGroup: String,
@@ -119,8 +107,8 @@
 +        .distinct()
 +        .sorted()
 +        .joinToString(" ")
- }
- 
++}
++
  tasks.jar {
 -    manifest {
 +    val apiProj = project(":apis-api")
@@ -173,7 +161,7 @@
              "Build-Number" to (build ?: ""),
              "Build-Time" to buildTime.toString(),
              "Git-Branch" to gitBranch,
-@@ -196,6 +_,9 @@
+@@ -215,6 +294,9 @@
              attributes("$tld/bukkit", "Sealed" to true)
          }
      }
@@ -183,35 +171,37 @@
  }
  
  // Compile tests with -parameters for better junit parameterized test names
-@@ -240,14 +_,8 @@
+@@ -250,21 +332,47 @@
      })
  }
  
--tasks.test {
--    include("**/**TestSuite.class")
 +fun Test.configureServerTestDefaults() {
-     workingDir = temporaryDir
--    useJUnitPlatform {
--        forkEvery = 1
--        excludeTags("Slow")
--    }
--
-     // Configure mockito agent that is needed in newer java versions
-     val provider = objects.newInstance<MockitoAgentProvider>()
-     provider.fileCollection.from(mockitoAgent)
-@@ -258,13 +_,34 @@
-     systemProperty("joml.nounsafe", true)
- }
- 
-+tasks.test {
-+    configureServerTestDefaults()
-+    include("**/**TestSuite.class")
-+    useJUnitPlatform {
-+        forkEvery = 1
-+        excludeTags("Slow")
-+    }
++    workingDir = temporaryDir
++
++    // Configure mockito agent that is needed in newer java versions
++    val provider = objects.newInstance<MockitoAgentProvider>()
++    provider.fileCollection.from(mockitoAgent)
++    jvmArgumentProviders.add(provider)
++
++    // Hides repeated jline/joml warnings due to forking
++    jvmArgs("--enable-native-access=ALL-UNNAMED")
++    systemProperty("joml.nounsafe", true)
 +}
 +
+ tasks.test {
++    configureServerTestDefaults()
+     include("**/**TestSuite.class")
+-    workingDir = temporaryDir
+     useJUnitPlatform {
+         forkEvery = 1
+         excludeTags("Slow")
+     }
++}
+ 
+-    // Configure mockito agent that is needed in newer java versions
+-    val provider = objects.newInstance<MockitoAgentProvider>()
+-    provider.fileCollection.from(mockitoAgent)
+-    jvmArgumentProviders.add(provider)
 +tasks.register<Test>("apisTest") {
 +    group = LifecycleBasePlugin.VERIFICATION_GROUP
 +    description = "Runs only Apis unit tests (org.apismc.apis.ApisTestSuite)."
@@ -222,29 +212,37 @@
 +    useJUnitPlatform {
 +        excludeTags("Slow")
 +    }
-+}
-+
- tasks.withType<io.papermc.paperweight.tasks.CreateBundlerJar>().configureEach {
-     extraManifestMainAttributes = mapOf(
-         "Enable-Native-Access" to "ALL-UNNAMED",
-     )
  }
  
 -val generatedDir: java.nio.file.Path = layout.projectDirectory.dir("src/generated/java").asFile.toPath()
++tasks.withType<io.papermc.paperweight.tasks.CreateBundlerJar>().configureEach {
++    extraManifestMainAttributes = mapOf(
++        "Enable-Native-Access" to "ALL-UNNAMED",
++    )
++}
++
 +val generatedDir: java.nio.file.Path = layout.projectDirectory.dir("../paper-server/src/generated/java").asFile.toPath() // Apis
  idea {
      module {
          generatedSourceDirs.add(generatedDir.toFile())
-@@ -346,7 +_,7 @@
+@@ -356,8 +464,14 @@
      mainClass.set(null as String?)
  }
  
 -fill {
+-    project("paper")
++tasks.register("createPaperclipJar") {
++    dependsOn(tasks.named("createMojmapPaperclipJar"))
++}
++tasks.register("createBundlerJar") {
++    dependsOn(tasks.named("createMojmapBundlerJar"))
++}
++
 +/* fill {
-     project("paper")
      versionFamily(paperweight.minecraftVersion.map { it.split(".", "-").takeWhile { part -> part.toIntOrNull() != null }.take(2).joinToString(".") })
      version(paperweight.minecraftVersion)
-@@ -361,4 +_,4 @@
+ 
+@@ -371,4 +485,4 @@
              }
          }
      }
