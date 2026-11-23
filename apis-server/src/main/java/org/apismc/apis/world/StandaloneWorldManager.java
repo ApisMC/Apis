@@ -587,7 +587,7 @@ public final class StandaloneWorldManager {
                 .filter(name -> fallbackName == null || !name.equalsIgnoreCase(fallbackName))
                 .sorted(String.CASE_INSENSITIVE_ORDER)
                 .forEach(unloaded::add);
-        } catch (IOException _) {
+        } catch (IOException ignored) {
         }
         return List.copyOf(unloaded);
     }
@@ -840,7 +840,7 @@ public final class StandaloneWorldManager {
                 .map(path -> path.getFileName().toString().toLowerCase(Locale.ROOT))
                 .filter(name -> !name.startsWith("."))
                 .forEach(folders::add);
-        } catch (IOException _) {
+        } catch (IOException ignored) {
         }
         return folders;
     }
@@ -874,7 +874,7 @@ public final class StandaloneWorldManager {
                 .filter(name -> name.equalsIgnoreCase(requestedName))
                 .findFirst()
                 .orElse(null);
-        } catch (IOException _) {
+        } catch (IOException ignored) {
             return null;
         }
     }
@@ -972,10 +972,10 @@ public final class StandaloneWorldManager {
             walk.sorted(Comparator.reverseOrder()).forEach(path -> {
                 try {
                     Files.deleteIfExists(path);
-                } catch (IOException _) {
+                } catch (IOException ignored) {
                 }
             });
-        } catch (IOException _) {
+        } catch (IOException ignored) {
         }
     }
 

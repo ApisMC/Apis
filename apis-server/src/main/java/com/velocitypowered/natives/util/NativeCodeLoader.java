@@ -113,7 +113,7 @@ public final class NativeCodeLoader<T> implements Supplier<T> {
                     this.setup.run();
                     this.constructed = this.object.get();
                     this.status = Status.SETUP;
-                } catch (Exception _) {
+                } catch (Exception ignored) {
                     this.status = Status.SETUP_FAILURE;
                     return null;
                 }

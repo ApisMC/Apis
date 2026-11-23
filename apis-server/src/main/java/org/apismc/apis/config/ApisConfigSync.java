@@ -70,7 +70,6 @@ public final class ApisConfigSync {
         final boolean weatherDisabled = ApisHooks.isWeatherDisabled();
         world.environment.disableThunder = weatherDisabled;
         world.environment.disableIceAndSnow = weatherDisabled;
-        world.unsupportedSettings.ticking.chunks = !ApisHooks.isChunkTickingDisabled();
     }
 
     /**

@@ -58,7 +58,7 @@ class ConnectionBatchingTest {
             assertEquals(0, harness.recorder.written.size(), "flush=false packet should stay in outbound batch before tick");
             assertEquals(0, harness.recorder.flushedTotal.get());
 
-            try (MockedStatic<MinecraftServer> _ = mockMainThreadServer()) {
+            try (MockedStatic<MinecraftServer> ignored = mockMainThreadServer()) {
                 connection.tick();
             }
             harness.awaitEventLoop();
@@ -80,7 +80,7 @@ class ConnectionBatchingTest {
             assertEquals(256, harness.recorder.written.size(), "Batch should auto-drain first 256 packets on threshold");
             assertEquals(0, harness.recorder.flushedTotal.get(), "Threshold drain writes without immediate flush");
 
-            try (MockedStatic<MinecraftServer> _ = mockMainThreadServer()) {
+            try (MockedStatic<MinecraftServer> ignored = mockMainThreadServer()) {
                 connection.tick();
             }
             harness.awaitEventLoop();

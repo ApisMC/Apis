@@ -4,7 +4,7 @@
 
 package ca.spottedleaf.concurrentutil.numa;
 
-import ca.spottedleaf.common.util.FlatBitsetUtil;
+import ca.spottedleaf.concurrentutil.util.FlatBitsetUtil;
 import it.unimi.dsi.fastutil.ints.IntArrayList;
 import java.util.Locale;
 import org.apismc.apis.hooks.ApisHooks;

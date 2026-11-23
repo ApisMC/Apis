@@ -99,7 +99,7 @@ class PluginPackageIndexTest {
         final SimpleListPluginClassLoaderGroup group = new SimpleListPluginClassLoaderGroup() {
             @Override
             public ClassLoaderAccess getAccess() {
-                return _ -> true;
+                return ignored -> true;
             }
         };
         group.add(unrelated);
@@ -143,7 +143,7 @@ class PluginPackageIndexTest {
             final SimpleListPluginClassLoaderGroup group = new SimpleListPluginClassLoaderGroup() {
                 @Override
                 public ClassLoaderAccess getAccess() {
-                    return _ -> true;
+                    return ignored -> true;
                 }
             };
             group.add(unrelated);
@@ -183,7 +183,7 @@ class PluginPackageIndexTest {
         final SimpleListPluginClassLoaderGroup group = new SimpleListPluginClassLoaderGroup() {
             @Override
             public ClassLoaderAccess getAccess() {
-                return _ -> true;
+                return ignored -> true;
             }
         };
         group.add(first);

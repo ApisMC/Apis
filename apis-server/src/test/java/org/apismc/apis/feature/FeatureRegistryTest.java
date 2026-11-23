@@ -24,7 +24,7 @@ import net.minecraft.core.HolderLookup;
 import net.minecraft.core.HolderSet;
 import net.minecraft.core.MappedRegistry;
 import net.minecraft.core.registries.Registries;
-import net.minecraft.core.registries.codec.RegistryCodecs;
+import net.minecraft.core.RegistryCodecs;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.NbtOps;
 import net.minecraft.nbt.Tag;
@@ -34,10 +34,9 @@ import net.minecraft.resources.ResourceKey;
 import net.minecraft.stats.ServerStatsCounter;
 import net.minecraft.tags.TagKey;
 import net.minecraft.util.datafix.fixes.References;
-import net.minecraft.world.entity.EntityTypes;
+import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.MobCategory;
 import net.minecraft.world.entity.ai.attributes.DefaultAttributes;
-import net.minecraft.world.item.slot.SlotSource;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.biome.Biome;
 import net.minecraft.world.level.levelgen.structure.Structure;
@@ -199,8 +198,8 @@ class FeatureRegistryTest {
         assertTrue(ApisHooks.shouldPruneRegistryAtLoad(Registries.TEST_INSTANCE));
         assertFalse(ApisHooks.shouldPruneRegistryAtLoad(Registries.BIOME));
         assertEquals(Biome.NETWORK_CODEC, ApisHooks.resolveRegistryDecoder(Registries.BIOME, Biome.DIRECT_CODEC));
-        assertTrue(DefaultAttributes.hasSupplier(EntityTypes.ZOMBIE));
-        assertNotNull(DefaultAttributes.getSupplier(EntityTypes.PLAYER));
+        assertTrue(DefaultAttributes.hasSupplier(EntityType.ZOMBIE));
+        assertNotNull(DefaultAttributes.getSupplier(EntityType.PLAYER));
 
         assertTrue(ApisHooks.isMemoryOnlyWorld());
         assertTrue(ApisHooks.isFastShutdown());
@@ -231,7 +230,7 @@ class FeatureRegistryTest {
         assertTrue(ApisHooks.isBrainDisabled());
         assertTrue(ApisHooks.isPathfindingDisabled());
         assertTrue(ApisHooks.isSensorsDisabled());
-        assertTrue(ApisHooks.isAiDisabled(EntityTypes.CREEPER));
+        assertTrue(ApisHooks.isAiDisabled(EntityType.CREEPER));
 
         assertTrue(ApisHooks.isChunkTickingDisabled());
         assertTrue(ApisHooks.isRandomTicksDisabled());
@@ -313,9 +312,9 @@ class FeatureRegistryTest {
         assertFalse(FeatureRegistry.isWorldTickDisabled(Level.NETHER, true));
         assertTrue(FeatureRegistry.isWorldTickDisabled(customArena, true));
         assertTrue(FeatureRegistry.isWorldTickDisabled(customShowcase, true));
-        assertTrue(FeatureRegistry.isEntityAiDisabled(EntityTypes.ZOMBIE));
-        assertTrue(FeatureRegistry.isEntityAiDisabled(EntityTypes.VILLAGER));
-        assertFalse(FeatureRegistry.isEntityAiDisabled(EntityTypes.CREEPER));
+        assertTrue(FeatureRegistry.isEntityAiDisabled(EntityType.ZOMBIE));
+        assertTrue(FeatureRegistry.isEntityAiDisabled(EntityType.VILLAGER));
+        assertFalse(FeatureRegistry.isEntityAiDisabled(EntityType.CREEPER));
 
         cfg.dimensions.enabled = List.of("*");
         FeatureRegistry.applyEarly(cfg);
@@ -365,7 +364,7 @@ class FeatureRegistryTest {
             HolderLookup.Provider.create(Stream.of(structureRegistry))
         );
         final DataResult<HolderSet<Structure>> decoded = RegistryCodecs
-            .holderSet(Registries.STRUCTURE)
+            .homogeneousList(Registries.STRUCTURE)
             .parse(ops, new JsonPrimitive("#minecraft:on_treasure_maps"));
         assertTrue(decoded.isSuccess(), () -> "Expected empty HolderSet but got error: " + decoded.error());
         assertEquals(0, decoded.getOrThrow().size());
@@ -408,20 +407,6 @@ class FeatureRegistryTest {
         ApisHooks.bindPrunedFallbackHolders(modRegistry);
         modRegistry.freeze();
         assertNotNull(modRegistry.getValue(modKey));
-
-        final MappedRegistry<SlotSource> slotRegistry = new MappedRegistry<>(
-            Registries.SLOT_SOURCE,
-            Lifecycle.stable()
-        );
-        final ResourceKey<SlotSource> slotKey = ResourceKey.create(
-            Registries.SLOT_SOURCE,
-            Identifier.withDefaultNamespace("test_slot")
-        );
-        slotRegistry.createRegistrationLookup().getOrThrow(slotKey);
-        slotRegistry.bindAllTagsToEmpty();
-        ApisHooks.bindPrunedFallbackHolders(slotRegistry);
-        slotRegistry.freeze();
-        assertNotNull(slotRegistry.getValue(slotKey));
     }
 
     @Test
@@ -434,7 +419,6 @@ class FeatureRegistryTest {
         assertTrue(ApisHooks.shouldPruneRegistryAtLoad(Registries.LOOT_TABLE));
         assertTrue(ApisHooks.shouldPruneRegistryAtLoad(Registries.PREDICATE));
         assertTrue(ApisHooks.shouldPruneRegistryAtLoad(Registries.ITEM_MODIFIER));
-        assertTrue(ApisHooks.shouldPruneRegistryAtLoad(Registries.SLOT_SOURCE));
         assertFalse(ApisHooks.shouldPruneRegistryAtLoad(Registries.WORLD_PRESET));
         assertFalse(ApisHooks.shouldPruneRegistryAtLoad(Registries.FLAT_LEVEL_GENERATOR_PRESET));
 
@@ -446,7 +430,6 @@ class FeatureRegistryTest {
         assertFalse(ApisHooks.shouldPruneRegistryAtLoad(Registries.LOOT_TABLE));
         assertFalse(ApisHooks.shouldPruneRegistryAtLoad(Registries.PREDICATE));
         assertFalse(ApisHooks.shouldPruneRegistryAtLoad(Registries.ITEM_MODIFIER));
-        assertFalse(ApisHooks.shouldPruneRegistryAtLoad(Registries.SLOT_SOURCE));
         assertTrue(ApisHooks.shouldPruneRegistryAtLoad(Registries.WORLD_PRESET));
         assertTrue(ApisHooks.shouldPruneRegistryAtLoad(Registries.FLAT_LEVEL_GENERATOR_PRESET));
 
@@ -456,8 +439,8 @@ class FeatureRegistryTest {
         FeatureRegistry.applyEarly(structuresWithoutDecor);
 
         assertFalse(ApisHooks.shouldPruneRegistryAtLoad(Registries.PLACED_FEATURE));
-        assertFalse(ApisHooks.shouldPruneRegistryAtLoad(Registries.FEATURE));
-        assertTrue(ApisHooks.shouldPruneRegistryAtLoad(Registries.CARVER));
+        assertFalse(ApisHooks.shouldPruneRegistryAtLoad(Registries.CONFIGURED_FEATURE));
+        assertTrue(ApisHooks.shouldPruneRegistryAtLoad(Registries.CONFIGURED_CARVER));
         assertTrue(ApisHooks.isBiomeDecorationDisabled());
         assertFalse(ApisHooks.isStructuresDisabled());
     }

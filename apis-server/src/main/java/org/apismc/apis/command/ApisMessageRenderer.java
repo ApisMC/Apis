@@ -40,7 +40,7 @@ public final class ApisMessageRenderer {
         }
         try {
             return MINI_MESSAGE.deserialize(raw, resolvers);
-        } catch (Exception _) {
+        } catch (Exception ignored) {
             return Component.text(raw);
         }
     }
@@ -95,7 +95,7 @@ public final class ApisMessageRenderer {
         try {
             final double parsed = Double.parseDouble(raw);
             return Double.isFinite(parsed) ? parsed : null;
-        } catch (NumberFormatException _) {
+        } catch (NumberFormatException ignored) {
             return null;
         }
     }
@@ -110,7 +110,7 @@ public final class ApisMessageRenderer {
         try {
             final float parsed = Float.parseFloat(raw);
             return Float.isFinite(parsed) ? parsed : null;
-        } catch (NumberFormatException _) {
+        } catch (NumberFormatException ignored) {
             return null;
         }
     }

@@ -33,12 +33,12 @@ class ApisBstatsMetricsTest {
 
         final String serverUuid = UUID.randomUUID().toString();
         final Metrics metrics = Metrics.createDetached(Metrics.APIS_SERVICE_ID, serverUuid);
-        metrics.addCustomChart(new Metrics.SimplePie("minecraft_version", () -> "26.3"));
+        metrics.addCustomChart(new Metrics.SimplePie("minecraft_version", () -> "1.21.11"));
         metrics.addCustomChart(new Metrics.SingleLineChart("players", () -> 4));
         metrics.addCustomChart(
             new Metrics.SimplePie(
                 "apis_version",
-                () -> Metrics.PaperMetrics.formatApisVersion("26.3", "git-Apis-e90c812")
+                () -> Metrics.PaperMetrics.formatApisVersion("1.21.11", "git-Apis-e90c812")
             )
         );
 
@@ -61,14 +61,14 @@ class ApisBstatsMetricsTest {
         final String serialized = payload.toJSONString();
         assertFalse(serialized.contains("Paper"), "Payload must not carry upstream Paper branding: " + serialized);
         assertTrue(serialized.contains("\"apis_version\""));
-        assertTrue(serialized.contains("git-Apis-26.3-e90c812"));
+        assertTrue(serialized.contains("git-Apis-1.21.11-e90c812"));
     }
 
     @Test
     void formatsApisVersionSafelyWhenImplVersionMissingOrHyphenated() {
-        assertEquals("unknown", Metrics.PaperMetrics.formatApisVersion("26.3", null));
-        assertEquals("unknown", Metrics.PaperMetrics.formatApisVersion("26.3", ""));
-        assertEquals("git-Apis-26.3-abc1234", Metrics.PaperMetrics.formatApisVersion("26.3", "26.3-RELEASE-abc1234"));
+        assertEquals("unknown", Metrics.PaperMetrics.formatApisVersion("1.21.11", null));
+        assertEquals("unknown", Metrics.PaperMetrics.formatApisVersion("1.21.11", ""));
+        assertEquals("git-Apis-1.21.11-abc1234", Metrics.PaperMetrics.formatApisVersion("1.21.11", "1.21.11-RELEASE-abc1234"));
     }
 
     @Test

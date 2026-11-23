@@ -443,7 +443,7 @@ public final class ApisConfig {
     @ConfigSerializable
     public static final class StartupSection {
         @Setting("datafixers")
-        @Comment("Build DFU/DataConverter schemas & migrate old level/item formats; false = skip DFU completely (fast boot, breaks pre-26.3 world upgrades) | Будувати схеми DFU/DataConverter та мігрувати старі світи; false = пропустити ініціалізацію DFU для прискорення старту")
+        @Comment("Build DFU/DataConverter schemas & migrate old level/item formats; false = skip DFU completely (fast boot, breaks pre-1.21.11 world upgrades) | Будувати схеми DFU/DataConverter та мігрувати старі світи; false = пропустити ініціалізацію DFU для прискорення старту")
         public boolean datafixers = true;
 
         @Setting("search-spawn-point")
@@ -621,7 +621,7 @@ public final class ApisConfig {
     @ConfigSerializable
     public static final class WorldEnvironmentSection {
         @Setting("daylight-cycle")
-        @Comment("Tick WorldClock time, sky brightness & SetTime broadcasts; false = freeze world time with zero packet spam | Рухати цикл дня/ночі та розсилати пакети часу; false = заморозити час доби без мережевого спаму")
+        @Comment("Tick world time, sky brightness & SetTime broadcasts; false = freeze world time with zero packet spam | Рухати цикл дня/ночі та розсилати пакети часу; false = заморозити час доби без мережевого спаму")
         public boolean daylightCycle = true;
 
         @Setting("weather")
@@ -796,7 +796,7 @@ public final class ApisConfig {
         public boolean wardenTracker = true;
 
         @Setting("locator-bar")
-        @Comment("Track player waypoints and WAYPOINT_TRANSMIT_RANGE crouch attributes for the 26.3 Locator Bar; false = disable Locator Bar tracking | Відстежувати вейпоїнти та атрибут WAYPOINT_TRANSMIT_RANGE для Locator Bar; false = вимкнути Locator Bar")
+        @Comment("Track player waypoints and WAYPOINT_TRANSMIT_RANGE crouch attributes for the Locator Bar; false = disable Locator Bar tracking | Відстежувати вейпоїнти та атрибут WAYPOINT_TRANSMIT_RANGE для Locator Bar; false = вимкнути Locator Bar")
         public boolean locatorBar = true;
 
         @Setting("inventory-special-item-updates")

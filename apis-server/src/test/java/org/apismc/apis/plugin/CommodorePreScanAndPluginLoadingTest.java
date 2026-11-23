@@ -117,7 +117,7 @@ class CommodorePreScanAndPluginLoadingTest {
         final String fieldsStr = seenFields.toString();
         assertTrue(fieldsStr.contains("mount=Lorg/bukkit/event/entity/EntityMountEvent;"));
         assertTrue(fieldsStr.contains("cow=Lorg/bukkit/entity/AbstractCow;"));
-        assertTrue(fieldsStr.contains("slime=Lorg/bukkit/entity/AbstractCubeMob;"));
+        assertTrue(fieldsStr.contains("slime=Lorg/bukkit/entity/Slime;"));
         assertTrue(seenLdc.toString().contains("com.mysql.cj.jdbc.Driver"));
 
         // Method descriptor referencing org/bukkit/entity/Player must trigger pre-scan even without field refs

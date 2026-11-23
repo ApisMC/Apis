@@ -55,7 +55,7 @@ class BlockBehaviourCacheTest {
     @Test
     void concurrentAsBlockDataReadsReturnValidIndependentClones() throws Exception {
         final BlockState state = Blocks.OAK_PLANKS.defaultBlockState();
-        final Field cachedField = BlockBehaviour.BlockStateBase.class.getDeclaredField("cachedBlockData");
+        final Field cachedField = BlockBehaviour.BlockStateBase.class.getDeclaredField("cachedCraftBlockData");
         cachedField.setAccessible(true);
         cachedField.set(state, null);
 
@@ -64,7 +64,7 @@ class BlockBehaviourCacheTest {
         try {
             final List<Callable<CraftBlockData>> tasks = new ArrayList<>(threads);
             for (int i = 0; i < threads; i++) {
-                tasks.add(state::asBlockData);
+                tasks.add(state::createCraftBlockData);
             }
             final List<Future<CraftBlockData>> futures = pool.invokeAll(tasks);
             for (final Future<CraftBlockData> future : futures) {

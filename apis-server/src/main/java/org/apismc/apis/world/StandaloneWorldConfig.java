@@ -159,13 +159,13 @@ public final class StandaloneWorldConfig {
             Files.writeString(temp, commented, StandardCharsets.UTF_8);
             try {
                 Files.move(temp, target, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
-            } catch (AtomicMoveNotSupportedException _) {
+            } catch (AtomicMoveNotSupportedException ignored) {
                 Files.move(temp, target, StandardCopyOption.REPLACE_EXISTING);
             }
         } catch (final IOException ex) {
             try {
                 Files.deleteIfExists(temp);
-            } catch (IOException _) {
+            } catch (IOException ignored) {
             }
             throw new IllegalStateException("Failed to write " + target + ": " + ex.getMessage(), ex);
         }

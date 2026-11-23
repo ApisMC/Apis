@@ -60,7 +60,6 @@ import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.MobCategory;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.entity.projectile.Projectile;
-import net.minecraft.world.item.slot.EmptySlotSource;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.biome.Biome;
 import net.minecraft.world.level.biome.BiomeSource;
@@ -218,17 +217,16 @@ public final class ApisHooks {
         }
         if (Registries.LOOT_TABLE.equals(registryKey)
             || Registries.PREDICATE.equals(registryKey)
-            || Registries.ITEM_MODIFIER.equals(registryKey)
-            || Registries.SLOT_SOURCE.equals(registryKey)) {
+            || Registries.ITEM_MODIFIER.equals(registryKey)) {
             return FeatureRegistry.isDisabled(Feature.GAMEPLAY_LOOT_TABLES);
         }
         if (Registries.WORLD_PRESET.equals(registryKey) || Registries.FLAT_LEVEL_GENERATOR_PRESET.equals(registryKey)) {
             return FeatureRegistry.isStandaloneMode();
         }
-        if (Registries.CARVER.equals(registryKey)) {
+        if (Registries.CONFIGURED_CARVER.equals(registryKey)) {
             return FeatureRegistry.isDisabled(Feature.CHUNKS_BIOME_DECORATION);
         }
-        if (Registries.FEATURE.equals(registryKey) || Registries.PLACED_FEATURE.equals(registryKey)) {
+        if (Registries.CONFIGURED_FEATURE.equals(registryKey) || Registries.PLACED_FEATURE.equals(registryKey)) {
             return FeatureRegistry.isDisabled(Feature.CHUNKS_BIOME_DECORATION)
                 && FeatureRegistry.isDisabled(Feature.CHUNKS_STRUCTURES);
         }
@@ -290,11 +288,6 @@ public final class ApisHooks {
             @Override
             public Optional<HolderSet.Named<T>> get(final TagKey<T> id) {
                 return Optional.empty();
-            }
-
-            @Override
-            public boolean canSerialize(final HolderOwner<T> owner) {
-                return registry.canSerialize(owner);
             }
         };
     }
@@ -362,13 +355,13 @@ public final class ApisHooks {
 
     /**
      * Emits a single startup WARN if {@code startup.datafixers=false} while loading a world saved under an older
-     * Minecraft DataVersion than the running 26.3 server.
+     * Minecraft DataVersion than the running 1.21.11 server.
      *
      * @param worldName        loaded primary world name
      * @param levelDataUnfixed unfixed {@code level.dat} Data compound
      */
     public static void warnIfOldWorldWithoutDataFixers(final String worldName, final Dynamic<?> levelDataUnfixed) {
-        final int worldDataVersion = NbtUtils.getDataVersion(levelDataUnfixed);
+        final int worldDataVersion = NbtUtils.getDataVersion(levelDataUnfixed, -1);
         final int currentDataVersion = SharedConstants.getCurrentVersion().dataVersion().version();
         warnIfOldWorldVersionMismatch(worldName, worldDataVersion, currentDataVersion);
     }
@@ -380,7 +373,7 @@ public final class ApisHooks {
     ) {
         if (worldDataVersion < currentDataVersion && WARNED_OLD_WORLD_NO_DFU.compareAndSet(false, true)) {
             LOGGER.warn(
-                "World '{}' has DataVersion {} (< current {} for 26.3) while {}=false in apis.yml; "
+                "World '{}' has DataVersion {} (< current {} for 1.21.11) while {}=false in apis.yml; "
                     + "old world/player/chunk data will not be migrated and may break or corrupt.",
                 worldName,
                 worldDataVersion > 0 ? Integer.toString(worldDataVersion) : "legacy/unknown",
@@ -408,11 +401,9 @@ public final class ApisHooks {
         if (Registries.LOOT_TABLE.equals(registry.key())) {
             registry.bindUnboundHoldersToFallback((T) LootTable.EMPTY);
         } else if (Registries.PREDICATE.equals(registry.key())) {
-            registry.bindUnboundHoldersToFallback((T) AllOfCondition.allOf(HolderSet.empty()));
+            registry.bindUnboundHoldersToFallback((T) AllOfCondition.allOf(List.of()));
         } else if (Registries.ITEM_MODIFIER.equals(registry.key())) {
-            registry.bindUnboundHoldersToFallback((T) new SequenceFunction(HolderSet.empty()));
-        } else if (Registries.SLOT_SOURCE.equals(registry.key())) {
-            registry.bindUnboundHoldersToFallback((T) new EmptySlotSource());
+            registry.bindUnboundHoldersToFallback((T) SequenceFunction.of(List.of()));
         }
     }
 
@@ -988,7 +979,12 @@ public final class ApisHooks {
         if (biomeProvider == ApisVoidChunkGenerator.VOID_BIOME_PROVIDER) {
             return new FixedBiomeSource(registryAccess.lookupOrThrow(Registries.BIOME).getOrThrow(Biomes.THE_VOID));
         }
-        return new CustomWorldChunkManager(bukkitWorld, biomeProvider, fallbackSource);
+        return new CustomWorldChunkManager(
+            bukkitWorld,
+            biomeProvider,
+            registryAccess.lookupOrThrow(Registries.BIOME),
+            fallbackSource
+        );
     }
 
     public static WorldDimensions resolveInitialStandaloneDimensions(
@@ -1116,7 +1112,7 @@ public final class ApisHooks {
                         if (parsed > 0L) {
                             pid = parsed;
                         }
-                    } catch (NumberFormatException _) {
+                    } catch (NumberFormatException ignored) {
                     }
                 }
             }
@@ -1127,7 +1123,7 @@ public final class ApisHooks {
                 return ProcessHandle.of(pid).filter(ProcessHandle::isAlive).isPresent();
             }
             return false;
-        } catch (IOException _) {
+        } catch (IOException ignored) {
             return false;
         }
     }
@@ -1142,7 +1138,7 @@ public final class ApisHooks {
                 if (host != null && !host.isBlank()) {
                     sanitizedHost = sanitizeHostToken(host);
                 }
-            } catch (Exception _) {
+            } catch (Exception ignored) {
             }
         }
         if (IS_LINUX) {
@@ -1154,7 +1150,7 @@ public final class ApisHooks {
                         return sanitizedHost + "@" + bootId;
                     }
                 }
-            } catch (IOException _) {
+            } catch (IOException ignored) {
             }
         }
         return sanitizedHost;

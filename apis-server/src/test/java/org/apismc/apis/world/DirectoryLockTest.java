@@ -77,7 +77,7 @@ class DirectoryLockTest {
 
         try {
             Files.setPosixFilePermissions(lockPath, Set.of(PosixFilePermission.OWNER_READ));
-        } catch (UnsupportedOperationException _) {
+        } catch (UnsupportedOperationException ignored) {
             // Non-POSIX filesystem fallback
         }
 
@@ -94,7 +94,7 @@ class DirectoryLockTest {
                 StandardOpenOption.CREATE,
                 StandardOpenOption.WRITE
             );
-            FileLock _ = existingChannel.tryLock();
+            FileLock ignoredLock = existingChannel.tryLock();
             DirectoryLock recovered = DirectoryLock.create(worldDir)
         ) {
             assertTrue(recovered.isValid());
@@ -180,7 +180,7 @@ class DirectoryLockTest {
         try {
             try (
                 FileChannel channel = FileChannel.open(lockPath, StandardOpenOption.CREATE, StandardOpenOption.WRITE);
-                FileLock _ = channel.tryLock()
+                FileLock ignoredLock = channel.tryLock()
             ) {
                 channel.truncate(0L);
                 channel.write(ByteBuffer.wrap(("☃\n" + holder.pid() + "\n").getBytes(StandardCharsets.UTF_8)));
