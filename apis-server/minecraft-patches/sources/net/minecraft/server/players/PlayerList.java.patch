@@ -57,3 +57,12 @@
          if (++this.sendAllPlayerInfoIn > 600) {
              // CraftBukkit start
              for (int i = 0; i < this.players.size(); ++i) {
+@@ -1189,7 +_,7 @@
+         }
+ 
+         String playerNameStatsFile = gameProfile.name() + ".json";
+-        if (FileUtil.isValidPathSegment(playerNameStatsFile)) {
++        if (!org.apismc.apis.hooks.ApisHooks.isPlayerDataSavingDisabled() && FileUtil.isValidPathSegment(playerNameStatsFile)) { // Apis
+             Path playerNameStatsPath = statFolder.resolve(playerNameStatsFile);
+             if (Files.isRegularFile(playerNameStatsPath)) {
+                 try {

@@ -105,6 +105,8 @@ class ApisConfigTest {
         assertTrue(yamlText.contains("tick-monitor: true"));
         assertTrue(yamlText.contains("mode: standalone"));
         assertTrue(yamlText.contains("fallback-world: hub"));
+        assertTrue(yamlText.contains("always-ticking:"));
+        assertTrue(yamlText.contains("never-ticking: []"));
         assertTrue(yamlText.contains("messages:"));
         assertTrue(yamlText.contains("setworldspawn-success:"));
         assertTrue(yamlText.contains("invalid-syntax-world:"));

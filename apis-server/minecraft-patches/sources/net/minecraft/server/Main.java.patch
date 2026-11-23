@@ -71,14 +71,17 @@
              LevelStorageSource levelStorageSource = LevelStorageSource.createDefault(universePath.toPath());
              LevelStorageSource.LevelStorageAccess access = levelStorageSource.validateAndCreateAccess(levelName);
              Dynamic<?> levelDataTag;
-@@ -217,7 +_,9 @@
+@@ -217,7 +_,12 @@
                      return;
                  }
  
 -                levelDataTag = DataFixers.getFileFixer().fix(access, levelDataUnfixed, new UpgradeProgress(notificationManager));
-+                levelDataTag = org.apismc.apis.hooks.ApisHooks.isDataFixersEnabled()
-+                    ? DataFixers.getFileFixer().fix(access, levelDataUnfixed, new UpgradeProgress(notificationManager))
-+                    : levelDataUnfixed; // Apis
++                if (org.apismc.apis.hooks.ApisHooks.isDataFixersEnabled()) { // Apis
++                    levelDataTag = DataFixers.getFileFixer().fix(access, levelDataUnfixed, new UpgradeProgress(notificationManager));
++                } else {
++                    org.apismc.apis.hooks.ApisHooks.warnIfOldWorldWithoutDataFixers(levelName, levelDataUnfixed);
++                    levelDataTag = levelDataUnfixed;
++                } // Apis
              } else {
                  levelDataTag = null;
              }

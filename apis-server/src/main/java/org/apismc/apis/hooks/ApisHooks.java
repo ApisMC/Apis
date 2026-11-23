@@ -11,6 +11,7 @@ import com.mojang.datafixers.schemas.Schema;
 import com.mojang.datafixers.types.Type;
 import com.mojang.datafixers.types.templates.TypeTemplate;
 import com.mojang.serialization.Decoder;
+import com.mojang.serialization.Dynamic;
 import io.papermc.paper.adventure.PaperAdventure;
 import java.io.File;
 import java.io.IOException;
@@ -20,24 +21,40 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Instant;
+import java.util.ArrayDeque;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Deque;
+import java.util.IdentityHashMap;
+import java.util.LinkedHashSet;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Supplier;
 import joptsimple.OptionSet;
 import net.kyori.adventure.key.Key;
+import net.minecraft.SharedConstants;
+import net.minecraft.core.Holder;
+import net.minecraft.core.HolderGetter;
 import net.minecraft.core.HolderLookup;
+import net.minecraft.core.HolderOwner;
 import net.minecraft.core.HolderSet;
 import net.minecraft.core.MappedRegistry;
 import net.minecraft.core.Registry;
 import net.minecraft.core.RegistryAccess;
 import net.minecraft.core.registries.Registries;
+import net.minecraft.nbt.NbtUtils;
 import net.minecraft.resources.Identifier;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.dedicated.DedicatedServerProperties;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.tags.TagKey;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.MobCategory;
@@ -91,6 +108,7 @@ public final class ApisHooks {
         .startInstant()
         .map(Instant::toEpochMilli)
         .orElse(-1L);
+    private static final AtomicBoolean WARNED_OLD_WORLD_NO_DFU = new AtomicBoolean(false);
 
     private ApisHooks() {
     }
@@ -207,10 +225,12 @@ public final class ApisHooks {
         if (Registries.WORLD_PRESET.equals(registryKey) || Registries.FLAT_LEVEL_GENERATOR_PRESET.equals(registryKey)) {
             return FeatureRegistry.isStandaloneMode();
         }
-        if (Registries.CARVER.equals(registryKey)
-            || Registries.FEATURE.equals(registryKey)
-            || Registries.PLACED_FEATURE.equals(registryKey)) {
+        if (Registries.CARVER.equals(registryKey)) {
             return FeatureRegistry.isDisabled(Feature.CHUNKS_BIOME_DECORATION);
+        }
+        if (Registries.FEATURE.equals(registryKey) || Registries.PLACED_FEATURE.equals(registryKey)) {
+            return FeatureRegistry.isDisabled(Feature.CHUNKS_BIOME_DECORATION)
+                && FeatureRegistry.isDisabled(Feature.CHUNKS_STRUCTURES);
         }
         if (Registries.STRUCTURE.equals(registryKey)
             || Registries.STRUCTURE_SET.equals(registryKey)
@@ -241,6 +261,140 @@ public final class ApisHooks {
             return (Decoder<T>) Biome.NETWORK_CODEC;
         }
         return vanillaDecoder;
+    }
+
+    /**
+     * Checks whether registration lookups during datapack loading should avoid allocating unbound holders.
+     *
+     * @param registryKey registry key
+     * @return {@code true} when referencing pruned recipes must fail cleanly instead of creating unbound holders
+     */
+    public static boolean shouldSkipUnboundRegistrationLookup(final ResourceKey<? extends Registry<?>> registryKey) {
+        return Registries.RECIPE.equals(registryKey) && FeatureRegistry.isDisabled(Feature.GAMEPLAY_RECIPES);
+    }
+
+    /**
+     * Returns a read-only registration lookup that never allocates unbound holders for pruned registries.
+     *
+     * @param registry target registry
+     * @param <T>      element type
+     * @return non-mutating {@link HolderGetter}
+     */
+    public static <T> HolderGetter<T> createEmptyReadOnlyLookup(final Registry<T> registry) {
+        return new HolderGetter<T>() {
+            @Override
+            public Optional<Holder.Reference<T>> get(final ResourceKey<T> id) {
+                return registry.get(id);
+            }
+
+            @Override
+            public Optional<HolderSet.Named<T>> get(final TagKey<T> id) {
+                return Optional.empty();
+            }
+
+            @Override
+            public boolean canSerialize(final HolderOwner<T> owner) {
+                return registry.canSerialize(owner);
+            }
+        };
+    }
+
+    /**
+     * Checks whether an advancement parse error was caused by pruned structures or recipes and returns
+     * the disabling {@code apis.yml} config key, or {@code null} for unrelated datapack errors.
+     *
+     * @param error exception thrown while parsing the advancement
+     * @return {@code apis.yml} flag reason or {@code null}
+     */
+    public static @Nullable String detectSkippedAdvancementReason(final Throwable error) {
+        final boolean structuresDisabled = FeatureRegistry.isDisabled(Feature.CHUNKS_STRUCTURES);
+        final boolean recipesDisabled = FeatureRegistry.isDisabled(Feature.GAMEPLAY_RECIPES);
+        if (!structuresDisabled && !recipesDisabled) {
+            return null;
+        }
+        final Set<Throwable> visited = Collections.newSetFromMap(new IdentityHashMap<>());
+        final Deque<Throwable> queue = new ArrayDeque<>();
+        queue.add(error);
+        while (!queue.isEmpty()) {
+            final Throwable current = queue.removeFirst();
+            if (!visited.add(current)) {
+                continue;
+            }
+            final @Nullable String message = current.getMessage();
+            if (message != null) {
+                if (structuresDisabled && message.contains("minecraft:worldgen/structure")) {
+                    return Feature.CHUNKS_STRUCTURES.configKey() + "=false";
+                }
+                if (recipesDisabled && message.contains("minecraft:recipe")) {
+                    return Feature.GAMEPLAY_RECIPES.configKey() + "=false";
+                }
+            }
+            if (current.getCause() != null) {
+                queue.addLast(current.getCause());
+            }
+            Collections.addAll(queue, current.getSuppressed());
+        }
+        return null;
+    }
+
+    /**
+     * Logs a single consolidated WARN listing advancements skipped due to pruned structure/recipe registries.
+     *
+     * @param skipped map of skipped advancement ID to {@code apis.yml} reason
+     */
+    public static void warnSkippedAdvancements(final Map<Identifier, String> skipped) {
+        if (skipped.isEmpty()) {
+            return;
+        }
+        final Set<String> reasons = new LinkedHashSet<>(skipped.values());
+        final List<String> ids = new ArrayList<>(skipped.size());
+        for (final Identifier id : skipped.keySet()) {
+            ids.add(id.toString());
+        }
+        Collections.sort(ids);
+        LOGGER.warn(
+            "Skipped {} advancement(s) requiring registries disabled in apis.yml ({}): {}",
+            ids.size(),
+            String.join(", ", reasons),
+            ids
+        );
+    }
+
+    /**
+     * Emits a single startup WARN if {@code startup.datafixers=false} while loading a world saved under an older
+     * Minecraft DataVersion than the running 26.3 server.
+     *
+     * @param worldName        loaded primary world name
+     * @param levelDataUnfixed unfixed {@code level.dat} Data compound
+     */
+    public static void warnIfOldWorldWithoutDataFixers(final String worldName, final Dynamic<?> levelDataUnfixed) {
+        final int worldDataVersion = NbtUtils.getDataVersion(levelDataUnfixed);
+        final int currentDataVersion = SharedConstants.getCurrentVersion().dataVersion().version();
+        warnIfOldWorldVersionMismatch(worldName, worldDataVersion, currentDataVersion);
+    }
+
+    static void warnIfOldWorldVersionMismatch(
+        final String worldName,
+        final int worldDataVersion,
+        final int currentDataVersion
+    ) {
+        if (worldDataVersion < currentDataVersion && WARNED_OLD_WORLD_NO_DFU.compareAndSet(false, true)) {
+            LOGGER.warn(
+                "World '{}' has DataVersion {} (< current {} for 26.3) while {}=false in apis.yml; "
+                    + "old world/player/chunk data will not be migrated and may break or corrupt.",
+                worldName,
+                worldDataVersion > 0 ? Integer.toString(worldDataVersion) : "legacy/unknown",
+                currentDataVersion,
+                Feature.STARTUP_DATAFIXERS.configKey()
+            );
+        }
+    }
+
+    /**
+     * Resets per-run warning deduplication state between unit tests.
+     */
+    public static void resetForTesting() {
+        WARNED_OLD_WORLD_NO_DFU.set(false);
     }
 
     /**
@@ -420,7 +574,7 @@ public final class ApisHooks {
     }
 
     public static boolean isWorldTickDisabled(final Level level) {
-        return FeatureRegistry.isWorldTickDisabled(level.dimension());
+        return FeatureRegistry.isWorldTickDisabled(level.dimension(), !level.players().isEmpty());
     }
 
     // 3. Entities & AI

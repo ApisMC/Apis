@@ -27,3 +27,67 @@
                                  registrationInfo
                              );
                          },
+@@ -65,7 +_,11 @@
+             )
+             .thenAcceptAsync(
+                 loadedEntries -> {
+-                    this.registerElements(loadedEntries.entrySet().stream().sorted(Entry.comparingByKey()).map(Entry::getValue), conversions);
++                    final java.util.stream.Stream<RegistryLoadTask.PendingRegistration<T>> entriesToRegister =
++                        net.minecraft.core.registries.Registries.ADVANCEMENT.equals(this.registryKey())
++                            ? filterPrunedAdvancementEntries(loadedEntries)
++                            : loadedEntries.entrySet().stream().sorted(Entry.comparingByKey()).map(Entry::getValue); // Apis
++                    this.registerElements(entriesToRegister, conversions); // Apis
+                     io.papermc.paper.registry.PaperRegistryAccess.instance().lockReferenceHolders(this.registryKey()); // Paper - lock reference holders
+                     io.papermc.paper.registry.PaperRegistryListenerManager.INSTANCE.runFreezeListeners(this.registryKey(), conversions); // Paper - run pre-freeze listeners
+                     TagLoader.ElementLookup<Holder<T>> tagElementLookup = TagLoader.ElementLookup.fromGetters(
+@@ -76,5 +_,50 @@
+                 },
+                 executor
+             );
++    }
++
++    @SuppressWarnings("unchecked")
++    private static <T> java.util.stream.Stream<RegistryLoadTask.PendingRegistration<T>> filterPrunedAdvancementEntries( // Apis
++        final Map<Identifier, RegistryLoadTask.PendingRegistration<T>> loadedEntries
++    ) {
++        final List<RegistryLoadTask.PendingRegistration<T>> sorted = loadedEntries.entrySet().stream()
++            .sorted(Entry.comparingByKey())
++            .map(Entry::getValue)
++            .toList();
++        final Map<Identifier, String> skipped = new java.util.LinkedHashMap<>();
++        final List<RegistryLoadTask.PendingRegistration<T>> parsedOk = new java.util.ArrayList<>(sorted.size());
++        final List<RegistryLoadTask.PendingRegistration<T>> kept = new java.util.ArrayList<>(sorted.size());
++        for (final RegistryLoadTask.PendingRegistration<T> entry : sorted) {
++            final java.util.Optional<Exception> rightErr = entry.value().right();
++            if (rightErr.isPresent()) {
++                final String reason = org.apismc.apis.hooks.ApisHooks.detectSkippedAdvancementReason(rightErr.get());
++                if (reason != null) {
++                    skipped.put(entry.key().identifier(), reason);
++                    continue;
++                }
++                kept.add(entry);
++            } else {
++                parsedOk.add(entry);
++            }
++        }
++        boolean changed = !skipped.isEmpty();
++        while (changed) {
++            changed = false;
++            final java.util.Iterator<RegistryLoadTask.PendingRegistration<T>> it = parsedOk.iterator();
++            while (it.hasNext()) {
++                final RegistryLoadTask.PendingRegistration<T> entry = it.next();
++                final net.minecraft.advancements.Advancement advancement =
++                    (net.minecraft.advancements.Advancement)entry.value().left().orElseThrow();
++                if (advancement.parent().isPresent() && skipped.containsKey(advancement.parent().get())) {
++                    skipped.put(entry.key().identifier(), skipped.get(advancement.parent().get()));
++                    it.remove();
++                    changed = true;
++                }
++            }
++        }
++        kept.addAll(parsedOk);
++        kept.sort(java.util.Comparator.comparing(entry -> entry.key().identifier()));
++        org.apismc.apis.hooks.ApisHooks.warnSkippedAdvancements(skipped);
++        return kept.stream();
+     }
+ }

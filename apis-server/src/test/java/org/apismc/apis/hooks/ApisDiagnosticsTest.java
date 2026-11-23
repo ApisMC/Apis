@@ -6,6 +6,9 @@ import io.papermc.paper.ServerBuildInfo;
 import io.papermc.paper.ServerBuildInfoImpl;
 import java.io.FileNotFoundException;
 import java.nio.file.NoSuchFileException;
+import net.minecraft.core.registries.Registries;
+import org.apismc.apis.config.ApisConfig;
+import org.apismc.apis.feature.FeatureRegistry;
 import org.bukkit.support.environment.Normal;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
@@ -68,5 +71,38 @@ class ApisDiagnosticsTest {
         assertEquals("Apis", info.brandName());
         assertTrue(info.isBrandCompatible(ServerBuildInfo.BRAND_APIS_ID));
         assertTrue(info.isBrandCompatible(ServerBuildInfo.BRAND_PAPER_ID));
+    }
+
+    @Test
+    void detectsPrunedStructureAndRecipeAdvancementErrors() {
+        final ApisConfig cfg = new ApisConfig();
+        cfg.chunks.structures = false;
+        cfg.gameplay.recipes = false;
+        FeatureRegistry.applyEarly(cfg);
+        try {
+            assertTrue(ApisHooks.shouldSkipUnboundRegistrationLookup(Registries.RECIPE));
+            assertFalse(ApisHooks.shouldSkipUnboundRegistrationLookup(Registries.ADVANCEMENT));
+
+            final IllegalStateException structErr = new IllegalStateException(
+                "Failed to parse minecraft:nether/find_fortress from pack vanilla",
+                new IllegalStateException(
+                    "Failed to get element minecraft:fortress from registry minecraft:worldgen/structure"
+                )
+            );
+            assertEquals("chunks.structures=false", ApisHooks.detectSkippedAdvancementReason(structErr));
+
+            final IllegalStateException recipeErr = new IllegalStateException(
+                "Failed to parse minecraft:recipes/tools/stone_pickaxe from pack vanilla",
+                new IllegalStateException(
+                    "Failed to get element minecraft:stone_pickaxe from registry minecraft:recipe"
+                )
+            );
+            assertEquals("gameplay.recipes=false", ApisHooks.detectSkippedAdvancementReason(recipeErr));
+
+            final IllegalStateException otherErr = new IllegalStateException("Malformed JSON syntax");
+            assertNull(ApisHooks.detectSkippedAdvancementReason(otherErr));
+        } finally {
+            FeatureRegistry.resetForTesting();
+        }
     }
 }

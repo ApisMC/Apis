@@ -46,7 +46,7 @@ public final class ApisConfig {
         "minecraft:the_nether",
         "minecraft:the_end"
     );
-    public static final List<String> DEFAULT_TICKING_DIMENSIONS = List.of("*");
+    public static final List<String> DEFAULT_ALWAYS_TICKING_DIMENSIONS = List.of("minecraft:overworld");
 
     private static final Logger LOGGER = LoggerFactory.getLogger("Minecraft");
     private static final String HEADER = """
@@ -349,7 +349,10 @@ public final class ApisConfig {
         if (this.caches == null) this.caches = new CachesSection();
         if (this.dimensions == null) this.dimensions = new DimensionsSection();
         if (this.dimensions.enabled == null) this.dimensions.enabled = new ArrayList<>(DEFAULT_ENABLED_DIMENSIONS);
-        if (this.dimensions.ticking == null) this.dimensions.ticking = new ArrayList<>(DEFAULT_TICKING_DIMENSIONS);
+        if (this.dimensions.alwaysTicking == null) {
+            this.dimensions.alwaysTicking = new ArrayList<>(DEFAULT_ALWAYS_TICKING_DIMENSIONS);
+        }
+        if (this.dimensions.neverTicking == null) this.dimensions.neverTicking = new ArrayList<>();
         if (this.chunks == null) this.chunks = new ChunksSection();
         if (this.chunks.ticking == null) this.chunks.ticking = new ChunkTickingSection();
         if (this.chunks.ticking.subFeatures == null) this.chunks.ticking.subFeatures = new ChunkTickingSubFeaturesSection();
@@ -501,9 +504,13 @@ public final class ApisConfig {
         @Comment("Positive whitelist of dimensions allowed to load (minecraft:overworld is always protected and loaded; remove the_nether/the_end to skip allocation) | Позитивний білий список вимірів, дозволених до завантаження (minecraft:overworld завжди захищений і завантажується)")
         public List<String> enabled = new ArrayList<>(DEFAULT_ENABLED_DIMENSIONS);
 
-        @Setting("ticking")
-        @Comment("Positive whitelist of loaded dimensions allowed to tick entities & chunks (use '*' for all loaded dimensions) | Позитивний білий список вимірів, де виконуються тіки сутностей і чанків ('*' = усі завантажені світи)")
-        public List<String> ticking = new ArrayList<>(DEFAULT_TICKING_DIMENSIONS);
+        @Setting("always-ticking")
+        @Comment("Dimensions that always tick even with 0 players online (other worlds tick dynamically only while players are inside) | Виміри, що тікають завжди навіть без гравців (інші світи сплять при 0 гравців)")
+        public List<String> alwaysTicking = new ArrayList<>(DEFAULT_ALWAYS_TICKING_DIMENSIONS);
+
+        @Setting("never-ticking")
+        @Comment("Dimensions that never tick even when players are inside (overrides always-ticking and dynamic player-presence ticking) | Виміри, що не тікають ніколи навіть із гравцями (має пріоритет над always-ticking)")
+        public List<String> neverTicking = new ArrayList<>();
 
         @Setting("custom-worlds")
         @Comment("Allow plugins to create or load extra worlds at runtime via CraftServer.createWorld; false = block runtime world creation | Дозволити плагінам створювати або завантажувати додаткові світи; false = заблокувати створення світів")

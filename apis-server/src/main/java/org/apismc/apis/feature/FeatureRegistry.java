@@ -35,7 +35,7 @@ public final class FeatureRegistry {
         "minecraft:the_nether",
         "minecraft:the_end"
     );
-    private static final Set<String> DEFAULT_TICKING_DIMENSION_IDS = Set.of(WILDCARD);
+    private static final Set<String> DEFAULT_ALWAYS_TICKING_DIMENSION_IDS = Set.of("minecraft:overworld");
 
     private static volatile long disabledMask0;
     private static volatile long disabledMask1;
@@ -43,12 +43,15 @@ public final class FeatureRegistry {
     private static volatile Set<String> enabledDimensionIds = DEFAULT_ENABLED_DIMENSION_IDS;
     private static volatile boolean enabledDimensionsWildcard;
     private static volatile boolean overworldOmittedInConfig;
-    private static volatile Set<String> tickingDimensionIds = DEFAULT_TICKING_DIMENSION_IDS;
-    private static volatile boolean tickingDimensionsWildcard = true;
+    private static volatile Set<String> alwaysTickingDimensionIds = DEFAULT_ALWAYS_TICKING_DIMENSION_IDS;
+    private static volatile boolean alwaysTickingWildcard;
+    private static volatile Set<String> neverTickingDimensionIds = Set.of();
+    private static volatile boolean neverTickingWildcard;
     private static volatile Set<String> aiTypeFilterIds = Set.of();
 
     private static volatile Set<ResourceKey<Level>> enabledDimensions = Set.of();
-    private static volatile Set<ResourceKey<Level>> tickingDimensions = Set.of();
+    private static volatile Set<ResourceKey<Level>> alwaysTickingDimensions = Set.of();
+    private static volatile Set<ResourceKey<Level>> neverTickingDimensions = Set.of();
     private static volatile Set<EntityType<?>> aiTypeFilterTypes = Set.of();
     private static volatile boolean registriesResolved;
 
@@ -100,19 +103,36 @@ public final class FeatureRegistry {
     }
 
     /**
-     * Checks whether ticking a dimension is skipped under the {@code dimensions.ticking} positive whitelist.
+     * Checks whether ticking a dimension should be skipped for the current tick.
+     * Priority: {@code dimensions.never-ticking} &gt; {@code dimensions.always-ticking} &gt; dynamic player presence.
      *
      * @param dimensionKey dimension resource key
-     * @return {@code true} if excluded from {@code dimensions.ticking}
+     * @param hasPlayers   whether the dimension currently has at least one player inside
+     * @return {@code true} if {@code level.tick()} should be skipped
      */
-    public static boolean isWorldTickDisabled(final ResourceKey<Level> dimensionKey) {
-        if (tickingDimensionsWildcard) {
+    public static boolean isWorldTickDisabled(final ResourceKey<Level> dimensionKey, final boolean hasPlayers) {
+        if (matchesDimensionFilter(dimensionKey, neverTickingWildcard, neverTickingDimensions, neverTickingDimensionIds)) {
+            return true;
+        }
+        if (matchesDimensionFilter(dimensionKey, alwaysTickingWildcard, alwaysTickingDimensions, alwaysTickingDimensionIds)) {
             return false;
         }
-        if (registriesResolved) {
-            return !tickingDimensions.contains(dimensionKey);
+        return !hasPlayers;
+    }
+
+    private static boolean matchesDimensionFilter(
+        final ResourceKey<Level> dimensionKey,
+        final boolean wildcard,
+        final Set<ResourceKey<Level>> resolvedSet,
+        final Set<String> rawIdSet
+    ) {
+        if (wildcard) {
+            return true;
         }
-        return !tickingDimensionIds.contains(dimensionKey.identifier().toString());
+        if (registriesResolved) {
+            return resolvedSet.contains(dimensionKey);
+        }
+        return rawIdSet.contains(dimensionKey.identifier().toString());
     }
 
     /**
@@ -293,9 +313,13 @@ public final class FeatureRegistry {
             enabledDimensionIds = normalizedEnabledDims;
         }
 
-        final Set<String> normalizedTickDims = normalizeDimensionIds(config.dimensions.ticking);
-        tickingDimensionsWildcard = normalizedTickDims.contains(WILDCARD);
-        tickingDimensionIds = normalizedTickDims;
+        final Set<String> normalizedAlwaysTickDims = normalizeDimensionIds(config.dimensions.alwaysTicking);
+        alwaysTickingWildcard = normalizedAlwaysTickDims.contains(WILDCARD);
+        alwaysTickingDimensionIds = normalizedAlwaysTickDims;
+
+        final Set<String> normalizedNeverTickDims = normalizeDimensionIds(config.dimensions.neverTicking);
+        neverTickingWildcard = normalizedNeverTickDims.contains(WILDCARD);
+        neverTickingDimensionIds = normalizedNeverTickDims;
 
         aiTypeFilterIds = normalizeIds(config.entities.ai.typeFilter);
         standaloneMode = ApisConfig.MODE_STANDALONE.equals(config.dimensions.mode);
@@ -332,19 +356,18 @@ public final class FeatureRegistry {
         }
         enabledDimensions = ReferenceSets.unmodifiable(enabledDimSet);
 
-        final ReferenceOpenHashSet<ResourceKey<Level>> tickDimSet = new ReferenceOpenHashSet<>();
-        if (!tickingDimensionsWildcard) {
-            for (final String raw : tickingDimensionIds) {
-                if (WILDCARD.equals(raw)) {
-                    continue;
-                }
-                final ResourceKey<Level> key = parseDimensionKey(raw, "dimensions.ticking", logger);
-                if (key != null) {
-                    tickDimSet.add(key);
-                }
-            }
-        }
-        tickingDimensions = ReferenceSets.unmodifiable(tickDimSet);
+        alwaysTickingDimensions = resolveDimensionFilterSet(
+            alwaysTickingWildcard,
+            alwaysTickingDimensionIds,
+            "dimensions.always-ticking",
+            logger
+        );
+        neverTickingDimensions = resolveDimensionFilterSet(
+            neverTickingWildcard,
+            neverTickingDimensionIds,
+            "dimensions.never-ticking",
+            logger
+        );
 
         final Registry<EntityType<?>> entityRegistry = registryAccess != null
             ? registryAccess.lookupOrThrow(Registries.ENTITY_TYPE)
@@ -385,10 +408,15 @@ public final class FeatureRegistry {
             Collections.sort(sorted);
             active.add("dimensions.enabled=" + sorted);
         }
-        if (!tickingDimensionsWildcard) {
-            final List<String> sorted = new ArrayList<>(tickingDimensionIds);
+        if (!alwaysTickingDimensionIds.equals(DEFAULT_ALWAYS_TICKING_DIMENSION_IDS)) {
+            final List<String> sorted = new ArrayList<>(alwaysTickingDimensionIds);
             Collections.sort(sorted);
-            active.add("dimensions.ticking=" + sorted);
+            active.add("dimensions.always-ticking=" + sorted);
+        }
+        if (!neverTickingDimensionIds.isEmpty()) {
+            final List<String> sorted = new ArrayList<>(neverTickingDimensionIds);
+            Collections.sort(sorted);
+            active.add("dimensions.never-ticking=" + sorted);
         }
         if (!aiTypeFilterIds.isEmpty()) {
             final List<String> sorted = new ArrayList<>(aiTypeFilterIds);
@@ -407,11 +435,14 @@ public final class FeatureRegistry {
         enabledDimensionIds = DEFAULT_ENABLED_DIMENSION_IDS;
         enabledDimensionsWildcard = false;
         overworldOmittedInConfig = false;
-        tickingDimensionIds = DEFAULT_TICKING_DIMENSION_IDS;
-        tickingDimensionsWildcard = true;
+        alwaysTickingDimensionIds = DEFAULT_ALWAYS_TICKING_DIMENSION_IDS;
+        alwaysTickingWildcard = false;
+        neverTickingDimensionIds = Set.of();
+        neverTickingWildcard = false;
         aiTypeFilterIds = Set.of();
         enabledDimensions = Set.of();
-        tickingDimensions = Set.of();
+        alwaysTickingDimensions = Set.of();
+        neverTickingDimensions = Set.of();
         aiTypeFilterTypes = Set.of();
         registriesResolved = false;
         projectileTrackingRange = 32;
@@ -464,6 +495,28 @@ public final class FeatureRegistry {
 
     private static String normalizeNamespace(final String id) {
         return id.contains(":") ? id : "minecraft:" + id;
+    }
+
+    private static Set<ResourceKey<Level>> resolveDimensionFilterSet(
+        final boolean wildcard,
+        final Set<String> rawIds,
+        final String configPath,
+        final Logger logger
+    ) {
+        if (wildcard || rawIds.isEmpty()) {
+            return Set.of();
+        }
+        final ReferenceOpenHashSet<ResourceKey<Level>> resolved = new ReferenceOpenHashSet<>();
+        for (final String raw : rawIds) {
+            if (WILDCARD.equals(raw)) {
+                continue;
+            }
+            final @Nullable ResourceKey<Level> key = parseDimensionKey(raw, configPath, logger);
+            if (key != null) {
+                resolved.add(key);
+            }
+        }
+        return ReferenceSets.unmodifiable(resolved);
     }
 
     private static @Nullable ResourceKey<Level> parseDimensionKey(

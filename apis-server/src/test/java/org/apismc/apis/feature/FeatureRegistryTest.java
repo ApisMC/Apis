@@ -13,6 +13,9 @@ import com.mojang.serialization.DataResult;
 import com.mojang.serialization.Dynamic;
 import com.mojang.serialization.JsonOps;
 import com.mojang.serialization.Lifecycle;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -28,6 +31,7 @@ import net.minecraft.nbt.Tag;
 import net.minecraft.resources.Identifier;
 import net.minecraft.resources.RegistryOps;
 import net.minecraft.resources.ResourceKey;
+import net.minecraft.stats.ServerStatsCounter;
 import net.minecraft.tags.TagKey;
 import net.minecraft.util.datafix.fixes.References;
 import net.minecraft.world.entity.EntityTypes;
@@ -45,6 +49,7 @@ import org.apismc.apis.hooks.ApisHooks;
 import org.bukkit.support.environment.AllFeatures;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 import org.slf4j.LoggerFactory;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -271,7 +276,8 @@ class FeatureRegistryTest {
     void dimensionAndEntityWhitelistsWorkBeforeAndAfterRegistryResolution() {
         final ApisConfig cfg = new ApisConfig();
         cfg.dimensions.enabled = List.of("minecraft:the_end");
-        cfg.dimensions.ticking = List.of("minecraft:overworld", "custom:arena");
+        cfg.dimensions.alwaysTicking = List.of("minecraft:overworld", "custom:arena");
+        cfg.dimensions.neverTicking = List.of("custom:arena", "custom:showcase");
         cfg.entities.ai.typeFilter = List.of("zombie", "minecraft:villager");
 
         FeatureRegistry.applyEarly(cfg);
@@ -280,14 +286,21 @@ class FeatureRegistryTest {
             Registries.DIMENSION,
             Identifier.fromNamespaceAndPath("custom", "arena")
         );
+        final ResourceKey<Level> customShowcase = ResourceKey.create(
+            Registries.DIMENSION,
+            Identifier.fromNamespaceAndPath("custom", "showcase")
+        );
         assertFalse(FeatureRegistry.isDimensionDisabled(Level.OVERWORLD), "Overworld must never be disabled");
         assertFalse(FeatureRegistry.isDimensionDisabled(Level.END));
         assertTrue(FeatureRegistry.isDimensionDisabled(Level.NETHER));
         assertTrue(FeatureRegistry.isDimensionDisabled(customArena));
 
-        assertFalse(FeatureRegistry.isWorldTickDisabled(Level.OVERWORLD));
-        assertFalse(FeatureRegistry.isWorldTickDisabled(customArena));
-        assertTrue(FeatureRegistry.isWorldTickDisabled(Level.NETHER));
+        assertFalse(FeatureRegistry.isWorldTickDisabled(Level.OVERWORLD, false));
+        assertTrue(FeatureRegistry.isWorldTickDisabled(Level.NETHER, false));
+        assertFalse(FeatureRegistry.isWorldTickDisabled(Level.NETHER, true));
+        assertTrue(FeatureRegistry.isWorldTickDisabled(customArena, false));
+        assertTrue(FeatureRegistry.isWorldTickDisabled(customArena, true));
+        assertTrue(FeatureRegistry.isWorldTickDisabled(customShowcase, true));
 
         FeatureRegistry.resolveRegistries(null, LoggerFactory.getLogger("ApisTest"));
 
@@ -295,8 +308,11 @@ class FeatureRegistryTest {
         assertFalse(FeatureRegistry.isDimensionDisabled(Level.END));
         assertTrue(FeatureRegistry.isDimensionDisabled(Level.NETHER));
         assertTrue(FeatureRegistry.isDimensionDisabled(customArena));
-        assertFalse(FeatureRegistry.isWorldTickDisabled(Level.OVERWORLD));
-        assertTrue(FeatureRegistry.isWorldTickDisabled(Level.NETHER));
+        assertFalse(FeatureRegistry.isWorldTickDisabled(Level.OVERWORLD, false));
+        assertTrue(FeatureRegistry.isWorldTickDisabled(Level.NETHER, false));
+        assertFalse(FeatureRegistry.isWorldTickDisabled(Level.NETHER, true));
+        assertTrue(FeatureRegistry.isWorldTickDisabled(customArena, true));
+        assertTrue(FeatureRegistry.isWorldTickDisabled(customShowcase, true));
         assertTrue(FeatureRegistry.isEntityAiDisabled(EntityTypes.ZOMBIE));
         assertTrue(FeatureRegistry.isEntityAiDisabled(EntityTypes.VILLAGER));
         assertFalse(FeatureRegistry.isEntityAiDisabled(EntityTypes.CREEPER));
@@ -433,6 +449,17 @@ class FeatureRegistryTest {
         assertFalse(ApisHooks.shouldPruneRegistryAtLoad(Registries.SLOT_SOURCE));
         assertTrue(ApisHooks.shouldPruneRegistryAtLoad(Registries.WORLD_PRESET));
         assertTrue(ApisHooks.shouldPruneRegistryAtLoad(Registries.FLAT_LEVEL_GENERATOR_PRESET));
+
+        final ApisConfig structuresWithoutDecor = new ApisConfig();
+        structuresWithoutDecor.chunks.structures = true;
+        structuresWithoutDecor.chunks.biomeDecoration = false;
+        FeatureRegistry.applyEarly(structuresWithoutDecor);
+
+        assertFalse(ApisHooks.shouldPruneRegistryAtLoad(Registries.PLACED_FEATURE));
+        assertFalse(ApisHooks.shouldPruneRegistryAtLoad(Registries.FEATURE));
+        assertTrue(ApisHooks.shouldPruneRegistryAtLoad(Registries.CARVER));
+        assertTrue(ApisHooks.isBiomeDecorationDisabled());
+        assertFalse(ApisHooks.isStructuresDisabled());
     }
 
     @Test
@@ -447,5 +474,39 @@ class FeatureRegistryTest {
                 OSNuma.getNativeInstance().getClass().getSimpleName()
             );
         }
+    }
+
+    @Test
+    void statsSavePerformsZeroDiskWritesWhenWorldOrPlayerSavingDisabled(@TempDir final Path tempDir)
+        throws IOException {
+        final Path noWorldSaveFile = tempDir.resolve("no-world-save/stats/player.json");
+        final ApisConfig worldSaveOff = new ApisConfig();
+        worldSaveOff.storage.worldSaving = false;
+        worldSaveOff.players.dataSaving = true;
+        FeatureRegistry.applyEarly(worldSaveOff);
+        assertTrue(ApisHooks.isPlayerDataSavingDisabled());
+        new ServerStatsCounter(null, noWorldSaveFile).save();
+        assertFalse(Files.exists(noWorldSaveFile));
+        assertFalse(Files.exists(noWorldSaveFile.getParent()));
+
+        final Path noPlayerSaveFile = tempDir.resolve("no-player-save/stats/player.json");
+        final ApisConfig playerSaveOff = new ApisConfig();
+        playerSaveOff.storage.worldSaving = true;
+        playerSaveOff.players.dataSaving = false;
+        FeatureRegistry.applyEarly(playerSaveOff);
+        assertTrue(ApisHooks.isPlayerDataSavingDisabled());
+        new ServerStatsCounter(null, noPlayerSaveFile).save();
+        assertFalse(Files.exists(noPlayerSaveFile));
+        assertFalse(Files.exists(noPlayerSaveFile.getParent()));
+
+        final Path enabledFile = tempDir.resolve("enabled/stats/player.json");
+        final ApisConfig bothEnabled = new ApisConfig();
+        bothEnabled.storage.worldSaving = true;
+        bothEnabled.players.dataSaving = true;
+        FeatureRegistry.applyEarly(bothEnabled);
+        assertFalse(ApisHooks.isPlayerDataSavingDisabled());
+        new ServerStatsCounter(null, enabledFile).save();
+        assertTrue(Files.isRegularFile(enabledFile));
+        assertTrue(Files.size(enabledFile) > 0L);
     }
 }
