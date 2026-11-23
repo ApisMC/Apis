@@ -1,14 +1,9 @@
 name: "Setup Environment"
-description: "Checkout repository, setup Java, Gradle and Git identity"
+description: "Setup Java, Gradle and Git identity"
 
 runs:
   using: "composite"
   steps:
-    - name: Checkout repository
-      uses: actions/checkout@v7
-      with:
-        fetch-depth: 0
-
     - name: Setup Java 25
       uses: actions/setup-java@v5
       with:
