@@ -184,6 +184,7 @@ jobs:
           body_path: release-assets/release_notes.md
           draft: false
           prerelease: false
+          make_latest: ${{ github.ref_name == github.event.repository.default_branch && 'true' || 'false' }}
           generate_release_notes: false
           files: |
             release-assets/${{ needs.build.outputs.jar_name }}
